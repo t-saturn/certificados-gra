@@ -1,0 +1,94 @@
+# Raíz del proyecto
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+node_modules/
+dist/
+coverage/
+.vscode/
+.idea/
+*.swp
+
+# Next.js (Frontend) - /app
+app/.next/
+app/out/
+app/node_modules/
+app/.env
+app/.env.local
+app/.env.*.local
+app/.turbo/
+app/.vercel/
+app/.eslintcache
+app/next-env.d.ts
+app/.cache/
+app/build/
+
+# Archivos de sistema o de prueba
+app/npm-debug.log*
+app/yarn-debug.log*
+app/yarn-error.log*
+app/pnpm-debug.log*
+
+# Go (Backend) - /server
+server/bin/
+server/build/
+server/tmp/
+server/vendor/
+server/coverage/
+server/.env
+server/.env.local
+server/.env.*.local
+server/*.log
+server/*.out
+server/*.exe
+server/*.test
+server/go.sum.old
+server/.air.toml
+server/.air/
+server/.idea/
+server/.vscode/
+server/debug
+
+# Compilados y cachés
+server/*.exe
+server/*.dll
+server/*.so
+server/*.dylib
+server/*.test
+server/*.out
+
+# Caché de dependencias
+server/.cache/
+server/.modcache/
+
+# Docker / General
+*.pid
+*.pid.lock
+docker-compose.override.yml
+docker-data/
+.docker/
+.dockerignore
+docker-compose*.yml
+.env.docker
+.env.production
+.env.development
+
+# Test / Reports
+*.coverprofile
+*.testlog
+*.prof
+*.bench
+*.tmp
+
+# Sistema operativo
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
