@@ -45,7 +45,7 @@ server/*.out
 server/*.exe
 server/*.test
 server/go.sum.old
-server/.air.toml
+# server/.air.toml
 server/.air/
 server/.idea/
 server/.vscode/
