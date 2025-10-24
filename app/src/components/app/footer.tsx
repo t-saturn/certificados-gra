@@ -1,10 +1,11 @@
+import Image from 'next/image';
 import { Mail, Phone, MapPin, ExternalLink, Shield, FileText, Globe, Facebook } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import Image from 'next/image';
 
 const ORG_NAME = 'Gobierno Regional de Ayacucho';
-const ORG_SUBTITLE = 'Sistema de authenticacion unica';
+const ORG_SUBTITLE = 'Sistema de Certificados';
 const ORG_ADDRESS = 'Jr. Callao N 122, Ayacucho, Huamanga, Ayacucho';
 const ORG_PHONE = '066-303195';
 const ORG_EMAIL = 'kcalle@regionayacucho.gob.pe';
