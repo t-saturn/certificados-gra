@@ -42,8 +42,8 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
             <div className="flex items-center gap-4 p-6 font-semibold">
               <Image src="/img/logo.png" alt="logo" width={40} height={20} />
               <div className="flex flex-col">
-                <span className="font-bold text-xl">Viaticos</span>
-                <span className="font-light text-muted-foreground text-sm">Sistema de Viaticos de Resoluciones</span>
+                <span className="font-bold text-xl">Certificaciones</span>
+                <span className="font-light text-muted-foreground text-sm">Sistema de Certificaciones</span>
               </div>
             </div>
           ) : (
