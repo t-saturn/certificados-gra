@@ -72,8 +72,8 @@ export default function ParticipantsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="font-bold text-foreground text-3xl">Gestión de Participantes</h1>
-          <p className="text-muted-foreground">Administra los participantes de tus eventos</p>
+          <h1 className="font-bold text-foreground text-xl">Gestión de Participantes</h1>
+          <p className="text-md text-muted-foreground">Administra los participantes de tus eventos</p>
         </div>
         <Link href="/main/participants/upload">
           <Button className="gap-2 bg-primary hover:bg-primary/90 text-white">
@@ -90,7 +90,7 @@ export default function ParticipantsPage() {
       </div>
 
       {/* Participants Table */}
-      <Card className="p-6 border-border overflow-x-auto">
+      <Card className="p-2 border-border overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-border border-b">

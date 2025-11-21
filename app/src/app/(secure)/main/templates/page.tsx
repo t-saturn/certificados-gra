@@ -54,8 +54,8 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="font-bold text-foreground text-3xl">Gestión de Plantillas</h1>
-          <p className="text-muted-foreground">Crea y administra plantillas de certificados y constancias</p>
+          <h1 className="font-bold text-foreground text-xl">Gestión de Plantillas</h1>
+          <p className="text-muted-foreground text-sm">Crea y administra plantillas de certificados y constancias</p>
         </div>
         <Link href="/main/templates/new">
           <Button className="gap-2 bg-primary hover:bg-primary/90 text-white">
@@ -68,7 +68,7 @@ export default function TemplatesPage() {
       {/* Templates Grid */}
       <div className="gap-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {templates.map((template) => (
-          <Card key={template.id} className="hover:shadow-lg p-6 border-border rounded-md transition-shadow">
+          <Card key={template.id} className="hover:shadow-lg p-4 border-border rounded-md transition-shadow">
             <div className="space-y-4">
               {/* Template Header */}
               <div>
