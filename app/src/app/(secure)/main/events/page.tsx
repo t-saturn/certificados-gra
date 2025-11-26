@@ -85,7 +85,7 @@ export default function EventsPage() {
           <h1 className="font-bold text-foreground text-xl">Gestión de Eventos</h1>
           <p className="text-muted-foreground text-sm">Crea y administra tus eventos de certificación</p>
         </div>
-        <Link href="/dashboard/admin/events/new">
+        <Link href="/main/events/new">
           <Button className="gap-2 bg-primary hover:bg-primary/90 text-white">
             <Plus className="w-4 h-4" />
             Nuevo Evento
@@ -127,11 +127,7 @@ export default function EventsPage() {
           </thead>
           <tbody>
             {filteredEvents.map((event) => (
-              <tr
-                key={event.id}
-                className="hover:bg-muted/50 border-border border-b cursor-pointer"
-                onClick={() => router.push(`/dashboard/admin/events/${event.id}/participants`)}
-              >
+              <tr key={event.id} className="hover:bg-muted/50 border-border border-b cursor-pointer" onClick={() => router.push(`/main/events/${event.id}/participants`)}>
                 <td className="p-2">
                   <div className="text-xs">
                     <p className="font-medium text-foreground">{event.name}</p>

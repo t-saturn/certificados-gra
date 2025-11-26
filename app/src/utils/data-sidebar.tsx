@@ -1,5 +1,5 @@
 import { SidebarMenuGroup } from '@/types/sidebar-types';
-import { LayoutDashboard, FileSpreadsheet, ShieldCheck, Settings, Settings2, UserCircle, Signature, Calendar, ChartSpline } from 'lucide-react';
+import { LayoutDashboard, FileSpreadsheet, ShieldCheck, Settings, Signature, Calendar, ChartSpline } from 'lucide-react';
 
 export const baseMenus: SidebarMenuGroup[] = [
   {
@@ -8,7 +8,7 @@ export const baseMenus: SidebarMenuGroup[] = [
       {
         label: 'Panel Principal',
         icon: LayoutDashboard,
-        url: '/main/dashboard',
+        url: '/main',
         roles: ['user', 'admin', 'super_admin'],
       },
       {
@@ -46,24 +46,6 @@ export const baseMenus: SidebarMenuGroup[] = [
         icon: Settings,
         url: '/main/settings',
         roles: ['admin', 'super_admin'],
-      },
-    ],
-  },
-
-  {
-    title: 'Configuración',
-    menu: [
-      {
-        label: 'Ajustes',
-        icon: Settings2,
-        url: '/main/settings',
-        roles: ['user', 'admin', 'super_admin'],
-      },
-      {
-        label: 'Cuenta',
-        icon: UserCircle,
-        url: '/main/account',
-        roles: ['user', 'admin', 'super_admin'],
       },
     ],
   },
