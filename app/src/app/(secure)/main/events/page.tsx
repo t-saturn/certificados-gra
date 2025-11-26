@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useRouter } from 'next/navigation';
 import { Plus, Search, Edit2, Trash2, Eye } from 'lucide-react';
 
 interface Event {
@@ -60,6 +61,8 @@ const mockEvents: Event[] = [
 ];
 
 export default function EventsPage() {
+  const router = useRouter();
+
   const [events, setEvents] = useState<Event[]>(mockEvents);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('Todos');
@@ -124,7 +127,11 @@ export default function EventsPage() {
           </thead>
           <tbody>
             {filteredEvents.map((event) => (
-              <tr key={event.id} className="hover:bg-muted/50 border-border border-b">
+              <tr
+                key={event.id}
+                className="hover:bg-muted/50 border-border border-b cursor-pointer"
+                onClick={() => router.push(`/dashboard/admin/events/${event.id}/participants`)}
+              >
                 <td className="p-2">
                   <div className="text-xs">
                     <p className="font-medium text-foreground">{event.name}</p>
@@ -156,11 +163,19 @@ export default function EventsPage() {
                     {event.status}
                   </span>
                 </td>
-                <td className="p-2 text-right">
+                <td className="p-2 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                    {/* Ver participantes / cargar */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => router.push(`/main/events/${event.id}/participants`)}
+                      title="Gestionar participantes"
+                    >
                       <Eye className="w-4 h-4" />
                     </Button>
+
                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                       <Edit2 className="w-4 h-4" />
                     </Button>

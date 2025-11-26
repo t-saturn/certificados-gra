@@ -1,5 +1,5 @@
 import { SidebarMenuGroup } from '@/types/sidebar-types';
-import { LayoutDashboard, Users, FileSpreadsheet, ShieldCheck, Settings, Settings2, UserCircle, Signature, Calendar, ChartSpline } from 'lucide-react';
+import { LayoutDashboard, FileSpreadsheet, ShieldCheck, Settings, Settings2, UserCircle, Signature, Calendar, ChartSpline } from 'lucide-react';
 
 export const baseMenus: SidebarMenuGroup[] = [
   {
@@ -15,12 +15,6 @@ export const baseMenus: SidebarMenuGroup[] = [
         label: 'Eventos',
         icon: Calendar,
         url: '/main/events',
-        roles: ['admin', 'super_admin'],
-      },
-      {
-        label: 'Participantes',
-        icon: Users,
-        url: '/main/participants',
         roles: ['admin', 'super_admin'],
       },
       {

@@ -9,6 +9,7 @@ import { UploadDropzone } from './_components/upload-dropzone';
 import { UploadFormatHelp } from './_components/upload-format-help';
 import { UploadPreviewTable } from './_components/upload-preview-table';
 import { UploadActions } from './_components/upload-actions';
+import { useParams } from 'next/navigation';
 
 import * as XLSX from 'xlsx';
 import YAML from 'js-yaml';
@@ -24,6 +25,8 @@ type ParseResult = { ok: true; data: ParticipantRecord[] } | { ok: false; error:
 
 export default function UploadParticipantsPage() {
   const router = useRouter();
+  const params = useParams();
+  const eventId = params.id as string;
 
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -162,9 +165,23 @@ export default function UploadParticipantsPage() {
     if (selectedFile) processFile(selectedFile);
   };
 
-  const handleConfirm = () => {
-    console.log('Participantes cargados:', uploadedData);
-    router.push('/dashboard/admin/participants');
+  const handleConfirm = async () => {
+    try {
+      setLoading(true);
+
+      // Aquí mandas al backend:
+      // POST /api/events/{eventId}/participants/bulk
+      // body: uploadedData
+      await fetch(`/api/events/${eventId}/participants/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participants: uploadedData }),
+      });
+
+      router.push(`/dashboard/admin/events/${eventId}/participants`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
