@@ -8,6 +8,7 @@ import (
 	"server/internal/models"
 	"server/pkgs/logger"
 
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
@@ -37,8 +38,14 @@ func SeedUsers(db *gorm.DB) error {
 	}
 
 	for _, su := range seedUsers {
+		// Parsear el string a uuid.UUID
+		parsedID, err := uuid.Parse(su.ID)
+		if err != nil {
+			return fmt.Errorf("ID inválido para el usuario %s (%s): %w", su.Email, su.ID, err)
+		}
+
 		user := models.User{
-			ID:         su.ID, // UUID
+			ID:         parsedID,
 			Email:      su.Email,
 			NationalID: su.DNI,
 		}

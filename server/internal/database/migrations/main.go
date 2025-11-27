@@ -53,17 +53,33 @@ func MigrateUp() error {
 	fmt.Println("▶ Running migrate-up...")
 
 	return db.AutoMigrate(
+		// CORE CERT
 		&models.User{},
 		&models.UserDetail{},
 		&models.Notification{},
-		&models.DocumentType{},
 		&models.DocumentCategory{},
+		&models.DocumentType{},
 		&models.DocumentTemplate{},
 		&models.Event{},
 		&models.EventSchedule{},
 		&models.EventParticipant{},
 		&models.Document{},
 		&models.DocumentPDF{},
+
+		// EVALUATIONS
+		&models.Evaluation{},
+		&models.EvaluationQuestion{},
+		&models.EvaluationAnswer{},
+		&models.EvaluationScore{},
+		&models.EvaluationDoc{},
+
+		// STUDY MATERIALS / REFORCEMENT
+		&models.StudyMaterial{},
+		&models.StudySection{},
+		&models.StudySubsection{},
+		&models.StudyResource{},
+		&models.StudyAnnotation{},
+		&models.StudyProgress{},
 	)
 }
 
@@ -75,6 +91,22 @@ func MigrateDown() error {
 
 	// Orden inverso por dependencias
 	return db.Migrator().DropTable(
+		// STUDY MATERIALS (hijas primero)
+		&models.StudyProgress{},
+		&models.StudyAnnotation{},
+		&models.StudyResource{},
+		&models.StudySubsection{},
+		&models.StudySection{},
+		&models.StudyMaterial{},
+
+		// EVALUATIONS
+		&models.EvaluationDoc{},
+		&models.EvaluationScore{},
+		&models.EvaluationAnswer{},
+		&models.EvaluationQuestion{},
+		&models.Evaluation{},
+
+		// CORE CERT
 		&models.DocumentPDF{},
 		&models.Document{},
 		&models.EventParticipant{},

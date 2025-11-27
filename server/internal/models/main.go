@@ -1,10 +1,16 @@
 package models
 
-import "time"
+import (
+	"time"
 
-// USER (SSO-linked)
+	"github.com/google/uuid"
+)
+
+// CORE: USERS & USER DETAILS
+
+// User = usuario autenticado vía SSO
 type User struct {
-	ID         string    `gorm:"type:uuid;primaryKey"` // UUID
+	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Email      string    `gorm:"size:150;not null;uniqueIndex"`
 	NationalID string    `gorm:"size:20;not null;uniqueIndex"` // DNI from SSO
 	CreatedAt  time.Time `gorm:"not null"`
@@ -14,13 +20,18 @@ type User struct {
 	DocumentTemplates []DocumentTemplate `gorm:"foreignKey:CreatedBy"`
 	Events            []Event            `gorm:"foreignKey:CreatedBy"`
 	Documents         []Document         `gorm:"foreignKey:CreatedBy"`
+
+	// Relaciones con módulo de estudio / evaluaciones
+	Evaluations      []Evaluation      `gorm:"foreignKey:UserID"`
+	StudyAnnotations []StudyAnnotation `gorm:"foreignKey:UserID"`
+	StudyProgresses  []StudyProgress   `gorm:"foreignKey:UserID"`
 }
 
 func (User) TableName() string { return "users" }
 
-// USER DETAILS (beneficiario)
+// UserDetail = beneficiario de certificados (puede o no tener cuenta)
 type UserDetail struct {
-	ID         string    `gorm:"type:uuid;primaryKey"`         // UUID
+	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	NationalID string    `gorm:"size:20;not null;uniqueIndex"` // DNI
 	FirstName  string    `gorm:"size:100;not null"`
 	LastName   string    `gorm:"size:100;not null"`
@@ -38,12 +49,12 @@ func (UserDetail) TableName() string { return "user_details" }
 // NOTIFICATIONS
 
 type Notification struct {
-	ID               string  `gorm:"type:uuid;primaryKey"` // UUID
-	UserID           string  `gorm:"type:uuid;not null;index"`
-	Title            string  `gorm:"size:200;not null"`
-	Body             string  `gorm:"type:text;not null"`
-	NotificationType *string `gorm:"size:50"` // e.g. EVENT, DOCUMENT
-	IsRead           bool    `gorm:"not null;default:false"`
+	ID               uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID           uuid.UUID `gorm:"type:uuid;not null;index"`
+	Title            string    `gorm:"size:200;not null"`
+	Body             string    `gorm:"type:text;not null"`
+	NotificationType *string   `gorm:"size:50"` // e.g. EVENT, DOCUMENT
+	IsRead           bool      `gorm:"not null;default:false"`
 	ReadAt           *time.Time
 	CreatedAt        time.Time `gorm:"not null"`
 
@@ -55,7 +66,7 @@ func (Notification) TableName() string { return "notifications" }
 // DOCUMENT TYPES, CATEGORIES & TEMPLATES
 
 type DocumentType struct {
-	ID          string    `gorm:"type:uuid;primaryKey"`         // UUID
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Code        string    `gorm:"size:50;not null;uniqueIndex"` // CERTIFICATE, CONSTANCY, RECOGNITION
 	Name        string    `gorm:"size:100;not null"`
 	Description *string   `gorm:"type:text"`
@@ -70,9 +81,9 @@ type DocumentType struct {
 
 func (DocumentType) TableName() string { return "document_types" }
 
-// ⚠️ Categorías se queda con ID numérico autoincremental
+// EXCEPCIÓN: Categorías numéricas autoincrementales
 type DocumentCategory struct {
-	ID          uint      `gorm:"primaryKey;autoIncrement"` // excepción: no UUID
+	ID          uint      `gorm:"primaryKey;autoIncrement"`
 	Name        string    `gorm:"size:100;not null"`
 	Description *string   `gorm:"type:text"`
 	IsActive    bool      `gorm:"not null;default:true"`
@@ -85,16 +96,16 @@ type DocumentCategory struct {
 func (DocumentCategory) TableName() string { return "document_categories" }
 
 type DocumentTemplate struct {
-	ID             string    `gorm:"type:uuid;primaryKey"` // UUID
-	Name           string    `gorm:"size:150;not null"`
-	Description    *string   `gorm:"type:text"`
-	DocumentTypeID string    `gorm:"type:uuid;not null;index"`
-	CategoryID     *uint     `gorm:"index"`             // referencia a DocumentCategory (uint)
-	FilePath       string    `gorm:"size:255;not null"` // template path or URL
-	IsActive       bool      `gorm:"not null;default:true"`
-	CreatedBy      *string   `gorm:"type:uuid;index"` // User ID (UUID)
-	CreatedAt      time.Time `gorm:"not null"`
-	UpdatedAt      time.Time `gorm:"not null"`
+	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name           string     `gorm:"size:150;not null"`
+	Description    *string    `gorm:"type:text"`
+	DocumentTypeID uuid.UUID  `gorm:"type:uuid;not null;index"`
+	CategoryID     *uint      `gorm:"index"`             // FK a DocumentCategory
+	FilePath       string     `gorm:"size:255;not null"` // template path or URL
+	IsActive       bool       `gorm:"not null;default:true"`
+	CreatedBy      *uuid.UUID `gorm:"type:uuid;index"` // User ID
+	CreatedAt      time.Time  `gorm:"not null"`
+	UpdatedAt      time.Time  `gorm:"not null"`
 
 	DocumentType DocumentType      `gorm:"foreignKey:DocumentTypeID"`
 	Category     *DocumentCategory `gorm:"foreignKey:CategoryID"`
@@ -107,16 +118,16 @@ func (DocumentTemplate) TableName() string { return "document_templates" }
 // EVENTS & SCHEDULES
 
 type Event struct {
-	ID                  string  `gorm:"type:uuid;primaryKey"` // UUID
-	Title               string  `gorm:"size:200;not null"`
-	Description         *string `gorm:"type:text"`
-	DocumentTypeID      string  `gorm:"type:uuid;not null;index"`
-	Location            string  `gorm:"size:200;not null"`
+	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Title               string    `gorm:"size:200;not null"`
+	Description         *string   `gorm:"type:text"`
+	DocumentTypeID      uuid.UUID `gorm:"type:uuid;not null;index"`
+	Location            string    `gorm:"size:200;not null"`
 	MaxParticipants     *int
 	RegistrationOpenAt  *time.Time
 	RegistrationCloseAt *time.Time
 	Status              string    `gorm:"size:50;not null;default:'PLANNED'"`
-	CreatedBy           string    `gorm:"type:uuid;not null;index"` // User (organizer/admin)
+	CreatedBy           uuid.UUID `gorm:"type:uuid;not null;index"` // User (organizer/admin)
 	CreatedAt           time.Time `gorm:"not null"`
 	UpdatedAt           time.Time `gorm:"not null"`
 
@@ -130,8 +141,8 @@ type Event struct {
 func (Event) TableName() string { return "events" }
 
 type EventSchedule struct {
-	ID            string    `gorm:"type:uuid;primaryKey"` // UUID
-	EventID       string    `gorm:"type:uuid;not null;index"`
+	ID            uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	EventID       uuid.UUID `gorm:"type:uuid;not null;index"`
 	StartDatetime time.Time `gorm:"not null"`
 	EndDatetime   time.Time `gorm:"not null"`
 	CreatedAt     time.Time `gorm:"not null"`
@@ -142,9 +153,9 @@ type EventSchedule struct {
 func (EventSchedule) TableName() string { return "event_schedules" }
 
 type EventParticipant struct {
-	ID                 string    `gorm:"type:uuid;primaryKey"` // UUID
-	EventID            string    `gorm:"type:uuid;not null;index:idx_event_userdetail,unique"`
-	UserDetailID       string    `gorm:"type:uuid;not null;index:idx_event_userdetail,unique"`
+	ID                 uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	EventID            uuid.UUID `gorm:"type:uuid;not null;index:idx_event_userdetail,unique"`
+	UserDetailID       uuid.UUID `gorm:"type:uuid;not null;index:idx_event_userdetail,unique"`
 	RegistrationSource *string   `gorm:"size:50"`                               // SELF, IMPORTED, ADMIN
 	RegistrationStatus string    `gorm:"size:50;not null;default:'REGISTERED'"` // REGISTERED, WAITLIST, CANCELLED
 	AttendanceStatus   string    `gorm:"size:50;not null;default:'PENDING'"`    // PRESENT, ABSENT, PENDING
@@ -160,21 +171,21 @@ func (EventParticipant) TableName() string { return "event_participants" }
 // DOCUMENTS & PDF STORAGE
 
 type Document struct {
-	ID                     string    `gorm:"type:uuid;primaryKey"` // UUID
-	UserDetailID           string    `gorm:"type:uuid;not null;index"`
-	EventID                *string   `gorm:"type:uuid;index"` // nullable for ad-hoc documents
-	DocumentTypeID         string    `gorm:"type:uuid;not null;index"`
-	TemplateID             *string   `gorm:"type:uuid;index"`
-	SerialCode             string    `gorm:"size:100;not null;uniqueIndex"`
-	VerificationCode       string    `gorm:"size:100;not null;uniqueIndex"`
-	HashValue              string    `gorm:"size:255;not null"`
-	QRText                 *string   `gorm:"size:255"`
-	QRImagePath            *string   `gorm:"size:255"`
-	IssueDate              time.Time `gorm:"not null"` // date only, but stored as time.Time
+	ID                     uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserDetailID           uuid.UUID  `gorm:"type:uuid;not null;index"`
+	EventID                *uuid.UUID `gorm:"type:uuid;index"` // nullable for ad-hoc documents
+	DocumentTypeID         uuid.UUID  `gorm:"type:uuid;not null;index"`
+	TemplateID             *uuid.UUID `gorm:"type:uuid;index"`
+	SerialCode             string     `gorm:"size:100;not null;uniqueIndex"`
+	VerificationCode       string     `gorm:"size:100;not null;uniqueIndex"`
+	HashValue              string     `gorm:"size:255;not null"`
+	QRText                 *string    `gorm:"size:255"`
+	QRImagePath            *string    `gorm:"size:255"`
+	IssueDate              time.Time  `gorm:"not null"` // date only, but stored as time.Time
 	SignedAt               *time.Time
 	DigitalSignatureStatus string    `gorm:"size:50;not null;default:'PENDING'"` // PENDING, SIGNED, FAILED
 	Status                 string    `gorm:"size:50;not null;default:'ISSUED'"`  // ISSUED, REVOKED, REPLACED
-	CreatedBy              string    `gorm:"type:uuid;not null;index"`           // User who issued
+	CreatedBy              uuid.UUID `gorm:"type:uuid;not null;index"`           // User who issued
 	CreatedAt              time.Time `gorm:"not null"`
 	UpdatedAt              time.Time `gorm:"not null"`
 
@@ -183,20 +194,184 @@ type Document struct {
 	DocumentType  DocumentType      `gorm:"foreignKey:DocumentTypeID"`
 	Template      *DocumentTemplate `gorm:"foreignKey:TemplateID"`
 	CreatedByUser User              `gorm:"foreignKey:CreatedBy"`
-	PDF           DocumentPDF       `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:DocumentID"`
+	PDF           *DocumentPDF      `gorm:"foreignKey:DocumentID"`
+
+	// Relaciones con evaluaciones / estudio
+	Evaluations []Evaluation `gorm:"foreignKey:DocumentID"`
 }
 
 func (Document) TableName() string { return "documents" }
 
 type DocumentPDF struct {
-	ID              string `gorm:"type:uuid;primaryKey"` // UUID
-	DocumentID      string `gorm:"type:uuid;not null;uniqueIndex"`
-	FileName        string `gorm:"size:255;not null"`
-	FilePath        string `gorm:"size:255;not null"`
-	FileHash        string `gorm:"size:255;not null"`
+	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	DocumentID      uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
+	FileName        string    `gorm:"size:255;not null"`
+	FilePath        string    `gorm:"size:255;not null"`
+	FileHash        string    `gorm:"size:255;not null"`
 	FileSizeBytes   *int64
 	StorageProvider *string   `gorm:"size:100"`
 	CreatedAt       time.Time `gorm:"not null"`
 }
 
 func (DocumentPDF) TableName() string { return "document_pdfs" }
+
+// EVALUATIONS
+
+type Evaluation struct {
+	ID          uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null;index"`
+	DocumentID  *uuid.UUID `gorm:"type:uuid;index"` // evaluación asociada a un documento (cert / constancia / etc.)
+	Title       string     `gorm:"type:text;not null"`
+	Description *string    `gorm:"type:text"`
+	Status      string     `gorm:"size:20;not null;default:'pending'"` // pending, answered, reviewed
+	CreatedAt   time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP"`
+	UpdatedAt   time.Time
+
+	User      User                 `gorm:"foreignKey:UserID"`
+	Document  *Document            `gorm:"foreignKey:DocumentID"`
+	Questions []EvaluationQuestion `gorm:"foreignKey:EvaluationID"`
+	Answers   []EvaluationAnswer   `gorm:"foreignKey:EvaluationID"`
+	Scores    []EvaluationScore    `gorm:"foreignKey:EvaluationID"`
+	Docs      []EvaluationDoc      `gorm:"foreignKey:EvaluationID"`
+}
+
+func (Evaluation) TableName() string { return "evaluations" }
+
+type EvaluationQuestion struct {
+	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	EvaluationID   uuid.UUID `gorm:"type:uuid;not null;index"`
+	QuestionNumber int       `gorm:"not null"`
+	QuestionText   string    `gorm:"type:text;not null"`
+	MaxScore       float64   `gorm:"type:numeric(5,2);default:1"`
+	CreatedAt      time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Evaluation Evaluation         `gorm:"foreignKey:EvaluationID"`
+	Answers    []EvaluationAnswer `gorm:"foreignKey:QuestionID"`
+	Scores     []EvaluationScore  `gorm:"foreignKey:QuestionID"`
+}
+
+func (EvaluationQuestion) TableName() string { return "evaluation_questions" }
+
+type EvaluationAnswer struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	EvaluationID uuid.UUID `gorm:"type:uuid;not null;index"`
+	QuestionID   uuid.UUID `gorm:"type:uuid;not null;index"`
+	ResponseText string    `gorm:"type:text"`
+	CreatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Evaluation Evaluation         `gorm:"foreignKey:EvaluationID"`
+	Question   EvaluationQuestion `gorm:"foreignKey:QuestionID"`
+}
+
+func (EvaluationAnswer) TableName() string { return "evaluation_answers" }
+
+type EvaluationScore struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	EvaluationID uuid.UUID `gorm:"type:uuid;not null;index"`
+	QuestionID   uuid.UUID `gorm:"type:uuid;not null;index"`
+	AdminVerdict string    `gorm:"size:20"` // correct, incorrect, partial
+	Score        float64   `gorm:"type:numeric(5,2)"`
+	Remarks      *string   `gorm:"type:text"`
+	ReviewedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Evaluation Evaluation         `gorm:"foreignKey:EvaluationID"`
+	Question   EvaluationQuestion `gorm:"foreignKey:QuestionID"`
+}
+
+func (EvaluationScore) TableName() string { return "evaluation_scores" }
+
+type EvaluationDoc struct {
+	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	EvaluationID    uuid.UUID `gorm:"type:uuid;not null;index"`
+	MarkdownContent string    `gorm:"type:text"`
+	GeneratedAt     time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Evaluation Evaluation `gorm:"foreignKey:EvaluationID"`
+}
+
+func (EvaluationDoc) TableName() string { return "evaluation_docs" }
+
+// STUDY MATERIALS / REFORCEMENT
+
+type StudyMaterial struct {
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Title       string    `gorm:"type:text;not null"`
+	Description *string   `gorm:"type:text"`
+	CreatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+	UpdatedAt   time.Time
+
+	Sections []StudySection `gorm:"foreignKey:MaterialID"`
+}
+
+func (StudyMaterial) TableName() string { return "study_materials" }
+
+type StudySection struct {
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	MaterialID  uuid.UUID `gorm:"type:uuid;not null;index"`
+	Title       string    `gorm:"type:text;not null"`
+	Description *string   `gorm:"type:text"`
+	OrderIndex  *int
+	CreatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Material    StudyMaterial     `gorm:"foreignKey:MaterialID"`
+	Subsections []StudySubsection `gorm:"foreignKey:SectionID"`
+}
+
+func (StudySection) TableName() string { return "study_sections" }
+
+type StudySubsection struct {
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	SectionID   uuid.UUID `gorm:"type:uuid;not null;index"`
+	Title       string    `gorm:"type:text;not null"`
+	Description *string   `gorm:"type:text"`
+	VideoURL    *string   `gorm:"type:text"`
+	OrderIndex  *int
+	CreatedAt   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Section    StudySection      `gorm:"foreignKey:SectionID"`
+	Resources  []StudyResource   `gorm:"foreignKey:SubsectionID"`
+	Notes      []StudyAnnotation `gorm:"foreignKey:SubsectionID"`
+	Progresses []StudyProgress   `gorm:"foreignKey:SubsectionID"`
+}
+
+func (StudySubsection) TableName() string { return "study_subsections" }
+
+type StudyResource struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	SubsectionID uuid.UUID `gorm:"type:uuid;not null;index"`
+	FileName     string    `gorm:"type:text"`
+	FileURL      string    `gorm:"type:text"`
+	FileType     string    `gorm:"size:50"` // pdf, xlsx, zip, etc.
+	CreatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+
+	Subsection StudySubsection `gorm:"foreignKey:SubsectionID"`
+}
+
+func (StudyResource) TableName() string { return "study_resources" }
+
+type StudyAnnotation struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID       uuid.UUID `gorm:"type:uuid;not null;index"`
+	SubsectionID uuid.UUID `gorm:"type:uuid;not null;index"`
+	Content      string    `gorm:"type:text"`
+	CreatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
+	UpdatedAt    time.Time
+
+	User       User            `gorm:"foreignKey:UserID"`
+	Subsection StudySubsection `gorm:"foreignKey:SubsectionID"`
+}
+
+func (StudyAnnotation) TableName() string { return "study_annotations" }
+
+type StudyProgress struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID       uuid.UUID `gorm:"type:uuid;not null;index"`
+	SubsectionID uuid.UUID `gorm:"type:uuid;not null;index"`
+	Completed    bool      `gorm:"not null;default:false"`
+	CompletedAt  *time.Time
+
+	User       User            `gorm:"foreignKey:UserID"`
+	Subsection StudySubsection `gorm:"foreignKey:SubsectionID"`
+}
+
+func (StudyProgress) TableName() string { return "study_progress" }
