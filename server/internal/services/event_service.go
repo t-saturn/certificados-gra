@@ -26,6 +26,10 @@ type EventService interface {
 	RemoveEventParticipant(ctx context.Context, eventID uuid.UUID, participantUserDetailID uuid.UUID, actorID uuid.UUID) (uuid.UUID, string, error)
 	// 👇 nuevo
 	ListEventParticipants(ctx context.Context, eventID uuid.UUID, in dto.ListEventParticipantsQuery) (*dto.ListEventParticipantsResult, error)
+	// 👇 NUEVOS
+	GenerateEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error)
+	SignEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error)
+	PublishEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error)
 }
 
 type eventServiceImpl struct {
@@ -38,6 +42,357 @@ func NewEventService(db *gorm.DB, noti NotificationService) EventService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+func (s *eventServiceImpl) GenerateEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error) {
+	now := time.Now().UTC()
+
+	var event models.Event
+	createdCount := 0
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1) Evento + validaciones
+		if err := tx.Preload("DocumentType").
+			Preload("Template").
+			First(&event, "id = ?", eventID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("event not found")
+			}
+			return err
+		}
+
+		if event.TemplateID == nil {
+			return errors.New("event has no template assigned")
+		}
+
+		// 2) Participantes a procesar
+		userDetails, err := s.getEventParticipantsUserDetails(ctx, tx, eventID, participantIDs)
+		if err != nil {
+			return err
+		}
+		if len(userDetails) == 0 {
+			return errors.New("no participants to generate certificates for")
+		}
+
+		for _, ud := range userDetails {
+			// 3) Evitar duplicados: ya tiene documento de este evento
+			var existing models.Document
+			if err := tx.Where("event_id = ? AND user_detail_id = ?", event.ID, ud.ID).
+				First(&existing).Error; err == nil {
+				// ya existe → omitir
+				continue
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			// 4) Generar códigos (aquí luego puedes implementar tu lógica real)
+			serialCode := "SER-" + uuid.New().String()
+			verificationCode := "VER-" + uuid.New().String()
+			doc := &models.Document{
+				UserDetailID:           ud.ID,
+				EventID:                &event.ID,
+				DocumentTypeID:         event.DocumentTypeID,
+				TemplateID:             event.TemplateID,
+				SerialCode:             serialCode,
+				VerificationCode:       verificationCode,
+				HashValue:              "", // se llenará al generar el PDF
+				QRText:                 nil,
+				IssueDate:              now,
+				SignedAt:               nil,
+				DigitalSignatureStatus: "PENDING_SIGN", // etapa: pendiente de firma
+				Status:                 "GENERATED",    // o "ISSUED", como prefieras
+				CreatedBy:              actorID,
+				CreatedAt:              now,
+				UpdatedAt:              now,
+			}
+
+			if err := tx.Create(doc).Error; err != nil {
+				return err
+			}
+
+			// 5) Crear/actualizar PDF (versión "para firma")
+			pdf := &models.DocumentPDF{
+				DocumentID: doc.ID,
+				FileName:   "draft-" + doc.ID.String() + ".pdf",
+				FileID:     uuid.New(), // ID de archivo (p.ej. en tu file server)
+				FileHash:   "",         // se llenará con el hash real del PDF
+				CreatedAt:  now,
+			}
+
+			// 👉 Aquí deberías llamar a tu servicio de generación de PDF:
+			// - construir el PDF usando la plantilla (event.Template)
+			// - renderizar datos del usuario, evento, etc.
+			// - subir a tu storage y obtener FileID, FileHash, FileSizeBytes, StorageProvider
+			//
+			// EJEMPLO:
+			// pdfBytes := pdfService.GenerateDraft(doc, event, ud)
+			// stored := fileStorage.Upload(pdfBytes)
+			// pdf.FileID = stored.FileID
+			// pdf.FileHash = stored.Hash
+			// pdf.FileSizeBytes = &stored.Size
+			// pdf.StorageProvider = &stored.Provider
+
+			// upsert: si ya hubiera uno (raro), se reemplaza
+			if err := tx.
+				Where("document_id = ?", doc.ID).
+				Assign(pdf).
+				FirstOrCreate(pdf).Error; err != nil {
+				return err
+			}
+
+			createdCount++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", 0, err
+	}
+
+	// Notificar al actor que se generaron certificados (opcional)
+	if s.noti != nil && createdCount > 0 {
+		_ = s.noti.NotifyUser(
+			ctx,
+			actorID,
+			"Certificados generados",
+			"Se generaron certificados en estado pending_sign para el evento: "+event.Title,
+			ptrString("DOCUMENT"),
+		)
+	}
+
+	return event.ID, event.Title, createdCount, nil
+}
+
+func (s *eventServiceImpl) SignEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error) {
+	now := time.Now().UTC()
+
+	var event models.Event
+	signedCount := 0
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("event not found")
+			}
+			return err
+		}
+
+		// Documentos a firmar
+		var docs []models.Document
+		q := tx.Where("event_id = ? AND digital_signature_status = ?", eventID, "PENDING_SIGN")
+
+		if len(participantIDs) > 0 {
+			q = q.Where("user_detail_id IN ?", participantIDs)
+		}
+
+		if err := q.Find(&docs).Error; err != nil {
+			return err
+		}
+		if len(docs) == 0 {
+			return errors.New("no certificates in pending_sign state to sign")
+		}
+
+		for i := range docs {
+			doc := &docs[i]
+
+			// 👉 Aquí llamas a tu servicio de firma digital:
+			// - descargar el PDF actual (DocumentPDF)
+			// - aplicar firma digital
+			// - subir el PDF firmado y actualizar FileID, FileHash, etc.
+			//
+			// EJEMPLO:
+			// pdf := current DocumentPDF
+			// signedBytes := signService.Sign(pdfBytes, cert, key)
+			// stored := fileStorage.Upload(signedBytes)
+			// pdf.FileID = stored.FileID
+			// pdf.FileHash = stored.Hash
+			// pdf.FileSizeBytes = &stored.Size
+
+			doc.DigitalSignatureStatus = "SIGNED"
+			doc.SignedAt = &now
+			doc.UpdatedAt = now
+
+			if err := tx.Save(doc).Error; err != nil {
+				return err
+			}
+
+			signedCount++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", 0, err
+	}
+
+	// Notificar al actor
+	if s.noti != nil && signedCount > 0 {
+		_ = s.noti.NotifyUser(
+			ctx,
+			actorID,
+			"Certificados firmados",
+			"Se firmaron certificados del evento: "+event.Title,
+			ptrString("DOCUMENT"),
+		)
+	}
+
+	return event.ID, event.Title, signedCount, nil
+}
+
+func (s *eventServiceImpl) PublishEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error) {
+	now := time.Now().UTC()
+
+	var event models.Event
+	publishedCount := 0
+
+	// guardaremos national_ids para notificar a usuarios con cuenta
+	type userNotify struct {
+		UserID uuid.UUID
+	}
+	var notifyUsers []userNotify
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("event not found")
+			}
+			return err
+		}
+
+		// Documentos firmados a publicar
+		var docs []models.Document
+		q := tx.Where("event_id = ? AND digital_signature_status = ?", eventID, "SIGNED")
+
+		if len(participantIDs) > 0 {
+			q = q.Where("user_detail_id IN ?", participantIDs)
+		}
+
+		if err := q.Find(&docs).Error; err != nil {
+			return err
+		}
+		if len(docs) == 0 {
+			return errors.New("no signed certificates to publish")
+		}
+
+		// Cargar user_details para QR / notificación
+		var userDetails []models.UserDetail
+		if err := tx.Where("id IN ?", collectUserDetailIDs(docs)).
+			Find(&userDetails).Error; err != nil {
+			return err
+		}
+		udByID := make(map[uuid.UUID]models.UserDetail)
+		for _, ud := range userDetails {
+			udByID[ud.ID] = ud
+		}
+
+		for i := range docs {
+			doc := &docs[i]
+			// ud := udByID[doc.UserDetailID]
+
+			// 1) Generar texto del QR (ejemplo)
+			// Aquí puedes incluir URL de verificación + verificationCode + hash, etc.
+			qrText := "https://tu-dominio/verify?code=" + doc.VerificationCode
+
+			doc.QRText = &qrText
+
+			// 2) Calcular hash del PDF final (aquí solo placeholder)
+			// EJEMPLO REAL:
+			// pdfBytes := fileStorage.Download(pdf.FileID)
+			// hash := cryptoService.Hash(pdfBytes)
+			// doc.HashValue = hash
+			doc.HashValue = "HASH_PLACEHOLDER"
+
+			// 3) Marcar como generado/publicado
+			doc.Status = "GENERATED" // o "ISSUED"
+			if doc.IssueDate.IsZero() {
+				doc.IssueDate = now
+			}
+			doc.UpdatedAt = now
+
+			// 4) Actualizar PDF final (con QR embebido)
+			// 👉 Aquí va tu lógica para:
+			// - abrir el PDF firmado
+			// - incrustar el QR
+			// - volver a subir el PDF final
+			//
+			// EJEMPLO:
+			// pdf := current DocumentPDF
+			// finalBytes := pdfService.EmbedQR(signedBytes, qrImage)
+			// stored := fileStorage.Upload(finalBytes)
+			// pdf.FileID = stored.FileID
+			// pdf.FileHash = stored.Hash
+			// pdf.FileSizeBytes = &stored.Size
+
+			if err := tx.Save(doc).Error; err != nil {
+				return err
+			}
+
+			publishedCount++
+		}
+
+		// Preparar usuarios a notificar (tienen cuenta)
+		// JOIN user_details -> users
+		if err := tx.
+			Table("documents AS d").
+			Select("DISTINCT u.id").
+			Joins("JOIN user_details AS ud ON ud.id = d.user_detail_id").
+			Joins("JOIN users AS u ON u.national_id = ud.national_id").
+			Where("d.event_id = ? AND d.digital_signature_status = ? AND d.status = ?", eventID, "SIGNED", "GENERATED").
+			Scan(&notifyUsers).Error; err != nil {
+			// si falla la query de notificaciones, no romper publicacion
+			notifyUsers = nil
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", 0, err
+	}
+
+	// Notificar a los usuarios con cuenta
+	if s.noti != nil && publishedCount > 0 {
+		seen := make(map[uuid.UUID]struct{})
+		for _, nu := range notifyUsers {
+			if _, ok := seen[nu.UserID]; ok {
+				continue
+			}
+			seen[nu.UserID] = struct{}{}
+
+			_ = s.noti.NotifyUser(
+				ctx,
+				nu.UserID,
+				"Certificado disponible",
+				"Tu certificado del evento \""+event.Title+"\" ya está disponible.",
+				ptrString("DOCUMENT"),
+			)
+		}
+
+		// Notificar al actor (admin)
+		_ = s.noti.NotifyUser(
+			ctx,
+			actorID,
+			"Certificados publicados",
+			"Se publicaron certificados del evento: "+event.Title,
+			ptrString("DOCUMENT"),
+		)
+	}
+
+	return event.ID, event.Title, publishedCount, nil
+}
+
+func collectUserDetailIDs(docs []models.Document) []uuid.UUID {
+	m := make(map[uuid.UUID]struct{})
+	for _, d := range docs {
+		m[d.UserDetailID] = struct{}{}
+	}
+	res := make([]uuid.UUID, 0, len(m))
+	for id := range m {
+		res = append(res, id)
+	}
+	return res
 }
 
 func (s *eventServiceImpl) ListEventParticipants(ctx context.Context, eventID uuid.UUID, in dto.ListEventParticipantsQuery) (*dto.ListEventParticipantsResult, error) {
@@ -850,4 +1205,23 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, createdBy uuid.UUID,
 // helper para no repetir &"texto"
 func ptrString(s string) *string {
 	return &s
+}
+
+func (s *eventServiceImpl) getEventParticipantsUserDetails(ctx context.Context, tx *gorm.DB, eventID uuid.UUID, participantIDs []uuid.UUID) ([]models.UserDetail, error) {
+	var rows []models.UserDetail
+
+	q := tx.WithContext(ctx).
+		Table("event_participants AS ep").
+		Joins("JOIN user_details AS ud ON ud.id = ep.user_detail_id").
+		Where("ep.event_id = ?", eventID)
+
+	if len(participantIDs) > 0 {
+		q = q.Where("ud.id IN ?", participantIDs)
+	}
+
+	if err := q.Select("ud.*").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }

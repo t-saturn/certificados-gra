@@ -195,7 +195,6 @@ type Document struct {
 	VerificationCode       string     `gorm:"size:100;not null;uniqueIndex"`
 	HashValue              string     `gorm:"size:255;not null"`
 	QRText                 *string    `gorm:"size:255"`
-	QRImagePath            *string    `gorm:"size:255"`
 	IssueDate              time.Time  `gorm:"not null"` // date only, but stored as time.Time
 	SignedAt               *time.Time
 	DigitalSignatureStatus string    `gorm:"size:50;not null;default:'PENDING'"` // PENDING, SIGNED, FAILED
@@ -210,6 +209,7 @@ type Document struct {
 	Template      *DocumentTemplate `gorm:"foreignKey:TemplateID"`
 	CreatedByUser User              `gorm:"foreignKey:CreatedBy"`
 	PDF           *DocumentPDF      `gorm:"foreignKey:DocumentID"`
+	PDFs          []DocumentPDF     `gorm:"foreignKey:DocumentID"`
 
 	// Relaciones con evaluaciones / estudio
 	Evaluations []Evaluation `gorm:"foreignKey:DocumentID"`

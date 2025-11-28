@@ -21,6 +21,157 @@ func NewEventHandler(svc services.EventService) *EventHandler {
 	return &EventHandler{svc: svc}
 }
 
+// POST /events/:event_id/certificate/generate?user_id=...
+func (h *EventHandler) GenerateCertificates(c fiber.Ctx) (interface{}, string, error) {
+	var req dto.CertificateActionRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return nil, "", fmt.Errorf("invalid request body")
+	}
+
+	eventIDParam := c.Params("event_id")
+	if eventIDParam == "" {
+		return nil, "", fmt.Errorf("missing event_id param")
+	}
+	eventID, err := uuid.Parse(eventIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid event_id")
+	}
+
+	actorIDParam := c.Query("user_id")
+	if actorIDParam == "" {
+		return nil, "", fmt.Errorf("missing user_id query param")
+	}
+	actorID, err := uuid.Parse(actorIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid user_id")
+	}
+
+	evID, evTitle, count, err := h.svc.GenerateEventCertificates(
+		context.Background(),
+		eventID,
+		actorID,
+		req.ParticipantIDs,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := fiber.Map{
+		"id":    evID,
+		"name":  evTitle,
+		"count": count,
+		"message": fmt.Sprintf(
+			"Se generaron %d certificado(s) en estado pending_sign para el evento: %s",
+			count,
+			evTitle,
+		),
+	}
+
+	return data, "ok", nil
+}
+
+// POST /events/:event_id/certificate/sign?user_id=...
+func (h *EventHandler) SignCertificates(c fiber.Ctx) (interface{}, string, error) {
+	var req dto.CertificateActionRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return nil, "", fmt.Errorf("invalid request body")
+	}
+
+	eventIDParam := c.Params("event_id")
+	if eventIDParam == "" {
+		return nil, "", fmt.Errorf("missing event_id param")
+	}
+	eventID, err := uuid.Parse(eventIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid event_id")
+	}
+
+	actorIDParam := c.Query("user_id")
+	if actorIDParam == "" {
+		return nil, "", fmt.Errorf("missing user_id query param")
+	}
+	actorID, err := uuid.Parse(actorIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid user_id")
+	}
+
+	evID, evTitle, count, err := h.svc.SignEventCertificates(
+		context.Background(),
+		eventID,
+		actorID,
+		req.ParticipantIDs,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := fiber.Map{
+		"id":    evID,
+		"name":  evTitle,
+		"count": count,
+		"message": fmt.Sprintf(
+			"Se firmaron %d certificado(s) del evento: %s",
+			count,
+			evTitle,
+		),
+	}
+
+	return data, "ok", nil
+}
+
+// POST /events/:event_id/certificate/publish?user_id=...
+func (h *EventHandler) PublishCertificates(c fiber.Ctx) (interface{}, string, error) {
+	var req dto.CertificateActionRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return nil, "", fmt.Errorf("invalid request body")
+	}
+
+	eventIDParam := c.Params("event_id")
+	if eventIDParam == "" {
+		return nil, "", fmt.Errorf("missing event_id param")
+	}
+	eventID, err := uuid.Parse(eventIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid event_id")
+	}
+
+	actorIDParam := c.Query("user_id")
+	if actorIDParam == "" {
+		return nil, "", fmt.Errorf("missing user_id query param")
+	}
+	actorID, err := uuid.Parse(actorIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid user_id")
+	}
+
+	evID, evTitle, count, err := h.svc.PublishEventCertificates(
+		context.Background(),
+		eventID,
+		actorID,
+		req.ParticipantIDs,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := fiber.Map{
+		"id":    evID,
+		"name":  evTitle,
+		"count": count,
+		"message": fmt.Sprintf(
+			"Se publicaron %d certificado(s) del evento: %s",
+			count,
+			evTitle,
+		),
+	}
+
+	return data, "ok", nil
+}
+
+
 func (h *EventHandler) ListEventParticipants(c fiber.Ctx) (interface{}, string, error) {
 	// event_id por path param /events/:event_id/participant/list
 	eventIDParam := c.Params("event_id")

@@ -113,3 +113,9 @@ type ListEventParticipantsResult struct {
 	Participants []EventParticipantListItem `json:"participants"`
 	Filters      EventParticipantsFilters   `json:"filters"`
 }
+
+// Para acciones de certificados: uno o varios participantes
+// Los IDs son de UserDetail
+type CertificateActionRequest struct {
+	ParticipantIDs []uuid.UUID `json:"participant_ids,omitempty"`
+}
