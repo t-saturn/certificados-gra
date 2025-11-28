@@ -178,7 +178,7 @@ export default function UploadParticipantsPage() {
         body: JSON.stringify({ participants: uploadedData }),
       });
 
-      router.push(`/dashboard/admin/events/${eventId}/participants`);
+      router.push(`/main/events/${eventId}/participants`);
     } finally {
       setLoading(false);
     }
