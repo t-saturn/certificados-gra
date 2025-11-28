@@ -14,5 +14,12 @@ func RegisterEventRoutes(app *fiber.App) {
 	eventService := services.NewEventService(config.DB, notiService)
 	eventHandler := handlers.NewEventHandler(eventService)
 
+	// Crear evento
 	app.Post("/events", httpwrap.Wrap(eventHandler.CreateEvent))
+
+	// Modificar detalles del evento
+	app.Patch("/events/:id", httpwrap.Wrap(eventHandler.UpdateEvent))
+
+	// Listar eventos (paginado + filtros)
+	app.Get("/events", httpwrap.Wrap(eventHandler.ListEvents))
 }

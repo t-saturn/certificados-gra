@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"server/internal/dto"
@@ -14,8 +15,11 @@ import (
 
 type EventService interface {
 	// createdBy = usuario autenticado (organizador/admin)
-	// Devuelve: ID del evento, título del evento
 	CreateEvent(ctx context.Context, createdBy uuid.UUID, in dto.CreateEventRequest) (uuid.UUID, string, error)
+
+	// UpdateEvent: actualiza detalles del evento (no toca participantes)
+	UpdateEvent(ctx context.Context, eventID uuid.UUID, in dto.UpdateEventRequest) (uuid.UUID, string, error)
+	ListEvents(ctx context.Context, in dto.ListEventsQuery) (*dto.ListEventsResult, error)
 }
 
 type eventServiceImpl struct {
@@ -28,6 +32,290 @@ func NewEventService(db *gorm.DB, noti NotificationService) EventService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+func (s *eventServiceImpl) ListEvents(ctx context.Context, in dto.ListEventsQuery) (*dto.ListEventsResult, error) {
+	// Normalizar paginado
+	page := in.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := in.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+
+	offset := (page - 1) * pageSize
+
+	// Normalizar status: scheduled, in_progress, completed → SCHEDULED, IN_PROGRESS, COMPLETED
+	statusFilter := strings.TrimSpace(strings.ToLower(in.Status))
+	var statusValue string
+	switch statusFilter {
+	case "scheduled":
+		statusValue = "SCHEDULED"
+	case "in_progress":
+		statusValue = "IN_PROGRESS"
+	case "completed":
+		statusValue = "COMPLETED"
+	case "", "all":
+		statusValue = "" // sin filtro
+	default:
+		// si manda algo raro, lo tratamos como "all"
+		statusValue = ""
+	}
+
+	search := strings.TrimSpace(in.SearchQuery)
+
+	// ---------- 1) TOTAL ----------
+	var total int64
+	countQuery := s.db.WithContext(ctx).Table("events AS e")
+
+	if search != "" {
+		countQuery = countQuery.Where("e.title ILIKE ?", "%"+search+"%")
+	}
+
+	if statusValue != "" {
+		countQuery = countQuery.Where("e.status = ?", statusValue)
+	}
+
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	if total == 0 {
+		return &dto.ListEventsResult{
+			Events: []dto.EventListItem{},
+			Filters: dto.EventListFilters{
+				Page:        page,
+				PageSize:    pageSize,
+				Total:       0,
+				HasNextPage: false,
+				HasPrevPage: page > 1,
+				SearchQuery: search,
+				Status:      statusFilterOrAll(statusFilter),
+			},
+		}, nil
+	}
+
+	// ---------- 2) LISTA PÁGINA ----------
+	var rows []struct {
+		ID                uuid.UUID
+		Title             string
+		DocumentTypeName  string
+		CategoryName      *string
+		Status            string
+		ParticipantsCount int64
+	}
+
+	listQuery := s.db.WithContext(ctx).
+		Table("events AS e").
+		Select(`
+			e.id,
+			e.title,
+			dt.name AS document_type_name,
+			dc.name AS category_name,
+			e.status,
+			COALESCE(COUNT(ep.id), 0) AS participants_count
+		`).
+		Joins("JOIN document_types AS dt ON dt.id = e.document_type_id").
+		Joins("LEFT JOIN document_templates AS t ON t.id = e.template_id").
+		Joins("LEFT JOIN document_categories AS dc ON dc.id = t.category_id").
+		Joins("LEFT JOIN event_participants AS ep ON ep.event_id = e.id")
+
+	if search != "" {
+		listQuery = listQuery.Where("e.title ILIKE ?", "%"+search+"%")
+	}
+	if statusValue != "" {
+		listQuery = listQuery.Where("e.status = ?", statusValue)
+	}
+
+	if err := listQuery.
+		Group("e.id, e.title, dt.name, dc.name, e.status").
+		Order("e.created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	events := make([]dto.EventListItem, 0, len(rows))
+	for _, r := range rows {
+		item := dto.EventListItem{
+			ID:                r.ID,
+			Name:              r.Title,
+			CategoryName:      r.CategoryName,
+			DocumentTypeName:  r.DocumentTypeName,
+			ParticipantsCount: r.ParticipantsCount,
+			Status:            r.Status,
+		}
+		events = append(events, item)
+	}
+
+	hasNext := int64(page*pageSize) < total
+	hasPrev := page > 1
+
+	res := &dto.ListEventsResult{
+		Events: events,
+		Filters: dto.EventListFilters{
+			Page:        page,
+			PageSize:    pageSize,
+			Total:       total,
+			HasNextPage: hasNext,
+			HasPrevPage: hasPrev,
+			SearchQuery: search,
+			Status:      statusFilterOrAll(statusFilter),
+		},
+	}
+
+	return res, nil
+}
+
+// helper pequeño para normalizar "all"
+func statusFilterOrAll(s string) string {
+	if s == "" {
+		return "all"
+	}
+	return s
+}
+
+func (s *eventServiceImpl) UpdateEvent(ctx context.Context, eventID uuid.UUID, in dto.UpdateEventRequest) (uuid.UUID, string, error) {
+	now := time.Now().UTC()
+	var event models.Event
+
+	// Usamos transacción para asegurar consistencia al cambiar tipo / plantilla
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1) Cargar evento
+		if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("event not found")
+			}
+			return err
+		}
+
+		// 2) Actualizar/validar DocumentType si viene
+		if in.DocumentTypeID != nil {
+			var docType models.DocumentType
+			if err := tx.
+				Where("id = ? AND is_active = TRUE", *in.DocumentTypeID).
+				First(&docType).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errors.New("document_type not found or inactive")
+				}
+				return err
+			}
+
+			event.DocumentTypeID = *in.DocumentTypeID
+		}
+
+		// 3) Actualizar/validar Template si viene
+		if in.TemplateID != nil {
+			var template models.DocumentTemplate
+			if err := tx.
+				Where("id = ? AND is_active = TRUE", *in.TemplateID).
+				First(&template).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errors.New("template not found or inactive")
+				}
+				return err
+			}
+
+			// Validar que el tipo de documento de la plantilla coincida con el del evento
+			documentTypeID := event.DocumentTypeID
+			if in.DocumentTypeID != nil {
+				documentTypeID = *in.DocumentTypeID
+			}
+
+			if template.DocumentTypeID != documentTypeID {
+				return errors.New("template document_type does not match event document_type")
+			}
+
+			event.TemplateID = in.TemplateID
+		}
+
+		// 4) Otros campos simples
+		if in.Title != nil {
+			event.Title = *in.Title
+		}
+		if in.Description != nil {
+			event.Description = in.Description
+		}
+		if in.Location != nil {
+			event.Location = *in.Location
+		}
+		if in.MaxParticipants != nil {
+			event.MaxParticipants = in.MaxParticipants
+		}
+		if in.RegistrationOpenAt != nil {
+			event.RegistrationOpenAt = in.RegistrationOpenAt
+		}
+		if in.RegistrationCloseAt != nil {
+			event.RegistrationCloseAt = in.RegistrationCloseAt
+		}
+		if in.Status != nil && *in.Status != "" {
+			event.Status = *in.Status
+		}
+
+		event.UpdatedAt = now
+
+		if err := tx.Save(&event).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
+	// --- NOTIFICACIONES DESPUÉS DE LA TRANSACCIÓN ---
+
+	// 1) Notificar al organizador
+	if s.noti != nil {
+		_ = s.noti.NotifyUser(
+			ctx,
+			event.CreatedBy,
+			"Evento actualizado",
+			"Se han actualizado los detalles del evento: "+event.Title,
+			ptrString("EVENT"),
+		)
+	}
+
+	// 2) Notificar a participantes que tienen cuenta (User asociado por DNI)
+	if s.noti != nil {
+		type userRow struct {
+			ID uuid.UUID
+		}
+
+		var rows []userRow
+		// event_participants -> user_details -> users (por national_id)
+		if err := s.db.WithContext(ctx).
+			Table("event_participants").
+			Select("users.id").
+			Joins("JOIN user_details ON event_participants.user_detail_id = user_details.id").
+			Joins("JOIN users ON users.national_id = user_details.national_id").
+			Where("event_participants.event_id = ?", eventID).
+			Scan(&rows).Error; err == nil {
+
+			seen := make(map[uuid.UUID]struct{})
+			for _, r := range rows {
+				if _, ok := seen[r.ID]; ok {
+					continue
+				}
+				seen[r.ID] = struct{}{}
+
+				_ = s.noti.NotifyUser(
+					ctx,
+					r.ID,
+					"Detalles de evento actualizados",
+					"Se han actualizado los detalles del evento: "+event.Title,
+					ptrString("EVENT"),
+				)
+			}
+		}
+	}
+
+	return event.ID, event.Title, nil
 }
 
 func (s *eventServiceImpl) CreateEvent(ctx context.Context, createdBy uuid.UUID, in dto.CreateEventRequest) (uuid.UUID, string, error) {
