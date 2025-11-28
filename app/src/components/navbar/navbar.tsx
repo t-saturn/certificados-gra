@@ -13,7 +13,7 @@ const mockNotifications: NotificationItem[] = [
     id: 1,
     title: 'Evento “Capacitación Q2 2024” creado',
     description: 'Ya puedes cargar participantes.',
-    href: '/dashboard/admin/events/1/participants',
+    href: '/main/events/1/participants',
     createdAt: 'Hace 5 min',
     read: false,
   },
