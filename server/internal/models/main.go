@@ -102,13 +102,12 @@ type DocumentTemplate struct {
 	Name           string    `gorm:"size:150;not null"`
 	Description    *string   `gorm:"type:text"`
 	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
-	CategoryID     *uint     `gorm:"index"` // FK a DocumentCategory
+	CategoryID     *uint     `gorm:"index"`
 
-	// ID del archivo en tu servidor de archivos (no guardas URL)
 	FileID uuid.UUID `gorm:"type:uuid;not null"`
 
 	IsActive  bool       `gorm:"not null;default:true"`
-	CreatedBy *uuid.UUID `gorm:"type:uuid;index"` // User ID
+	CreatedBy *uuid.UUID `gorm:"type:uuid;index"`
 	CreatedAt time.Time  `gorm:"not null"`
 	UpdatedAt time.Time  `gorm:"not null"`
 
@@ -116,6 +115,9 @@ type DocumentTemplate struct {
 	Category     *DocumentCategory `gorm:"foreignKey:CategoryID"`
 	User         *User             `gorm:"foreignKey:CreatedBy"`
 	Documents    []Document        `gorm:"foreignKey:TemplateID"`
+
+	// NUEVO: eventos que usan esta plantilla
+	Events []Event `gorm:"foreignKey:TemplateID"`
 }
 
 func (DocumentTemplate) TableName() string { return "document_templates" }
@@ -123,20 +125,28 @@ func (DocumentTemplate) TableName() string { return "document_templates" }
 // EVENTS & SCHEDULES
 
 type Event struct {
-	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Title               string    `gorm:"size:200;not null"`
-	Description         *string   `gorm:"type:text"`
-	DocumentTypeID      uuid.UUID `gorm:"type:uuid;not null;index"`
-	Location            string    `gorm:"size:200;not null"`
+	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Title          string    `gorm:"size:200;not null"`
+	Description    *string   `gorm:"type:text"`
+	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
+
+	// NUEVO: plantilla asociada al evento (opcional)
+	TemplateID *uuid.UUID `gorm:"type:uuid;index"`
+
+	Location            string `gorm:"size:200;not null"`
 	MaxParticipants     *int
 	RegistrationOpenAt  *time.Time
 	RegistrationCloseAt *time.Time
-	Status              string    `gorm:"size:50;not null;default:'PLANNED'"`
+	Status              string    `gorm:"size:50;not null;default:'SCHEDULED'"`
 	CreatedBy           uuid.UUID `gorm:"type:uuid;not null;index"` // User (organizer/admin)
 	CreatedAt           time.Time `gorm:"not null"`
 	UpdatedAt           time.Time `gorm:"not null"`
 
-	DocumentType      DocumentType       `gorm:"foreignKey:DocumentTypeID"`
+	DocumentType DocumentType `gorm:"foreignKey:DocumentTypeID"`
+
+	// NUEVO: relación con la plantilla
+	Template *DocumentTemplate `gorm:"foreignKey:TemplateID"`
+
 	User              User               `gorm:"foreignKey:CreatedBy"`
 	Schedules         []EventSchedule    `gorm:"foreignKey:EventID"`
 	EventParticipants []EventParticipant `gorm:"foreignKey:EventID"`
