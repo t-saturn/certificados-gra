@@ -17,11 +17,15 @@ type TemplateService interface {
 }
 
 type templateServiceImpl struct {
-	db *gorm.DB
+	db   *gorm.DB
+	noti NotificationService
 }
 
-func NewTemplateService(db *gorm.DB) TemplateService {
-	return &templateServiceImpl{db: db}
+func NewTemplateService(db *gorm.DB, noti NotificationService) TemplateService {
+	return &templateServiceImpl{
+		db:   db,
+		noti: noti,
+	}
 }
 
 func (s *templateServiceImpl) CreateTemplate(ctx context.Context, userID uuid.UUID, in dto.CreateTemplateRequest) (*models.DocumentTemplate, error) {
@@ -83,5 +87,17 @@ func (s *templateServiceImpl) CreateTemplate(ctx context.Context, userID uuid.UU
 		return nil, fmt.Errorf("error creating template: %w", err)
 	}
 
+	// Crear notificación
+	notifType := "TEMPLATE" // o "DOCUMENT_TEMPLATE", lo que prefieras
+	title := "Nueva plantilla creada"
+	body := fmt.Sprintf("Se ha creado la plantilla '%s'.", template.Name)
+
+	if err := s.noti.NotifyUser(ctx, userID, title, body, &notifType); err != nil {
+		// Aquí decides: ¿si falla la notificación, fallas todo o solo logueas?
+		// Por ahora devolvemos el error para verlo en desarrollo:
+		return nil, fmt.Errorf("template created but failed to create notification: %w", err)
+	}
+
 	return template, nil
+
 }

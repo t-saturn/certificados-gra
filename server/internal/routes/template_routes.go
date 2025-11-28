@@ -11,9 +11,9 @@ import (
 
 // RegisterTemplateRoutes registra las rutas relacionadas a plantillas
 func RegisterTemplateRoutes(app *fiber.App) {
-	templateService := services.NewTemplateService(config.DB)
+	notificationService := services.NewNotificationService(config.DB)
+	templateService := services.NewTemplateService(config.DB, notificationService)
 	templateHandler := handlers.NewTemplateHandler(templateService)
 
-	// POST /template?user_id=<uuid>
 	app.Post("/template", httpwrap.Wrap(templateHandler.CreateTemplate))
 }
