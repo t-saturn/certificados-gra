@@ -16,4 +16,5 @@ func RegisterTemplateRoutes(app *fiber.App) {
 	templateHandler := handlers.NewTemplateHandler(templateService)
 
 	app.Post("/template", httpwrap.Wrap(templateHandler.CreateTemplate))
+	app.Get("/templates", httpwrap.Wrap(templateHandler.ListTemplates))
 }

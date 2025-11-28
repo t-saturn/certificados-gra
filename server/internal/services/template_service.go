@@ -14,8 +14,8 @@ import (
 
 type TemplateService interface {
 	CreateTemplate(ctx context.Context, userID uuid.UUID, in dto.CreateTemplateRequest) (*models.DocumentTemplate, error)
+	ListTemplates(ctx context.Context, params dto.TemplateListQuery) (*dto.TemplateListResponse, error)
 }
-
 type templateServiceImpl struct {
 	db   *gorm.DB
 	noti NotificationService
@@ -26,6 +26,139 @@ func NewTemplateService(db *gorm.DB, noti NotificationService) TemplateService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+func (s *templateServiceImpl) ListTemplates(ctx context.Context, params dto.TemplateListQuery) (*dto.TemplateListResponse, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	// Normalizar page y page_size
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	var docTypeID *uuid.UUID
+
+	// Si viene type (CERTIFICATE, CONSTANCY, etc.), buscamos su ID
+	if params.Type != nil && *params.Type != "" {
+		var dt models.DocumentType
+		err := s.db.WithContext(ctx).
+			Where("code = ?", *params.Type).
+			First(&dt).Error
+
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				// No existe ese tipo → lista vacía pero sin error
+				filters := dto.TemplateListFilters{
+					Page:        page,
+					PageSize:    pageSize,
+					Total:       0,
+					HasNextPage: false,
+					HasPrevPage: page > 1,
+					SearchQuery: params.SearchQuery,
+					Type:        params.Type,
+				}
+				return &dto.TemplateListResponse{
+					Data:    []dto.TemplateItem{},
+					Filters: filters,
+				}, nil
+			}
+			return nil, fmt.Errorf("error buscando document_type '%s': %w", *params.Type, err)
+		}
+
+		docTypeID = &dt.ID
+	}
+
+	// Construir query base
+	query := s.db.WithContext(ctx).
+		Model(&models.DocumentTemplate{}).
+		Preload("DocumentType").
+		Preload("Category")
+
+	// Filtro por tipo
+	if docTypeID != nil {
+		query = query.Where("document_type_id = ?", *docTypeID)
+	}
+
+	// Filtro por búsqueda en nombre
+	if params.SearchQuery != nil && *params.SearchQuery != "" {
+		q := "%" + *params.SearchQuery + "%"
+		query = query.Where("name ILIKE ?", q)
+	}
+
+	// Contar total
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, fmt.Errorf("error contando plantillas: %w", err)
+	}
+
+	// Paginación
+	offset := (page - 1) * pageSize
+
+	var templates []models.DocumentTemplate
+	if err := query.
+		Order("created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&templates).Error; err != nil {
+		return nil, fmt.Errorf("error obteniendo plantillas: %w", err)
+	}
+
+	// Mapear a DTOs
+	items := make([]dto.TemplateItem, 0, len(templates))
+	for _, t := range templates {
+		var categoryName *string
+		if t.Category != nil {
+			name := t.Category.Name
+			categoryName = &name
+		}
+
+		item := dto.TemplateItem{
+			ID:               t.ID,
+			Name:             t.Name,
+			Description:      t.Description,
+			DocumentTypeID:   t.DocumentTypeID,
+			DocumentTypeCode: t.DocumentType.Code,
+			DocumentTypeName: t.DocumentType.Name,
+			CategoryID:       t.CategoryID,
+			CategoryName:     categoryName,
+			FileID:           t.FileID,
+			IsActive:         t.IsActive,
+			CreatedBy:        t.CreatedBy,
+			CreatedAt:        t.CreatedAt,
+			UpdatedAt:        t.UpdatedAt,
+		}
+
+		items = append(items, item)
+	}
+
+	hasNext := int64(page*pageSize) < total
+	hasPrev := page > 1
+
+	filters := dto.TemplateListFilters{
+		Page:        page,
+		PageSize:    pageSize,
+		Total:       total,
+		HasNextPage: hasNext,
+		HasPrevPage: hasPrev,
+		SearchQuery: params.SearchQuery,
+		Type:        params.Type,
+	}
+
+	return &dto.TemplateListResponse{
+		Data:    items,
+		Filters: filters,
+	}, nil
 }
 
 func (s *templateServiceImpl) CreateTemplate(ctx context.Context, userID uuid.UUID, in dto.CreateTemplateRequest) (*models.DocumentTemplate, error) {

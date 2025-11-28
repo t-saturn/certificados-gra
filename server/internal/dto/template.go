@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // CreateTemplateRequest representa el body del POST /template
 type CreateTemplateRequest struct {
@@ -17,4 +21,46 @@ type TemplateCreatedResponse struct {
 	Name string    `json:"name"`
 	// Puedes agregar más si quieres, pero sin anidar DocumentType
 	Message string `json:"message"`
+}
+
+// Query params normalizados
+type TemplateListQuery struct {
+	Page        int
+	PageSize    int
+	SearchQuery *string
+	Type        *string // código del tipo, ej: CERTIFICATE
+}
+
+// Item de la lista
+type TemplateItem struct {
+	ID               uuid.UUID  `json:"id"`
+	Name             string     `json:"name"`
+	Description      *string    `json:"description,omitempty"`
+	DocumentTypeID   uuid.UUID  `json:"document_type_id"`
+	DocumentTypeCode string     `json:"document_type_code"`
+	DocumentTypeName string     `json:"document_type_name"`
+	CategoryID       *uint      `json:"category_id,omitempty"`
+	CategoryName     *string    `json:"category_name,omitempty"`
+	FileID           uuid.UUID  `json:"file_id"`
+	IsActive         bool       `json:"is_active"`
+	CreatedBy        *uuid.UUID `json:"created_by,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+// Info de paginación y filtros usados
+type TemplateListFilters struct {
+	Page        int     `json:"page"`
+	PageSize    int     `json:"page_size"`
+	Total       int64   `json:"total"`
+	HasNextPage bool    `json:"has_next_page"`
+	HasPrevPage bool    `json:"has_prev_page"`
+	SearchQuery *string `json:"search_query,omitempty"`
+	Type        *string `json:"type,omitempty"`
+}
+
+// Lo que devolverá el handler dentro de "data"
+type TemplateListResponse struct {
+	Data    []TemplateItem      `json:"data"`
+	Filters TemplateListFilters `json:"filters"`
 }

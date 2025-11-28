@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"server/internal/dto"
 	"server/internal/services"
@@ -18,6 +20,51 @@ type TemplateHandler struct {
 
 func NewTemplateHandler(service services.TemplateService) *TemplateHandler {
 	return &TemplateHandler{service: service}
+}
+
+// GET /templates?search_query=&page=&page_size=&type=
+func (h *TemplateHandler) ListTemplates(c fiber.Ctx) (interface{}, string, error) {
+	// page
+	pageStr := c.Query("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	// page_size
+	pageSizeStr := c.Query("page_size", "10")
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize <= 0 {
+		pageSize = 10
+	}
+
+	// search_query
+	var searchQueryPtr *string
+	if q := strings.TrimSpace(c.Query("search_query")); q != "" {
+		searchQueryPtr = &q
+	}
+
+	// type (código, ej: CERTIFICATE, CONSTANCY)
+	var typePtr *string
+	if t := strings.TrimSpace(c.Query("type")); t != "" {
+		upper := strings.ToUpper(t)
+		typePtr = &upper
+	}
+
+	params := dto.TemplateListQuery{
+		Page:        page,
+		PageSize:    pageSize,
+		SearchQuery: searchQueryPtr,
+		Type:        typePtr,
+	}
+
+	ctx := context.Background()
+	resp, err := h.service.ListTemplates(ctx, params)
+	if err != nil {
+		return nil, "error", err
+	}
+
+	return resp, "ok", nil
 }
 
 // POST /template?user_id=<uuid>
