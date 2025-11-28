@@ -18,18 +18,25 @@ type CreateEventParticipantRequest struct {
 	AttendanceStatus   *string `json:"attendance_status,omitempty"`   // por defecto: PENDING
 }
 
-// Request principal para crear evento
+type CreateEventScheduleRequest struct {
+	StartDatetime time.Time `json:"start_datetime"`
+	EndDatetime   time.Time `json:"end_datetime"`
+}
+
 type CreateEventRequest struct {
 	Title               string                          `json:"title"`
 	Description         *string                         `json:"description,omitempty"`
 	DocumentTypeID      uuid.UUID                       `json:"document_type_id"`
-	TemplateID          *uuid.UUID                      `json:"template_id,omitempty"` // opcional
+	TemplateID          *uuid.UUID                      `json:"template_id,omitempty"`
 	Location            string                          `json:"location"`
 	MaxParticipants     *int                            `json:"max_participants,omitempty"`
 	RegistrationOpenAt  *time.Time                      `json:"registration_open_at,omitempty"`
 	RegistrationCloseAt *time.Time                      `json:"registration_close_at,omitempty"`
-	Status              *string                         `json:"status,omitempty"` // opcional, default: SCHEDULED
+	Status              *string                         `json:"status,omitempty"`
 	Participants        []CreateEventParticipantRequest `json:"participants,omitempty"`
+
+	// NUEVO: arreglo de bloques de horario
+	Schedules []CreateEventScheduleRequest `json:"schedules"`
 }
 
 type UpdateEventRequest struct {
@@ -42,9 +49,9 @@ type UpdateEventRequest struct {
 	RegistrationOpenAt  *time.Time `json:"registration_open_at,omitempty"`
 	RegistrationCloseAt *time.Time `json:"registration_close_at,omitempty"`
 	Status              *string    `json:"status,omitempty"`
-}
 
-// ... CreateEventParticipantRequest, CreateEventRequest, UpdateEventRequest, etc.
+	Schedules *[]CreateEventScheduleRequest `json:"schedules,omitempty"`
+}
 
 type ListEventsQuery struct {
 	SearchQuery string
@@ -53,13 +60,19 @@ type ListEventsQuery struct {
 	PageSize    int
 }
 
+type EventScheduleItem struct {
+	StartDatetime time.Time `json:"start_datetime"`
+	EndDatetime   time.Time `json:"end_datetime"`
+}
+
 type EventListItem struct {
-	ID                uuid.UUID `json:"id"`
-	Name              string    `json:"name"`
-	CategoryName      *string   `json:"category_name,omitempty"`
-	DocumentTypeName  string    `json:"document_type_name"`
-	ParticipantsCount int64     `json:"participants_count"`
-	Status            string    `json:"status"`
+	ID                uuid.UUID           `json:"id"`
+	Name              string              `json:"name"`
+	CategoryName      *string             `json:"category_name,omitempty"`
+	DocumentTypeName  string              `json:"document_type_name"`
+	ParticipantsCount int64               `json:"participants_count"`
+	Status            string              `json:"status"`
+	Schedules         []EventScheduleItem `json:"schedules"`
 }
 
 type EventListFilters struct {

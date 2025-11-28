@@ -125,13 +125,15 @@ func (DocumentTemplate) TableName() string { return "document_templates" }
 
 // EVENTS & SCHEDULES
 
+// EVENTS & SCHEDULES
+
 type Event struct {
 	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Title          string    `gorm:"size:200;not null"`
 	Description    *string   `gorm:"type:text"`
 	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
 
-	// NUEVO: plantilla asociada al evento (opcional)
+	// Plantilla asociada al evento (opcional)
 	TemplateID *uuid.UUID `gorm:"type:uuid;index"`
 
 	Location            string `gorm:"size:200;not null"`
@@ -143,12 +145,10 @@ type Event struct {
 	CreatedAt           time.Time `gorm:"not null"`
 	UpdatedAt           time.Time `gorm:"not null"`
 
-	DocumentType DocumentType `gorm:"foreignKey:DocumentTypeID"`
+	DocumentType DocumentType      `gorm:"foreignKey:DocumentTypeID"`
+	Template     *DocumentTemplate `gorm:"foreignKey:TemplateID"`
+	User         User              `gorm:"foreignKey:CreatedBy"`
 
-	// NUEVO: relación con la plantilla
-	Template *DocumentTemplate `gorm:"foreignKey:TemplateID"`
-
-	User              User               `gorm:"foreignKey:CreatedBy"`
 	Schedules         []EventSchedule    `gorm:"foreignKey:EventID"`
 	EventParticipants []EventParticipant `gorm:"foreignKey:EventID"`
 	Documents         []Document         `gorm:"foreignKey:EventID"`

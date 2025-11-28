@@ -171,7 +171,6 @@ func (h *EventHandler) PublishCertificates(c fiber.Ctx) (interface{}, string, er
 	return data, "ok", nil
 }
 
-
 func (h *EventHandler) ListEventParticipants(c fiber.Ctx) (interface{}, string, error) {
 	// event_id por path param /events/:event_id/participant/list
 	eventIDParam := c.Params("event_id")
@@ -386,17 +385,14 @@ func (h *EventHandler) UpdateEvent(c fiber.Ctx) (interface{}, string, error) {
 	return data, "ok", nil
 }
 
-// Compatible con httpwrap.HandlerFunc:
-// type HandlerFunc func(c fiber.Ctx) (data interface{}, message string, err error)
+// Compatible con httpwrap.HandlerFunc
 func (h *EventHandler) CreateEvent(c fiber.Ctx) (interface{}, string, error) {
 	var req dto.CreateEventRequest
 
-	// Fiber v3
 	if err := c.Bind().Body(&req); err != nil {
 		return nil, "", fmt.Errorf("invalid request body")
 	}
 
-	// user_id por query param ?user_id=
 	userIDParam := c.Query("user_id")
 	if userIDParam == "" {
 		return nil, "", fmt.Errorf("missing user_id query param")
@@ -412,13 +408,11 @@ func (h *EventHandler) CreateEvent(c fiber.Ctx) (interface{}, string, error) {
 		return nil, "", err
 	}
 
-	// 🔹 data simple, como pides
 	data := fiber.Map{
 		"id":      eventID,
 		"name":    eventTitle,
 		"message": fmt.Sprintf("Evento registrado con éxito: %s", eventTitle),
 	}
 
-	// este "ok" se va como `message` en dto.Response
 	return data, "ok", nil
 }
