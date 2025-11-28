@@ -22,4 +22,6 @@ func RegisterEventRoutes(app *fiber.App) {
 
 	// Listar eventos (paginado + filtros)
 	app.Get("/events", httpwrap.Wrap(eventHandler.ListEvents))
+	// 🔹 Nuevo endpoint para subir participantes
+	app.Patch("/events/:id/participants/upload", httpwrap.Wrap(eventHandler.UploadParticipants))
 }

@@ -21,6 +21,51 @@ func NewEventHandler(svc services.EventService) *EventHandler {
 	return &EventHandler{svc: svc}
 }
 
+func (h *EventHandler) UploadParticipants(c fiber.Ctx) (interface{}, string, error) {
+	var req dto.UploadEventParticipantsRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return nil, "", fmt.Errorf("invalid request body")
+	}
+
+	if len(req.Participants) == 0 {
+		return nil, "", fmt.Errorf("participants list cannot be empty")
+	}
+
+	// ID del evento por path param /events/:id/participants/upload
+	eventIDParam := c.Params("id")
+	if eventIDParam == "" {
+		return nil, "", fmt.Errorf("missing event id param")
+	}
+
+	eventID, err := uuid.Parse(eventIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid event id")
+	}
+
+	evID, evTitle, count, err := h.svc.UploadEventParticipants(
+		context.Background(),
+		eventID,
+		req.Participants,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := fiber.Map{
+		"id":    evID,
+		"name":  evTitle,
+		"count": count,
+		"message": fmt.Sprintf(
+			"Se registraron %d participante(s) al evento: %s",
+			count,
+			evTitle,
+		),
+	}
+
+	return data, "ok", nil
+}
+
 // GET /events?search_query=...&status=...&page=...&page_size=...
 func (h *EventHandler) ListEvents(c fiber.Ctx) (interface{}, string, error) {
 	searchQuery := c.Query("search_query", "")

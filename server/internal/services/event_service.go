@@ -20,6 +20,8 @@ type EventService interface {
 	// UpdateEvent: actualiza detalles del evento (no toca participantes)
 	UpdateEvent(ctx context.Context, eventID uuid.UUID, in dto.UpdateEventRequest) (uuid.UUID, string, error)
 	ListEvents(ctx context.Context, in dto.ListEventsQuery) (*dto.ListEventsResult, error)
+	// Sube/añade participantes a un evento existente
+	UploadEventParticipants(ctx context.Context, eventID uuid.UUID, participants []dto.CreateEventParticipantRequest) (uuid.UUID, string, int, error)
 }
 
 type eventServiceImpl struct {
@@ -32,6 +34,139 @@ func NewEventService(db *gorm.DB, noti NotificationService) EventService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+func (s *eventServiceImpl) UploadEventParticipants(
+	ctx context.Context,
+	eventID uuid.UUID,
+	participants []dto.CreateEventParticipantRequest,
+) (uuid.UUID, string, int, error) {
+	now := time.Now().UTC()
+
+	var event models.Event
+	participantUserIDs := make(map[uuid.UUID]struct{})
+	addedCount := 0
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1) Verificar que el evento exista
+		if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("event not found")
+			}
+			return err
+		}
+
+		// 2) Procesar participantes
+		for _, p := range participants {
+			if p.NationalID == "" {
+				return errors.New("participant.national_id is required")
+			}
+
+			// a) Buscar / crear UserDetail
+			var userDetail models.UserDetail
+			err := tx.
+				Where("national_id = ?", p.NationalID).
+				First(&userDetail).Error
+
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// No existe → debe crear
+				if p.FirstName == "" || p.LastName == "" {
+					return errors.New("first_name and last_name are required for new participants")
+				}
+
+				userDetail = models.UserDetail{
+					NationalID: p.NationalID,
+					FirstName:  p.FirstName,
+					LastName:   p.LastName,
+					Phone:      p.Phone,
+					Email:      p.Email,
+					CreatedAt:  now,
+					UpdatedAt:  now,
+				}
+
+				if err = tx.Create(&userDetail).Error; err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
+
+			// b) Estados por defecto
+			regStatus := "REGISTERED"
+			if p.RegistrationStatus != nil && *p.RegistrationStatus != "" {
+				regStatus = *p.RegistrationStatus
+			}
+
+			attStatus := "PENDING"
+			if p.AttendanceStatus != nil && *p.AttendanceStatus != "" {
+				attStatus = *p.AttendanceStatus
+			}
+
+			// c) Crear relación EventParticipant (si no existe)
+			participant := &models.EventParticipant{
+				EventID:            event.ID,
+				UserDetailID:       userDetail.ID,
+				RegistrationSource: p.RegistrationSource,
+				RegistrationStatus: regStatus,
+				AttendanceStatus:   attStatus,
+				CreatedAt:          now,
+				UpdatedAt:          now,
+			}
+
+			res := tx.
+				Where("event_id = ? AND user_detail_id = ?", event.ID, userDetail.ID).
+				Attrs(map[string]interface{}{
+					"registration_source": participant.RegistrationSource,
+					"registration_status": participant.RegistrationStatus,
+					"attendance_status":   participant.AttendanceStatus,
+					"created_at":          participant.CreatedAt,
+					"updated_at":          participant.UpdatedAt,
+				}).
+				FirstOrCreate(participant)
+
+			if res.Error != nil {
+				return res.Error
+			}
+
+			// Solo contamos si se creó una nueva relación
+			if res.RowsAffected > 0 {
+				addedCount++
+			}
+
+			// d) Si tiene cuenta (User) con ese DNI → guardar para notificación
+			var user models.User
+			if err := tx.
+				Where("national_id = ?", p.NationalID).
+				First(&user).Error; err == nil {
+				participantUserIDs[user.ID] = struct{}{}
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", 0, err
+	}
+
+	// --- NOTIFICACIONES DESPUÉS DE LA TRANSACCIÓN ---
+
+	// Notificar a participantes que tienen cuenta (User)
+	if s.noti != nil {
+		for uid := range participantUserIDs {
+			_ = s.noti.NotifyUser(
+				ctx,
+				uid,
+				"Inscripción a evento",
+				"Has sido inscrito al evento: "+event.Title,
+				ptrString("EVENT"),
+			)
+		}
+	}
+
+	return event.ID, event.Title, addedCount, nil
 }
 
 func (s *eventServiceImpl) ListEvents(ctx context.Context, in dto.ListEventsQuery) (*dto.ListEventsResult, error) {

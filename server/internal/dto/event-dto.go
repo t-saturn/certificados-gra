@@ -76,3 +76,7 @@ type ListEventsResult struct {
 	Events  []EventListItem  `json:"events"`
 	Filters EventListFilters `json:"filters"`
 }
+
+type UploadEventParticipantsRequest struct {
+	Participants []CreateEventParticipantRequest `json:"participants"`
+}
