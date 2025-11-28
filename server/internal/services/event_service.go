@@ -113,9 +113,11 @@ func (s *eventServiceImpl) GenerateEventCertificates(ctx context.Context, eventI
 			// 5) Crear/actualizar PDF (versión "para firma")
 			pdf := &models.DocumentPDF{
 				DocumentID: doc.ID,
+				Stage:      "draft", // o "pending_sign"
+				Version:    1,       // podrías calcular la versión previa +1 si quieres
 				FileName:   "draft-" + doc.ID.String() + ".pdf",
-				FileID:     uuid.New(), // ID de archivo (p.ej. en tu file server)
-				FileHash:   "",         // se llenará con el hash real del PDF
+				FileID:     uuid.New(),
+				FileHash:   "",
 				CreatedAt:  now,
 			}
 
@@ -132,11 +134,8 @@ func (s *eventServiceImpl) GenerateEventCertificates(ctx context.Context, eventI
 			// pdf.FileSizeBytes = &stored.Size
 			// pdf.StorageProvider = &stored.Provider
 
-			// upsert: si ya hubiera uno (raro), se reemplaza
-			if err := tx.
-				Where("document_id = ?", doc.ID).
-				Assign(pdf).
-				FirstOrCreate(pdf).Error; err != nil {
+			// Siempre creas un nuevo registro
+			if err := tx.Create(pdf).Error; err != nil {
 				return err
 			}
 
@@ -164,13 +163,18 @@ func (s *eventServiceImpl) GenerateEventCertificates(ctx context.Context, eventI
 	return event.ID, event.Title, createdCount, nil
 }
 
-func (s *eventServiceImpl) SignEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error) {
+func (s *eventServiceImpl) SignEventCertificates(
+	ctx context.Context,
+	eventID, actorID uuid.UUID,
+	participantIDs []uuid.UUID,
+) (uuid.UUID, string, int, error) {
 	now := time.Now().UTC()
 
 	var event models.Event
 	signedCount := 0
 
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1) Verificar evento
 		if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("event not found")
@@ -178,9 +182,10 @@ func (s *eventServiceImpl) SignEventCertificates(ctx context.Context, eventID, a
 			return err
 		}
 
-		// Documentos a firmar
+		// 2) Traer documentos en estado pendiente de firma
 		var docs []models.Document
-		q := tx.Where("event_id = ? AND digital_signature_status = ?", eventID, "PENDING_SIGN")
+		q := tx.
+			Where("event_id = ? AND digital_signature_status = ?", eventID, "PENDING_SIGN")
 
 		if len(participantIDs) > 0 {
 			q = q.Where("user_detail_id IN ?", participantIDs)
@@ -196,19 +201,71 @@ func (s *eventServiceImpl) SignEventCertificates(ctx context.Context, eventID, a
 		for i := range docs {
 			doc := &docs[i]
 
-			// 👉 Aquí llamas a tu servicio de firma digital:
-			// - descargar el PDF actual (DocumentPDF)
-			// - aplicar firma digital
-			// - subir el PDF firmado y actualizar FileID, FileHash, etc.
-			//
-			// EJEMPLO:
-			// pdf := current DocumentPDF
-			// signedBytes := signService.Sign(pdfBytes, cert, key)
-			// stored := fileStorage.Upload(signedBytes)
-			// pdf.FileID = stored.FileID
-			// pdf.FileHash = stored.Hash
-			// pdf.FileSizeBytes = &stored.Size
+			// 3) Obtener el último PDF generado para este documento
+			//    Normalmente será el "draft" o "pending_sign".
+			var lastPDF models.DocumentPDF
+			err := tx.
+				Where("document_id = ?", doc.ID).
+				Order("version DESC").
+				First(&lastPDF).Error
 
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+
+			// Si no hay PDF previo, igual continuamos pero con versión base 1
+			nextVersion := 1
+			if err == nil {
+				nextVersion = lastPDF.Version + 1
+			}
+
+			// 4) Aquí iría la lógica REAL de firma digital
+			//    ------------------------------------------------
+			//    Ejemplo conceptual:
+			//
+			//    // 4.1 Descargar el PDF base
+			//    baseBytes := fileStorage.Download(lastPDF.FileID)
+			//
+			//    // 4.2 Firmar con tu servicio de firma
+			//    signedBytes := signService.Sign(baseBytes, signingKey, certChain)
+			//
+			//    // 4.3 Subir el PDF firmado al storage
+			//    stored := fileStorage.Upload(signedBytes)
+			//
+			//    // 4.4 Usar los datos de storage para llenar el PDF firmado
+			//    fileID := stored.FileID
+			//    fileHash := stored.Hash
+			//    fileSize := stored.Size
+			//    provider := stored.Provider
+			//
+			//    ------------------------------------------------
+			//
+			//    Por ahora dejamos placeholders (para que no falle
+			//    compilar) y solo sepas dónde enganchar tu servicio:
+
+			fileID := uuid.New()        // <- reemplazar por ID real del storage
+			fileHash := "HASH_SIGNED"   // <- reemplazar por hash real del PDF firmado
+			var fileSize *int64         // <- tamaño en bytes, si lo tienes
+			var storageProvider *string // <- nombre del storage, ej: "s3", "local"
+
+			// 5) Crear un nuevo registro de PDF para la versión FIRMADA
+			signedPDF := &models.DocumentPDF{
+				DocumentID:      doc.ID,
+				Stage:           "signed", // importante: marcar etapa
+				Version:         nextVersion,
+				FileName:        "signed-" + doc.ID.String() + ".pdf",
+				FileID:          fileID,
+				FileHash:        fileHash,
+				FileSizeBytes:   fileSize,
+				StorageProvider: storageProvider,
+				CreatedAt:       now,
+			}
+
+			if err := tx.Create(signedPDF).Error; err != nil {
+				return err
+			}
+
+			// 6) Actualizar estado del documento
 			doc.DigitalSignatureStatus = "SIGNED"
 			doc.SignedAt = &now
 			doc.UpdatedAt = now
@@ -227,7 +284,7 @@ func (s *eventServiceImpl) SignEventCertificates(ctx context.Context, eventID, a
 		return uuid.Nil, "", 0, err
 	}
 
-	// Notificar al actor
+	// 7) Notificar al actor (admin / firmante)
 	if s.noti != nil && signedCount > 0 {
 		_ = s.noti.NotifyUser(
 			ctx,

@@ -208,7 +208,6 @@ type Document struct {
 	DocumentType  DocumentType      `gorm:"foreignKey:DocumentTypeID"`
 	Template      *DocumentTemplate `gorm:"foreignKey:TemplateID"`
 	CreatedByUser User              `gorm:"foreignKey:CreatedBy"`
-	PDF           *DocumentPDF      `gorm:"foreignKey:DocumentID"`
 	PDFs          []DocumentPDF     `gorm:"foreignKey:DocumentID"`
 
 	// Relaciones con evaluaciones / estudio
@@ -219,13 +218,15 @@ func (Document) TableName() string { return "documents" }
 
 type DocumentPDF struct {
 	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	DocumentID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
-	FileName   string    `gorm:"size:255;not null"`
+	DocumentID uuid.UUID `gorm:"type:uuid;not null;index"`
 
-	// ID del archivo PDF en tu servidor de archivos
-	FileID uuid.UUID `gorm:"type:uuid;not null"`
+	// nuevo: qué etapa / versión es este PDF
+	Stage   string `gorm:"size:50;not null"`   // e.g. "draft", "signed", "final"
+	Version int    `gorm:"not null;default:1"` // opcional, por si quieres V1, V2, V3...
 
-	FileHash        string `gorm:"size:255;not null"`
+	FileName        string    `gorm:"size:255;not null"`
+	FileID          uuid.UUID `gorm:"type:uuid;not null"`
+	FileHash        string    `gorm:"size:255;not null"`
 	FileSizeBytes   *int64
 	StorageProvider *string   `gorm:"size:100"`
 	CreatedAt       time.Time `gorm:"not null"`
