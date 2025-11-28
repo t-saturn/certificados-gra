@@ -21,6 +21,62 @@ func NewEventHandler(svc services.EventService) *EventHandler {
 	return &EventHandler{svc: svc}
 }
 
+func (h *EventHandler) RemoveParticipant(c fiber.Ctx) (interface{}, string, error) {
+	// ID del evento por path param /events/:event_id/participants/remove/:participant_id
+	eventIDParam := c.Params("event_id")
+	if eventIDParam == "" {
+		return nil, "", fmt.Errorf("missing event_id param")
+	}
+
+	eventID, err := uuid.Parse(eventIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid event_id")
+	}
+
+	// ID del participant (UserDetailID) por path param
+	participantIDParam := c.Params("participant_id")
+	if participantIDParam == "" {
+		return nil, "", fmt.Errorf("missing participant_id param")
+	}
+
+	participantID, err := uuid.Parse(participantIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid participant_id")
+	}
+
+	// user_id (actor) por query param ?user_id=
+	actorIDParam := c.Query("user_id")
+	if actorIDParam == "" {
+		return nil, "", fmt.Errorf("missing user_id query param")
+	}
+
+	actorID, err := uuid.Parse(actorIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid user_id")
+	}
+
+	evID, evTitle, err := h.svc.RemoveEventParticipant(
+		context.Background(),
+		eventID,
+		participantID,
+		actorID,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := fiber.Map{
+		"id":   evID,
+		"name": evTitle,
+		"message": fmt.Sprintf(
+			"Participante removido del evento: %s",
+			evTitle,
+		),
+	}
+
+	return data, "ok", nil
+}
+
 func (h *EventHandler) UploadParticipants(c fiber.Ctx) (interface{}, string, error) {
 	var req dto.UploadEventParticipantsRequest
 

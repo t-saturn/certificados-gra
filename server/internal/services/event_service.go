@@ -22,6 +22,8 @@ type EventService interface {
 	ListEvents(ctx context.Context, in dto.ListEventsQuery) (*dto.ListEventsResult, error)
 	// Sube/añade participantes a un evento existente
 	UploadEventParticipants(ctx context.Context, eventID uuid.UUID, participants []dto.CreateEventParticipantRequest) (uuid.UUID, string, int, error)
+	// 👇 nuevo
+	RemoveEventParticipant(ctx context.Context, eventID uuid.UUID, participantUserDetailID uuid.UUID, actorID uuid.UUID) (uuid.UUID, string, error)
 }
 
 type eventServiceImpl struct {
@@ -34,6 +36,87 @@ func NewEventService(db *gorm.DB, noti NotificationService) EventService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+func (s *eventServiceImpl) RemoveEventParticipant(
+	ctx context.Context,
+	eventID uuid.UUID,
+	participantUserDetailID uuid.UUID,
+	actorID uuid.UUID,
+) (uuid.UUID, string, error) {
+	var event models.Event
+	var userDetail models.UserDetail
+	var participant models.EventParticipant
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1) Verificar evento
+		if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("event not found")
+			}
+			return err
+		}
+
+		// 2) Verificar UserDetail (participante)
+		if err := tx.First(&userDetail, "id = ?", participantUserDetailID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("participant not found")
+			}
+			return err
+		}
+
+		// 3) Verificar relación en event_participants
+		if err := tx.
+			Where("event_id = ? AND user_detail_id = ?", event.ID, userDetail.ID).
+			First(&participant).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("participant is not registered in this event")
+			}
+			return err
+		}
+
+		// 4) Eliminar solo la relación
+		if err := tx.Delete(&participant).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
+	// --- NOTIFICACIONES DESPUÉS DE LA TRANSACCIÓN ---
+
+	// 1) Notificar al participante si tiene cuenta
+	if s.noti != nil {
+		var user models.User
+		if err := s.db.WithContext(ctx).
+			Where("national_id = ?", userDetail.NationalID).
+			First(&user).Error; err == nil {
+			_ = s.noti.NotifyUser(
+				ctx,
+				user.ID,
+				"Removido de evento",
+				"Has sido removido del evento: "+event.Title,
+				ptrString("EVENT"),
+			)
+		}
+	}
+
+	// 2) Notificar al actor (quien ejecutó la operación)
+	if s.noti != nil {
+		_ = s.noti.NotifyUser(
+			ctx,
+			actorID,
+			"Participante removido",
+			"Has removido un participante del evento: "+event.Title,
+			ptrString("EVENT"),
+		)
+	}
+
+	return event.ID, event.Title, nil
 }
 
 func (s *eventServiceImpl) UploadEventParticipants(
