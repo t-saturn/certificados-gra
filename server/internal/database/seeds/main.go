@@ -9,6 +9,7 @@ import (
 func Run(db *gorm.DB) error {
 	seeders := []func(*gorm.DB) error{
 		SeedUsers,
+		SeedDocumentTypes, // ahora hace tipos + categorías
 	}
 
 	for _, seed := range seeders {
