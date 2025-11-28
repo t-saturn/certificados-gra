@@ -10,6 +10,94 @@ export const getCurrentUserId = async (): Promise<string> => {
   return session.user.id;
 };
 
+/* ---------- CREATE TEMPLATE ---------- */
+
+export interface CreateTemplateBody {
+  name: string;
+  description: string;
+  document_type_id: string;
+  category_id: number;
+  file_id?: string;
+  prev_file_id?: string;
+  is_active: boolean;
+}
+
+export interface CreateTemplateApiData {
+  id: string;
+  name: string;
+  message: string;
+}
+
+interface CreateTemplateApiResponse {
+  data: CreateTemplateApiData;
+  status: 'success' | 'failed';
+  message: string;
+}
+
+export interface CreateTemplateResult {
+  id: string;
+  name: string;
+  message: string;
+}
+
+export type FnCreateTemplate = (body: CreateTemplateBody) => Promise<CreateTemplateResult>;
+
+export const fn_create_template: FnCreateTemplate = async (body) => {
+  const userId = await getCurrentUserId();
+
+  const url = `${BASE_URL}/template?user_id=${encodeURIComponent(userId)}`;
+
+  // 👀 Log rápido para ver qué estás mandando
+  console.log('[fn_create_template] URL:', url);
+  console.log('[fn_create_template] Body:', body);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    let text = '';
+    try {
+      text = await res.text();
+    } catch {
+      text = '';
+    }
+
+    console.error('Error al consumir POST /template =>', {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
+
+    // 🔴 MUY IMPORTANTE: propagar el mensaje real
+    throw new Error(text || `Error al crear la plantilla (status ${res.status})`);
+  }
+
+  let json: CreateTemplateApiResponse;
+  try {
+    json = (await res.json()) as CreateTemplateApiResponse;
+  } catch (err) {
+    console.error('Error parseando JSON de /template =>', err);
+    throw new Error('Respuesta inválida del servicio de plantillas');
+  }
+
+  if (json.status !== 'success') {
+    console.error('Servicio /template respondió failed =>', json);
+    throw new Error(json.message || 'Error en el servicio de plantillas');
+  }
+
+  return {
+    id: json.data.id,
+    name: json.data.name,
+    message: json.data.message,
+  };
+};
+
 // ---- Tipos ----
 export interface GetTemplatesParams {
   page?: number;
@@ -28,6 +116,7 @@ export interface TemplateItem {
   category_id: number;
   category_name: string;
   file_id: string;
+  prev_file_id?: string;
   is_active: boolean;
   created_by: string;
   created_at: string;
@@ -105,6 +194,8 @@ export interface UpdateTemplateBody {
   description?: string;
   document_type_id?: string;
   category_id?: number;
+  file_id?: string;
+  prev_file_id?: string;
   is_active?: boolean; // <- usar false para “eliminar” lógicamente
 }
 
