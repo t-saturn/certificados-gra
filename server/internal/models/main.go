@@ -83,29 +83,34 @@ func (DocumentType) TableName() string { return "document_types" }
 
 // EXCEPCIÓN: Categorías numéricas autoincrementales
 type DocumentCategory struct {
-	ID          uint      `gorm:"primaryKey;autoIncrement"`
-	Name        string    `gorm:"size:100;not null"`
-	Description *string   `gorm:"type:text"`
-	IsActive    bool      `gorm:"not null;default:true"`
-	CreatedAt   time.Time `gorm:"not null"`
-	UpdatedAt   time.Time `gorm:"not null"`
+	ID             uint      `gorm:"primaryKey;autoIncrement"`
+	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"` // a qué tipo pertenece
+	Name           string    `gorm:"size:100;not null"`
+	Description    *string   `gorm:"type:text"`
+	IsActive       bool      `gorm:"not null;default:true"`
+	CreatedAt      time.Time `gorm:"not null"`
+	UpdatedAt      time.Time `gorm:"not null"`
 
+	DocumentType      DocumentType       `gorm:"foreignKey:DocumentTypeID"`
 	DocumentTemplates []DocumentTemplate `gorm:"foreignKey:CategoryID"`
 }
 
 func (DocumentCategory) TableName() string { return "document_categories" }
 
 type DocumentTemplate struct {
-	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Name           string     `gorm:"size:150;not null"`
-	Description    *string    `gorm:"type:text"`
-	DocumentTypeID uuid.UUID  `gorm:"type:uuid;not null;index"`
-	CategoryID     *uint      `gorm:"index"`             // FK a DocumentCategory
-	FilePath       string     `gorm:"size:255;not null"` // template path or URL
-	IsActive       bool       `gorm:"not null;default:true"`
-	CreatedBy      *uuid.UUID `gorm:"type:uuid;index"` // User ID
-	CreatedAt      time.Time  `gorm:"not null"`
-	UpdatedAt      time.Time  `gorm:"not null"`
+	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name           string    `gorm:"size:150;not null"`
+	Description    *string   `gorm:"type:text"`
+	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
+	CategoryID     *uint     `gorm:"index"` // FK a DocumentCategory
+
+	// ID del archivo en tu servidor de archivos (no guardas URL)
+	FileID uuid.UUID `gorm:"type:uuid;not null"`
+
+	IsActive  bool       `gorm:"not null;default:true"`
+	CreatedBy *uuid.UUID `gorm:"type:uuid;index"` // User ID
+	CreatedAt time.Time  `gorm:"not null"`
+	UpdatedAt time.Time  `gorm:"not null"`
 
 	DocumentType DocumentType      `gorm:"foreignKey:DocumentTypeID"`
 	Category     *DocumentCategory `gorm:"foreignKey:CategoryID"`
@@ -203,11 +208,14 @@ type Document struct {
 func (Document) TableName() string { return "documents" }
 
 type DocumentPDF struct {
-	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	DocumentID      uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
-	FileName        string    `gorm:"size:255;not null"`
-	FilePath        string    `gorm:"size:255;not null"`
-	FileHash        string    `gorm:"size:255;not null"`
+	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	DocumentID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
+	FileName   string    `gorm:"size:255;not null"`
+
+	// ID del archivo PDF en tu servidor de archivos
+	FileID uuid.UUID `gorm:"type:uuid;not null"`
+
+	FileHash        string `gorm:"size:255;not null"`
 	FileSizeBytes   *int64
 	StorageProvider *string   `gorm:"size:100"`
 	CreatedAt       time.Time `gorm:"not null"`
