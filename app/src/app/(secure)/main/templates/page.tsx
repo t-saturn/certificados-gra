@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import type { FC, FormEvent } from 'react';
@@ -7,11 +8,16 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Plus, Edit2, Trash2, Eye, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, Loader2, AlertTriangle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
-// 🔹 Importa el server action y tipos
-import { fn_get_templates, type TemplateItem, type TemplatesFilters } from '@/actions/fn-template';
+// Dialog + Label + Textarea de shadcn
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+
+// 🔹 Server actions y tipos
+import { fn_get_templates, fn_update_template, type TemplateItem, type TemplatesFilters } from '@/actions/fn-template';
 
 type LoadTemplatesOptions = {
   page?: number;
@@ -32,6 +38,16 @@ const TemplatesPage: FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // 🔹 Estados para eliminar
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // 🔹 Estados para edición / modal
+  const [editingTemplate, setEditingTemplate] = useState<TemplateItem | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editFile, setEditFile] = useState<File | null>(null); // solo visual por ahora
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const loadTemplates = (opts?: LoadTemplatesOptions): void => {
     startTransition(async () => {
       try {
@@ -46,7 +62,6 @@ const TemplatesPage: FC = () => {
         setFilters(result.filters);
         setPage(result.filters.page);
         setError(null);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         console.error(err);
         const message = err?.message ?? 'Ocurrió un error al obtener las plantillas.';
@@ -75,11 +90,6 @@ const TemplatesPage: FC = () => {
     loadTemplates({ page: 1, type });
   };
 
-  // Por ahora solo borramos en UI (cuando tengas endpoint, aquí llamas al backend)
-  const handleDelete = (id: string): void => {
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
-  };
-
   const currentPage = filters?.page ?? page;
   const total = filters?.total ?? 0;
 
@@ -94,6 +104,78 @@ const TemplatesPage: FC = () => {
   const handleRetry = (): void => {
     setError(null);
     loadTemplates({ page: 1 });
+  };
+
+  // 🔹 Abrir modal de edición
+  const handleOpenEdit = (template: TemplateItem): void => {
+    setEditingTemplate(template);
+    setEditName(template.name);
+    setEditDescription(template.description ?? '');
+    setEditFile(null);
+  };
+
+  const handleCloseEdit = (): void => {
+    setEditingTemplate(null);
+    setEditFile(null);
+  };
+
+  // 🔹 Guardar cambios (PATCH name/description, file solo UI por ahora)
+  const handleSaveEdit = async (): Promise<void> => {
+    if (!editingTemplate) return;
+
+    setIsSavingEdit(true);
+    try {
+      await fn_update_template(editingTemplate.id, {
+        name: editName,
+        description: editDescription,
+        // TODO: aquí luego se integrará la lógica para subir el archivo HTML
+        // file_id u otro campo cuando el backend lo soporte.
+      });
+
+      // Actualizar en memoria
+      setTemplates((prev) =>
+        prev.map((t) =>
+          t.id === editingTemplate.id
+            ? {
+                ...t,
+                name: editName,
+                description: editDescription,
+              }
+            : t,
+        ),
+      );
+
+      toast.success('Plantilla actualizada con éxito');
+      handleCloseEdit();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('No se pudo actualizar la plantilla', {
+        description: err?.message ?? 'Error inesperado al guardar cambios.',
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // 🔹 Eliminar (baja lógica: is_active = false)
+  const handleDelete = async (id: string): Promise<void> => {
+    setDeletingId(id);
+    try {
+      await fn_update_template(id, { is_active: false });
+
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+
+      toast.success('Plantilla eliminada correctamente', {
+        description: 'Se ha desactivado la plantilla (baja lógica).',
+      });
+    } catch (err: any) {
+      console.error(err);
+      toast.error('No se pudo eliminar la plantilla', {
+        description: err?.message ?? 'Error inesperado al eliminar.',
+      });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -132,7 +214,6 @@ const TemplatesPage: FC = () => {
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="certificate">Certificados</SelectItem>
               <SelectItem value="constancy">Constancias</SelectItem>
-              <SelectItem value="recognition">Reconocimientos</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -218,12 +299,18 @@ const TemplatesPage: FC = () => {
                         <Eye className="w-4 h-4" />
                         Ver
                       </Button>
-                      <Button variant="ghost" size="sm" className="flex-1 gap-2 text-muted-foreground hover:text-foreground">
+                      <Button variant="ghost" size="sm" className="flex-1 gap-2 text-muted-foreground hover:text-foreground" onClick={() => handleOpenEdit(template)}>
                         <Edit2 className="w-4 h-4" />
                         Editar
                       </Button>
-                      <Button variant="ghost" size="sm" className="flex-1 gap-2 text-destructive hover:text-destructive/80" onClick={() => handleDelete(template.id)}>
-                        <Trash2 className="w-4 h-4" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 gap-2 text-destructive hover:text-destructive/80"
+                        onClick={() => handleDelete(template.id)}
+                        disabled={deletingId === template.id}
+                      >
+                        {deletingId === template.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         Eliminar
                       </Button>
                     </div>
@@ -258,6 +345,62 @@ const TemplatesPage: FC = () => {
           )}
         </>
       )}
+
+      {/* 🔹 Modal de edición de plantilla */}
+      <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && handleCloseEdit()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar plantilla</DialogTitle>
+            <DialogDescription>Modifica el nombre, descripción o reemplaza la plantilla HTML asociada.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="name">Nombre</Label>
+              <Input id="name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea id="description" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="file">Plantilla HTML</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".html,.htm"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setEditFile(file);
+                  }}
+                />
+              </div>
+              <p className="flex items-center gap-1 mt-1 text-muted-foreground text-xs">
+                <FileText className="w-3 h-3" />
+                Por ahora solo se selecciona el archivo de forma visual. La subida real se integrará más adelante.
+              </p>
+              {editFile && (
+                <p className="mt-1 text-muted-foreground text-xs">
+                  Archivo seleccionado: <span className="font-medium">{editFile.name}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={handleCloseEdit} disabled={isSavingEdit}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleSaveEdit} disabled={isSavingEdit || !editName.trim()} className="gap-2">
+              {isSavingEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
