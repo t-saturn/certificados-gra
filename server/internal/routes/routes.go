@@ -15,4 +15,6 @@ func RegisterRoutes(app *fiber.App) {
 	handler := handlers.NewHealthHandler(service)
 
 	app.Get("/health", httpwrap.Wrap(handler.GetHealth))
+
+	RegisterTemplateRoutes(app)
 }
