@@ -21,6 +21,50 @@ func NewEventHandler(svc services.EventService) *EventHandler {
 	return &EventHandler{svc: svc}
 }
 
+func (h *EventHandler) ListEventParticipants(c fiber.Ctx) (interface{}, string, error) {
+	// event_id por path param /events/:event_id/participant/list
+	eventIDParam := c.Params("event_id")
+	if eventIDParam == "" {
+		return nil, "", fmt.Errorf("missing event_id param")
+	}
+
+	eventID, err := uuid.Parse(eventIDParam)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid event_id")
+	}
+
+	searchQuery := c.Query("search_query", "")
+	pageStr := c.Query("page", "1")
+	pageSizeStr := c.Query("page_size", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize <= 0 {
+		pageSize = 10
+	}
+
+	in := dto.ListEventParticipantsQuery{
+		SearchQuery: strings.TrimSpace(searchQuery),
+		Page:        page,
+		PageSize:    pageSize,
+	}
+
+	result, err := h.svc.ListEventParticipants(context.Background(), eventID, in)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := fiber.Map{
+		"participants": result.Participants,
+		"filters":      result.Filters,
+	}
+
+	return data, "ok", nil
+}
+
 func (h *EventHandler) RemoveParticipant(c fiber.Ctx) (interface{}, string, error) {
 	// ID del evento por path param /events/:event_id/participants/remove/:participant_id
 	eventIDParam := c.Params("event_id")

@@ -24,6 +24,8 @@ type EventService interface {
 	UploadEventParticipants(ctx context.Context, eventID uuid.UUID, participants []dto.CreateEventParticipantRequest) (uuid.UUID, string, int, error)
 	// 👇 nuevo
 	RemoveEventParticipant(ctx context.Context, eventID uuid.UUID, participantUserDetailID uuid.UUID, actorID uuid.UUID) (uuid.UUID, string, error)
+	// 👇 nuevo
+	ListEventParticipants(ctx context.Context, eventID uuid.UUID, in dto.ListEventParticipantsQuery) (*dto.ListEventParticipantsResult, error)
 }
 
 type eventServiceImpl struct {
@@ -38,12 +40,147 @@ func NewEventService(db *gorm.DB, noti NotificationService) EventService {
 	}
 }
 
-func (s *eventServiceImpl) RemoveEventParticipant(
-	ctx context.Context,
-	eventID uuid.UUID,
-	participantUserDetailID uuid.UUID,
-	actorID uuid.UUID,
-) (uuid.UUID, string, error) {
+func (s *eventServiceImpl) ListEventParticipants(ctx context.Context, eventID uuid.UUID, in dto.ListEventParticipantsQuery) (*dto.ListEventParticipantsResult, error) {
+	// Normalizar paginado
+	page := in.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := in.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	search := strings.TrimSpace(in.SearchQuery)
+
+	// ---------- 1) Verificar que el evento exista (opcional pero útil) ----------
+	var exists int64
+	if err := s.db.WithContext(ctx).
+		Table("events").
+		Where("id = ?", eventID).
+		Count(&exists).Error; err != nil {
+		return nil, err
+	}
+	if exists == 0 {
+		return nil, errors.New("event not found")
+	}
+
+	// ---------- 2) TOTAL ----------
+	var total int64
+	countQuery := s.db.WithContext(ctx).
+		Table("event_participants AS ep").
+		Joins("JOIN user_details AS ud ON ud.id = ep.user_detail_id").
+		Where("ep.event_id = ?", eventID)
+
+	if search != "" {
+		like := "%" + search + "%"
+		countQuery = countQuery.Where(
+			"(ud.first_name ILIKE ? OR ud.last_name ILIKE ? OR (ud.first_name || ' ' || ud.last_name) ILIKE ?)",
+			like, like, like,
+		)
+	}
+
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	if total == 0 {
+		return &dto.ListEventParticipantsResult{
+			Participants: []dto.EventParticipantListItem{},
+			Filters: dto.EventParticipantsFilters{
+				Page:        page,
+				PageSize:    pageSize,
+				Total:       0,
+				HasNextPage: false,
+				HasPrevPage: page > 1,
+				SearchQuery: search,
+			},
+		}, nil
+	}
+
+	// ---------- 3) LISTA PÁGINA ----------
+	var rows []struct {
+		UserDetailID       uuid.UUID
+		NationalID         string
+		FirstName          string
+		LastName           string
+		Email              *string
+		Phone              *string
+		RegistrationSource *string
+		RegistrationStatus string
+		AttendanceStatus   string
+	}
+
+	listQuery := s.db.WithContext(ctx).
+		Table("event_participants AS ep").
+		Select(`
+			ud.id AS user_detail_id,
+			ud.national_id,
+			ud.first_name,
+			ud.last_name,
+			ud.email,
+			ud.phone,
+			ep.registration_source,
+			ep.registration_status,
+			ep.attendance_status
+		`).
+		Joins("JOIN user_details AS ud ON ud.id = ep.user_detail_id").
+		Where("ep.event_id = ?", eventID)
+
+	if search != "" {
+		like := "%" + search + "%"
+		listQuery = listQuery.Where(
+			"(ud.first_name ILIKE ? OR ud.last_name ILIKE ? OR (ud.first_name || ' ' || ud.last_name) ILIKE ?)",
+			like, like, like,
+		)
+	}
+
+	if err := listQuery.
+		Order("ud.first_name ASC, ud.last_name ASC").
+		Limit(pageSize).
+		Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	participants := make([]dto.EventParticipantListItem, 0, len(rows))
+	for _, r := range rows {
+		fullName := strings.TrimSpace(r.FirstName + " " + r.LastName)
+		item := dto.EventParticipantListItem{
+			UserDetailID:       r.UserDetailID,
+			NationalID:         r.NationalID,
+			FullName:           fullName,
+			FirstName:          r.FirstName,
+			LastName:           r.LastName,
+			Email:              r.Email,
+			Phone:              r.Phone,
+			RegistrationSource: r.RegistrationSource,
+			RegistrationStatus: r.RegistrationStatus,
+			AttendanceStatus:   r.AttendanceStatus,
+		}
+		participants = append(participants, item)
+	}
+
+	hasNext := int64(page*pageSize) < total
+	hasPrev := page > 1
+
+	res := &dto.ListEventParticipantsResult{
+		Participants: participants,
+		Filters: dto.EventParticipantsFilters{
+			Page:        page,
+			PageSize:    pageSize,
+			Total:       total,
+			HasNextPage: hasNext,
+			HasPrevPage: hasPrev,
+			SearchQuery: search,
+		},
+	}
+
+	return res, nil
+}
+
+func (s *eventServiceImpl) RemoveEventParticipant(ctx context.Context, eventID uuid.UUID, participantUserDetailID uuid.UUID, actorID uuid.UUID) (uuid.UUID, string, error) {
 	var event models.Event
 	var userDetail models.UserDetail
 	var participant models.EventParticipant
@@ -119,11 +256,7 @@ func (s *eventServiceImpl) RemoveEventParticipant(
 	return event.ID, event.Title, nil
 }
 
-func (s *eventServiceImpl) UploadEventParticipants(
-	ctx context.Context,
-	eventID uuid.UUID,
-	participants []dto.CreateEventParticipantRequest,
-) (uuid.UUID, string, int, error) {
+func (s *eventServiceImpl) UploadEventParticipants(ctx context.Context, eventID uuid.UUID, participants []dto.CreateEventParticipantRequest) (uuid.UUID, string, int, error) {
 	now := time.Now().UTC()
 
 	var event models.Event

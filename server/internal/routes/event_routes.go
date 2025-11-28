@@ -26,4 +26,6 @@ func RegisterEventRoutes(app *fiber.App) {
 	app.Patch("/events/:id/participants/upload", httpwrap.Wrap(eventHandler.UploadParticipants))
 	// 🔹 Nueva ruta: eliminar participante
 	app.Delete("/events/:event_id/participants/remove/:participant_id", httpwrap.Wrap(eventHandler.RemoveParticipant))
+	// 👇 nuevo
+	app.Get("/events/:event_id/participant/list", httpwrap.Wrap(eventHandler.ListEventParticipants))
 }

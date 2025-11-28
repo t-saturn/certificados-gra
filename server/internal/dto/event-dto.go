@@ -80,3 +80,36 @@ type ListEventsResult struct {
 type UploadEventParticipantsRequest struct {
 	Participants []CreateEventParticipantRequest `json:"participants"`
 }
+
+type ListEventParticipantsQuery struct {
+	SearchQuery string
+	Page        int
+	PageSize    int
+}
+
+type EventParticipantListItem struct {
+	UserDetailID       uuid.UUID `json:"user_detail_id"`
+	NationalID         string    `json:"national_id"`
+	FullName           string    `json:"full_name"`
+	FirstName          string    `json:"first_name"`
+	LastName           string    `json:"last_name"`
+	Email              *string   `json:"email,omitempty"`
+	Phone              *string   `json:"phone,omitempty"`
+	RegistrationSource *string   `json:"registration_source,omitempty"`
+	RegistrationStatus string    `json:"registration_status"`
+	AttendanceStatus   string    `json:"attendance_status"`
+}
+
+type EventParticipantsFilters struct {
+	Page        int    `json:"page"`
+	PageSize    int    `json:"page_size"`
+	Total       int64  `json:"total"`
+	HasNextPage bool   `json:"has_next_page"`
+	HasPrevPage bool   `json:"has_prev_page"`
+	SearchQuery string `json:"search_query"`
+}
+
+type ListEventParticipantsResult struct {
+	Participants []EventParticipantListItem `json:"participants"`
+	Filters      EventParticipantsFilters   `json:"filters"`
+}
