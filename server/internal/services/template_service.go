@@ -30,12 +30,7 @@ func NewTemplateService(db *gorm.DB, noti NotificationService) TemplateService {
 	}
 }
 
-func (s *templateServiceImpl) UpdateTemplate(
-	ctx context.Context,
-	templateID uuid.UUID,
-	userID uuid.UUID,
-	in dto.UpdateTemplateRequest,
-) (*models.DocumentTemplate, error) {
+func (s *templateServiceImpl) UpdateTemplate(ctx context.Context, templateID uuid.UUID, userID uuid.UUID, in dto.UpdateTemplateRequest) (*models.DocumentTemplate, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database connection is nil")
 	}
@@ -75,6 +70,13 @@ func (s *templateServiceImpl) UpdateTemplate(
 			return nil, fmt.Errorf("invalid file_id: %w", err)
 		}
 		template.FileID = fileID
+	}
+	if in.PrevFileID != nil && *in.PrevFileID != "" {
+		prevFileID, err := uuid.Parse(*in.PrevFileID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid prev_file_id: %w", err)
+		}
+		template.PrevFileID = prevFileID
 	}
 	if in.IsActive != nil {
 		template.IsActive = *in.IsActive
@@ -156,7 +158,8 @@ func (s *templateServiceImpl) ListTemplates(ctx context.Context, params dto.Temp
 	query := s.db.WithContext(ctx).
 		Model(&models.DocumentTemplate{}).
 		Preload("DocumentType").
-		Preload("Category")
+		Preload("Category").
+		Where("is_active = TRUE") // 👈 SOLO plantillas activas
 
 	// Filtro por tipo
 	if docTypeID != nil {
@@ -206,6 +209,7 @@ func (s *templateServiceImpl) ListTemplates(ctx context.Context, params dto.Temp
 			CategoryID:       t.CategoryID,
 			CategoryName:     categoryName,
 			FileID:           t.FileID,
+			PrevFileID:       t.PrevFileID,
 			IsActive:         t.IsActive,
 			CreatedBy:        t.CreatedBy,
 			CreatedAt:        t.CreatedAt,
@@ -249,6 +253,9 @@ func (s *templateServiceImpl) CreateTemplate(ctx context.Context, userID uuid.UU
 	if in.FileID == "" {
 		return nil, fmt.Errorf("file_id is required")
 	}
+	if in.PrevFileID == "" {
+		return nil, fmt.Errorf("prev_file_id is required")
+	}
 
 	// Parse de UUIDs
 	docTypeID, err := uuid.Parse(in.DocumentTypeID)
@@ -259,6 +266,10 @@ func (s *templateServiceImpl) CreateTemplate(ctx context.Context, userID uuid.UU
 	fileID, err := uuid.Parse(in.FileID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid file_id: %w", err)
+	}
+	prevFileID, err := uuid.Parse(in.PrevFileID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid prev_file_id: %w", err)
 	}
 
 	// (Opcional) Verificar que el usuario exista
@@ -283,6 +294,7 @@ func (s *templateServiceImpl) CreateTemplate(ctx context.Context, userID uuid.UU
 		DocumentTypeID: docTypeID,
 		CategoryID:     in.CategoryID,
 		FileID:         fileID,
+		PrevFileID:     prevFileID,
 		IsActive:       isActive,
 		CreatedBy:      &userID,
 		CreatedAt:      now,

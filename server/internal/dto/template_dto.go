@@ -13,6 +13,7 @@ type CreateTemplateRequest struct {
 	DocumentTypeID string  `json:"document_type_id"` // uuid, requerido
 	CategoryID     *uint   `json:"category_id"`      // opcional
 	FileID         string  `json:"file_id"`          // uuid, requerido
+	PrevFileID     string  `json:"prev_file_id"`     // uuid, requerido
 	IsActive       *bool   `json:"is_active"`        // opcional (default true si viene nil)
 }
 
@@ -42,6 +43,7 @@ type TemplateItem struct {
 	CategoryID       *uint      `json:"category_id,omitempty"`
 	CategoryName     *string    `json:"category_name,omitempty"`
 	FileID           uuid.UUID  `json:"file_id"`
+	PrevFileID       uuid.UUID  `json:"prev_file_id"`
 	IsActive         bool       `json:"is_active"`
 	CreatedBy        *uuid.UUID `json:"created_by,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
@@ -71,6 +73,7 @@ type UpdateTemplateRequest struct {
 	DocumentTypeID *string `json:"document_type_id"` // opcional (uuid string)
 	CategoryID     *uint   `json:"category_id"`      // opcional (puede ser nil para quitar?)
 	FileID         *string `json:"file_id"`          // opcional (uuid string)
+	PrevFileID     *string `json:"prev_file_id"`     // opcional (uuid string)
 	IsActive       *bool   `json:"is_active"`        // opcional
 }
 

@@ -104,7 +104,8 @@ type DocumentTemplate struct {
 	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
 	CategoryID     *uint     `gorm:"index"`
 
-	FileID uuid.UUID `gorm:"type:uuid;not null"`
+	FileID     uuid.UUID `gorm:"type:uuid;not null"`
+	PrevFileID uuid.UUID `gorm:"type:uuid;not null"`
 
 	IsActive  bool       `gorm:"not null;default:true"`
 	CreatedBy *uuid.UUID `gorm:"type:uuid;index"`
