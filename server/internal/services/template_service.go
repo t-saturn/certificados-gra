@@ -15,7 +15,9 @@ import (
 type TemplateService interface {
 	CreateTemplate(ctx context.Context, userID uuid.UUID, in dto.CreateTemplateRequest) (*models.DocumentTemplate, error)
 	ListTemplates(ctx context.Context, params dto.TemplateListQuery) (*dto.TemplateListResponse, error)
+	UpdateTemplate(ctx context.Context, templateID uuid.UUID, userID uuid.UUID, in dto.UpdateTemplateRequest) (*models.DocumentTemplate, error)
 }
+
 type templateServiceImpl struct {
 	db   *gorm.DB
 	noti NotificationService
@@ -26,6 +28,77 @@ func NewTemplateService(db *gorm.DB, noti NotificationService) TemplateService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+func (s *templateServiceImpl) UpdateTemplate(
+	ctx context.Context,
+	templateID uuid.UUID,
+	userID uuid.UUID,
+	in dto.UpdateTemplateRequest,
+) (*models.DocumentTemplate, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	// Buscar plantilla
+	var template models.DocumentTemplate
+	if err := s.db.WithContext(ctx).
+		Preload("DocumentType").
+		Preload("Category").
+		First(&template, "id = ?", templateID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("template not found")
+		}
+		return nil, fmt.Errorf("error fetching template: %w", err)
+	}
+
+	// Actualizar campos solo si vienen en el request
+	if in.Name != nil {
+		template.Name = *in.Name
+	}
+	if in.Description != nil {
+		template.Description = in.Description
+	}
+	if in.DocumentTypeID != nil && *in.DocumentTypeID != "" {
+		docTypeID, err := uuid.Parse(*in.DocumentTypeID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid document_type_id: %w", err)
+		}
+		template.DocumentTypeID = docTypeID
+	}
+	if in.CategoryID != nil {
+		template.CategoryID = in.CategoryID
+	}
+	if in.FileID != nil && *in.FileID != "" {
+		fileID, err := uuid.Parse(*in.FileID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid file_id: %w", err)
+		}
+		template.FileID = fileID
+	}
+	if in.IsActive != nil {
+		template.IsActive = *in.IsActive
+	}
+
+	template.UpdatedAt = time.Now().UTC()
+
+	if err := s.db.WithContext(ctx).Save(&template).Error; err != nil {
+		return nil, fmt.Errorf("error updating template: %w", err)
+	}
+
+	// Notificación
+	if s.noti != nil {
+		notifType := "TEMPLATE"
+		title := "Plantilla actualizada"
+		body := fmt.Sprintf("Se ha actualizado la plantilla '%s'.", template.Name)
+
+		if err := s.noti.NotifyUser(ctx, userID, title, body, &notifType); err != nil {
+			// En desarrollo te conviene ver el error; luego podrías solo loguearlo
+			return nil, fmt.Errorf("template updated but failed to create notification: %w", err)
+		}
+	}
+
+	return &template, nil
 }
 
 func (s *templateServiceImpl) ListTemplates(ctx context.Context, params dto.TemplateListQuery) (*dto.TemplateListResponse, error) {

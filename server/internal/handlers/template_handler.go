@@ -22,6 +22,47 @@ func NewTemplateHandler(service services.TemplateService) *TemplateHandler {
 	return &TemplateHandler{service: service}
 }
 
+func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) (interface{}, string, error) {
+	// Path param: template ID
+	templateIDStr := c.Params("id")
+	if templateIDStr == "" {
+		return nil, "bad_request", fmt.Errorf("template id is required in path")
+	}
+	templateID, err := uuid.Parse(templateIDStr)
+	if err != nil {
+		return nil, "bad_request", fmt.Errorf("invalid template id: %w", err)
+	}
+
+	// Query param: user_id (quién actualiza, para notificación)
+	userIDStr := c.Query("user_id")
+	if userIDStr == "" {
+		return nil, "bad_request", fmt.Errorf("user_id query param is required")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, "bad_request", fmt.Errorf("invalid user_id: %w", err)
+	}
+
+	var req dto.UpdateTemplateRequest
+	if err = c.Bind().Body(&req); err != nil {
+		return nil, "bad_request", fmt.Errorf("invalid JSON body: %w", err)
+	}
+
+	ctx := context.Background()
+	template, err := h.service.UpdateTemplate(ctx, templateID, userID, req)
+	if err != nil {
+		return nil, "error", err
+	}
+
+	resp := dto.TemplateUpdatedResponse{
+		ID:      template.ID,
+		Name:    template.Name,
+		Message: "Plantilla actualizada con éxito",
+	}
+
+	return resp, "ok", nil
+}
+
 // GET /templates?search_query=&page=&page_size=&type=
 func (h *TemplateHandler) ListTemplates(c fiber.Ctx) (interface{}, string, error) {
 	// page

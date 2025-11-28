@@ -64,3 +64,18 @@ type TemplateListResponse struct {
 	Data    []TemplateItem      `json:"data"`
 	Filters TemplateListFilters `json:"filters"`
 }
+
+type UpdateTemplateRequest struct {
+	Name           *string `json:"name"`             // opcional
+	Description    *string `json:"description"`      // opcional
+	DocumentTypeID *string `json:"document_type_id"` // opcional (uuid string)
+	CategoryID     *uint   `json:"category_id"`      // opcional (puede ser nil para quitar?)
+	FileID         *string `json:"file_id"`          // opcional (uuid string)
+	IsActive       *bool   `json:"is_active"`        // opcional
+}
+
+type TemplateUpdatedResponse struct {
+	ID      uuid.UUID `json:"id"`
+	Name    string    `json:"name"`
+	Message string    `json:"message"`
+}
