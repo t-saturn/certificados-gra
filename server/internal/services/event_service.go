@@ -18,6 +18,8 @@ type EventService interface {
 	CreateEvent(ctx context.Context, createdBy uuid.UUID, in dto.CreateEventRequest) (uuid.UUID, string, error)
 	UpdateEvent(ctx context.Context, eventID uuid.UUID, in dto.UpdateEventRequest) (uuid.UUID, string, error)
 	ListEvents(ctx context.Context, in dto.ListEventsQuery) (*dto.ListEventsResult, error)
+	GetEventDetail(ctx context.Context, eventID uuid.UUID, userID *uuid.UUID) (*dto.EventDetailResponse, error)
+
 	UploadEventParticipants(ctx context.Context, eventID uuid.UUID, participants []dto.CreateEventParticipantRequest) (uuid.UUID, string, int, error)
 	RemoveEventParticipant(ctx context.Context, eventID uuid.UUID, participantUserDetailID uuid.UUID, actorID uuid.UUID) (uuid.UUID, string, error)
 	ListEventParticipants(ctx context.Context, eventID uuid.UUID, in dto.ListEventParticipantsQuery) (*dto.ListEventParticipantsResult, error)
@@ -36,6 +38,140 @@ func NewEventService(db *gorm.DB, noti NotificationService) EventService {
 		db:   db,
 		noti: noti,
 	}
+}
+
+var (
+	ErrEventNotFound  = errors.New("event not found")
+	ErrEventForbidden = errors.New("event does not belong to this user")
+)
+
+func (s *eventServiceImpl) GetEventDetail(ctx context.Context, eventID uuid.UUID, userID *uuid.UUID) (*dto.EventDetailResponse, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	var ev models.Event
+
+	// 1) Cargar evento + relaciones principales
+	err := s.db.WithContext(ctx).
+		Preload("DocumentType").
+		Preload("Template").
+		Preload("Template.Category").
+		Preload("Schedules").
+		Preload("EventParticipants.UserDetail").
+		First(&ev, "id = ?", eventID).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrEventNotFound
+		}
+		return nil, fmt.Errorf("error fetching event: %w", err)
+	}
+
+	// 2) Validar que el user_id (si viene) coincida con CreatedBy
+	if userID != nil && ev.CreatedBy != *userID {
+		return nil, ErrEventForbidden
+	}
+
+	// 3) Traer documentos (certificados) emitidos en este evento
+	var docs []models.Document
+	if err := s.db.WithContext(ctx).
+		Where("event_id = ?", ev.ID).
+		Find(&docs).Error; err != nil {
+		return nil, fmt.Errorf("error fetching documents for event: %w", err)
+	}
+
+	// Mapear documentos por UserDetailID
+	docsByUser := make(map[uuid.UUID][]dto.EventParticipantDocument)
+	for _, d := range docs {
+		pDoc := dto.EventParticipantDocument{
+			ID:               d.ID,
+			SerialCode:       d.SerialCode,
+			VerificationCode: d.VerificationCode,
+			Status:           d.Status,
+			IssueDate:        d.IssueDate,
+			TemplateID:       d.TemplateID,
+		}
+		docsByUser[d.UserDetailID] = append(docsByUser[d.UserDetailID], pDoc)
+	}
+
+	// 4) Mapear DocumentType
+	docType := dto.EventDetailDocumentType{
+		ID:   ev.DocumentType.ID,
+		Code: ev.DocumentType.Code,
+		Name: ev.DocumentType.Name,
+	}
+
+	// 5) Mapear Template (si existe) + Category
+	var tpl *dto.EventDetailTemplate
+	if ev.Template != nil {
+		var categoryName *string
+		if ev.Template.Category != nil {
+			cn := ev.Template.Category.Name
+			categoryName = &cn
+		}
+
+		t := &dto.EventDetailTemplate{
+			ID:           ev.Template.ID,
+			Name:         ev.Template.Name,
+			CategoryName: categoryName,
+			FileID:       ev.Template.FileID,
+			IsActive:     ev.Template.IsActive,
+			CreatedBy:    ev.Template.CreatedBy,
+		}
+		tpl = t
+	}
+
+	// 6) Mapear schedules
+	schedules := make([]dto.EventDetailSchedule, 0, len(ev.Schedules))
+	for _, sch := range ev.Schedules {
+		schedules = append(schedules, dto.EventDetailSchedule{
+			StartDatetime: sch.StartDatetime,
+			EndDatetime:   sch.EndDatetime,
+		})
+	}
+
+	// 7) Mapear participantes + documentos por participante
+	participants := make([]dto.EventParticipantDetail, 0, len(ev.EventParticipants))
+	for _, ep := range ev.EventParticipants {
+		ud := ep.UserDetail
+
+		p := dto.EventParticipantDetail{
+			UserDetailID:       ud.ID,
+			NationalID:         ud.NationalID,
+			FirstName:          ud.FirstName,
+			LastName:           ud.LastName,
+			Email:              ud.Email,
+			Phone:              ud.Phone,
+			RegistrationSource: ep.RegistrationSource,
+			RegistrationStatus: ep.RegistrationStatus,
+			AttendanceStatus:   ep.AttendanceStatus,
+			Documents:          docsByUser[ud.ID], // certificados de este evento para este participante
+		}
+
+		participants = append(participants, p)
+	}
+
+	// 8) Armar respuesta final
+	out := &dto.EventDetailResponse{
+		ID:                  ev.ID,
+		Title:               ev.Title,
+		Description:         ev.Description,
+		DocumentType:        docType,
+		Template:            tpl,
+		Location:            ev.Location,
+		MaxParticipants:     ev.MaxParticipants,
+		RegistrationOpenAt:  ev.RegistrationOpenAt,
+		RegistrationCloseAt: ev.RegistrationCloseAt,
+		Status:              ev.Status,
+		CreatedBy:           ev.CreatedBy,
+		CreatedAt:           ev.CreatedAt,
+		UpdatedAt:           ev.UpdatedAt,
+		Schedules:           schedules,
+		Participants:        participants,
+	}
+
+	return out, nil
 }
 
 func (s *eventServiceImpl) GenerateEventCertificates(ctx context.Context, eventID, actorID uuid.UUID, participantIDs []uuid.UUID) (uuid.UUID, string, int, error) {

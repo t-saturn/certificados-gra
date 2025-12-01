@@ -19,6 +19,7 @@ func RegisterEventRoutes(app *fiber.App) {
 
 	// Modificar detalles del evento
 	app.Patch("/events/:id", httpwrap.Wrap(eventHandler.UpdateEvent))
+	app.Get("/event-detail", httpwrap.Wrap(eventHandler.GetEventDetail))
 
 	// Listar eventos (paginado + filtros)
 	app.Get("/events", httpwrap.Wrap(eventHandler.ListEvents))

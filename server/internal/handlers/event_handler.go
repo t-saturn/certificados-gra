@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,6 +20,45 @@ type EventHandler struct {
 
 func NewEventHandler(svc services.EventService) *EventHandler {
 	return &EventHandler{svc: svc}
+}
+
+// ... CreateEvent, UpdateEvent, ListEvents, etc.
+
+// GET /event-detail?event_id=<uuid>&user_id=<uuid_opcional>
+func (h *EventHandler) GetEventDetail(c fiber.Ctx) (interface{}, string, error) {
+	eventIDStr := c.Query("event_id")
+	if eventIDStr == "" {
+		return nil, "bad_request", fmt.Errorf("event_id query param is required")
+	}
+
+	eventID, err := uuid.Parse(eventIDStr)
+	if err != nil {
+		return nil, "bad_request", fmt.Errorf("invalid event_id")
+	}
+
+	var userIDPtr *uuid.UUID
+	if userIDStr := c.Query("user_id"); userIDStr != "" {
+		uid, parseErr := uuid.Parse(userIDStr)
+		if parseErr != nil {
+			return nil, "bad_request", fmt.Errorf("invalid user_id")
+		}
+		userIDPtr = &uid
+	}
+
+	resp, err := h.svc.GetEventDetail(context.Background(), eventID, userIDPtr)
+	if err != nil {
+		// Aquí diferenciamos el tipo de error para que httpwrap pueda decidir mejor
+		switch {
+		case errors.Is(err, services.ErrEventNotFound):
+			return nil, "not_found", err
+		case errors.Is(err, services.ErrEventForbidden):
+			return nil, "forbidden", err
+		default:
+			return nil, "error", err
+		}
+	}
+
+	return resp, "ok", nil
 }
 
 // POST /events/:event_id/certificate/generate?user_id=...

@@ -1,4 +1,6 @@
 import type { JSX } from 'react';
+import { fn_get_event_detail, type EventDetailResult } from '@/actions/fn-event-detail';
+import EventDetailClient from './content-page';
 
 interface EventDetailPageProps {
   params: Promise<{
@@ -9,12 +11,15 @@ interface EventDetailPageProps {
 const EventDetailPage = async ({ params }: EventDetailPageProps): Promise<JSX.Element> => {
   const { eventId } = await params;
 
+  const eventDetail: EventDetailResult = await fn_get_event_detail(eventId, {
+    send_user_id: true,
+  });
+
   return (
-    <section className="p-6">
-      <h1 className="mb-4 font-semibold text-xl">Detalle del evento</h1>
-      <p className="text-sm">
-        ID del evento: <span className="font-mono font-bold">{eventId}</span>
-      </p>
+    <section className="space-y-4 p-6">
+      <h1 className="mb-2 font-semibold text-2xl">Detalle del evento</h1>
+
+      <EventDetailClient event={eventDetail} />
     </section>
   );
 };

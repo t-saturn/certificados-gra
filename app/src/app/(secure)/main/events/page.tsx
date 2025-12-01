@@ -180,7 +180,9 @@ const Page: FC = async (): Promise<JSX.Element> => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button className="text-xs sm:text-sm">Nuevo Evento</Button>
+          <Link href="/main/events/new">
+            <Button className="text-xs sm:text-sm">Nuevo Evento</Button>
+          </Link>
         </div>
       </header>
 

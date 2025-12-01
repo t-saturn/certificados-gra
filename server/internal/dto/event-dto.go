@@ -132,3 +132,68 @@ type ListEventParticipantsResult struct {
 type CertificateActionRequest struct {
 	ParticipantIDs []uuid.UUID `json:"participant_ids,omitempty"`
 }
+
+type EventDetailSchedule struct {
+	StartDatetime time.Time `json:"start_datetime"`
+	EndDatetime   time.Time `json:"end_datetime"`
+}
+
+// Info del tipo de documento asociado al evento
+type EventDetailDocumentType struct {
+	ID   uuid.UUID `json:"id"`
+	Code string    `json:"code"`
+	Name string    `json:"name"`
+}
+
+// Info de la plantilla asociada al evento (opcional)
+type EventDetailTemplate struct {
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	CategoryName *string    `json:"category_name,omitempty"`
+	FileID       uuid.UUID  `json:"file_id"`
+	IsActive     bool       `json:"is_active"`
+	CreatedBy    *uuid.UUID `json:"created_by,omitempty"`
+}
+
+// Documento (certificado) emitido a un participante en este evento
+type EventParticipantDocument struct {
+	ID               uuid.UUID  `json:"id"`
+	SerialCode       string     `json:"serial_code"`
+	VerificationCode string     `json:"verification_code"`
+	Status           string     `json:"status"`      // ISSUED, REVOKED, etc.
+	IssueDate        time.Time  `json:"issue_date"`  // fecha de emisión
+	TemplateID       *uuid.UUID `json:"template_id"` // por si quieres saber con qué plantilla se emitió
+}
+
+// Participante + sus certificados
+type EventParticipantDetail struct {
+	UserDetailID       uuid.UUID                  `json:"user_detail_id"`
+	NationalID         string                     `json:"national_id"`
+	FirstName          string                     `json:"first_name"`
+	LastName           string                     `json:"last_name"`
+	Email              *string                    `json:"email,omitempty"`
+	Phone              *string                    `json:"phone,omitempty"`
+	RegistrationSource *string                    `json:"registration_source,omitempty"`
+	RegistrationStatus string                     `json:"registration_status"`
+	AttendanceStatus   string                     `json:"attendance_status"`
+	Documents          []EventParticipantDocument `json:"documents"` // certificados de este evento
+}
+
+// Respuesta principal de detalle de evento COMPLETO
+type EventDetailResponse struct {
+	ID                  uuid.UUID                `json:"id"`
+	Title               string                   `json:"title"`
+	Description         *string                  `json:"description,omitempty"`
+	DocumentType        EventDetailDocumentType  `json:"document_type"`
+	Template            *EventDetailTemplate     `json:"template,omitempty"`
+	Location            string                   `json:"location"`
+	MaxParticipants     *int                     `json:"max_participants,omitempty"`
+	RegistrationOpenAt  *time.Time               `json:"registration_open_at,omitempty"`
+	RegistrationCloseAt *time.Time               `json:"registration_close_at,omitempty"`
+	Status              string                   `json:"status"`
+	CreatedBy           uuid.UUID                `json:"created_by"`
+	CreatedAt           time.Time                `json:"created_at"`
+	UpdatedAt           time.Time                `json:"updated_at"`
+	Schedules           []EventDetailSchedule    `json:"schedules"`
+	Participants        []EventParticipantDetail `json:"participants"`
+}
