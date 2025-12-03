@@ -15,6 +15,8 @@ import (
 type DocumentCategoryService interface {
 	CreateCategory(ctx context.Context, in dto.DocumentCategoryCreateRequest) error
 	ListCategories(ctx context.Context, params dto.DocumentCategoryListQuery) (*dto.DocumentCategoryListResponse, error)
+	UpdateCategory(ctx context.Context, id uint, in dto.DocumentCategoryUpdateRequest) error
+	SoftDeleteCategory(ctx context.Context, id uint) error
 }
 
 type documentCategoryServiceImpl struct {
@@ -184,4 +186,72 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 	}
 
 	return resp, nil
+}
+
+func (s *documentCategoryServiceImpl) UpdateCategory(ctx context.Context, id uint, in dto.DocumentCategoryUpdateRequest) error {
+	if s.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	var category models.DocumentCategory
+	if err := s.db.WithContext(ctx).
+		First(&category, "id = ?", id).Error; err != nil {
+
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("document category not found")
+		}
+		return fmt.Errorf("error fetching document category: %w", err)
+	}
+
+	// IMPORTANTE: NO tocar DocumentTypeID (type)
+	if in.Code != nil {
+		category.Code = *in.Code
+	}
+	if in.Name != nil {
+		category.Name = *in.Name
+	}
+	if in.Description != nil {
+		category.Description = in.Description
+	}
+	if in.IsActive != nil {
+		category.IsActive = *in.IsActive
+	}
+
+	category.UpdatedAt = time.Now().UTC()
+
+	if err := s.db.WithContext(ctx).Save(&category).Error; err != nil {
+		return fmt.Errorf("error updating document category: %w", err)
+	}
+
+	return nil
+}
+
+func (s *documentCategoryServiceImpl) SoftDeleteCategory(ctx context.Context, id uint) error {
+	if s.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	var category models.DocumentCategory
+	if err := s.db.WithContext(ctx).
+		First(&category, "id = ?", id).Error; err != nil {
+
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("document category not found")
+		}
+		return fmt.Errorf("error fetching document category: %w", err)
+	}
+
+	// Borrado lógico
+	if !category.IsActive {
+		// ya estaba desactivada; no es error, pero igual actualizamos updated_at
+	}
+
+	category.IsActive = false
+	category.UpdatedAt = time.Now().UTC()
+
+	if err := s.db.WithContext(ctx).Save(&category).Error; err != nil {
+		return fmt.Errorf("error soft-deleting document category: %w", err)
+	}
+
+	return nil
 }

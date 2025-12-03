@@ -2,9 +2,18 @@ package dto
 
 // Request para crear categoría
 type DocumentCategoryCreateRequest struct {
-	DocTypeCode string  `json:"doc_type_code" validate:"required,max=50"` // nuevo
+	DocTypeCode string  `json:"doc_type_code" validate:"required,max=50"`
 	Code        string  `json:"code" validate:"required,max=50"`
 	Name        string  `json:"name" validate:"required,max=100"`
+	Description *string `json:"description,omitempty" validate:"omitempty,max=1000"`
+	IsActive    *bool   `json:"is_active,omitempty"`
+}
+
+// Request para actualizar categoría (PATCH)
+type DocumentCategoryUpdateRequest struct {
+	// NO permitimos cambiar el tipo → no hay doc_type_code aquí
+	Code        *string `json:"code,omitempty" validate:"omitempty,max=50"`
+	Name        *string `json:"name,omitempty" validate:"omitempty,max=100"`
 	Description *string `json:"description,omitempty" validate:"omitempty,max=1000"`
 	IsActive    *bool   `json:"is_active,omitempty"`
 }
@@ -15,11 +24,10 @@ type DocumentCategoryListQuery struct {
 	PageSize    int     `query:"page_size"`
 	SearchQuery *string `query:"search_query"`
 	IsActive    *bool   `query:"is_active"`
-	DocTypeCode *string `query:"doc_type_code"` // nuevo filtro
-	DocTypeName *string `query:"doc_type_name"` // nuevo filtro
+	DocTypeCode *string `query:"doc_type_code"`
+	DocTypeName *string `query:"doc_type_name"`
 }
 
-// Item de la lista
 type DocumentCategoryListItem struct {
 	ID          uint    `json:"id"`
 	Code        string  `json:"code"`
@@ -30,7 +38,6 @@ type DocumentCategoryListItem struct {
 	UpdatedAt   string  `json:"updated_at"`
 }
 
-// Meta de paginación
 type DocumentCategoryPagination struct {
 	Page        int  `json:"page"`
 	PageSize    int  `json:"page_size"`
@@ -40,7 +47,6 @@ type DocumentCategoryPagination struct {
 	HasNextPage bool `json:"has_next_page"`
 }
 
-// Filtros usados en el listado
 type DocumentCategoryListFilters struct {
 	SearchQuery *string `json:"search_query,omitempty"`
 	IsActive    *bool   `json:"is_active,omitempty"`
@@ -48,9 +54,8 @@ type DocumentCategoryListFilters struct {
 	DocTypeName *string `json:"doc_type_name,omitempty"`
 }
 
-// Respuesta de listado
 type DocumentCategoryListResponse struct {
-	Items      []DocumentCategoryListItem  `json:"items"`
-	Pagination DocumentCategoryPagination  `json:"pagination"`
+	Items      []DocumentCategoryListItem `json:"items"`
+	Pagination DocumentCategoryPagination `json:"pagination"`
 	Filters    DocumentCategoryListFilters `json:"filters"`
 }
