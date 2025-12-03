@@ -29,14 +29,23 @@ type DocumentCategoryListItem struct {
 
 // Meta de paginación
 type DocumentCategoryPagination struct {
-	Page       int `json:"page"`
-	PageSize   int `json:"page_size"`
-	TotalItems int `json:"total_items"`
-	TotalPages int `json:"total_pages"`
+	Page        int  `json:"page"`
+	PageSize    int  `json:"page_size"`
+	TotalItems  int  `json:"total_items"`
+	TotalPages  int  `json:"total_pages"`
+	HasPrevPage bool `json:"has_prev_page"`
+	HasNextPage bool `json:"has_next_page"`
+}
+
+// Filtros usados en el listado
+type DocumentCategoryListFilters struct {
+	SearchQuery *string `json:"search_query,omitempty"`
+	IsActive    *bool   `json:"is_active,omitempty"`
 }
 
 // Respuesta de listado
 type DocumentCategoryListResponse struct {
-	Items      []DocumentCategoryListItem `json:"items"`
-	Pagination DocumentCategoryPagination `json:"pagination"`
+	Items      []DocumentCategoryListItem  `json:"items"`
+	Pagination DocumentCategoryPagination  `json:"pagination"`
+	Filters    DocumentCategoryListFilters `json:"filters"`
 }

@@ -95,10 +95,16 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 		return &dto.DocumentCategoryListResponse{
 			Items: []dto.DocumentCategoryListItem{},
 			Pagination: dto.DocumentCategoryPagination{
-				Page:       page,
-				PageSize:   pageSize,
-				TotalItems: 0,
-				TotalPages: 0,
+				Page:        page,
+				PageSize:    pageSize,
+				TotalItems:  0,
+				TotalPages:  0,
+				HasPrevPage: page > 1,
+				HasNextPage: false,
+			},
+			Filters: dto.DocumentCategoryListFilters{
+				SearchQuery: params.SearchQuery,
+				IsActive:    params.IsActive,
 			},
 		}, nil
 	}
@@ -125,13 +131,23 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 		})
 	}
 
+	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+	hasNext := page < totalPages
+	hasPrev := page > 1
+
 	resp := &dto.DocumentCategoryListResponse{
 		Items: items,
 		Pagination: dto.DocumentCategoryPagination{
-			Page:       page,
-			PageSize:   pageSize,
-			TotalItems: int(total),
-			TotalPages: int(math.Ceil(float64(total) / float64(pageSize))),
+			Page:        page,
+			PageSize:    pageSize,
+			TotalItems:  int(total),
+			TotalPages:  totalPages,
+			HasPrevPage: hasPrev,
+			HasNextPage: hasNext,
+		},
+		Filters: dto.DocumentCategoryListFilters{
+			SearchQuery: params.SearchQuery,
+			IsActive:    params.IsActive,
 		},
 	}
 
