@@ -1,0 +1,19 @@
+meta {
+  name: soft enable
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{base_url}}/document-type/:id/enable
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 
+}
+
+settings {
+  encodeUrl: true
+}

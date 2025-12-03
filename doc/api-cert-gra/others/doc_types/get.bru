@@ -1,0 +1,23 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/document-types?page=1&page_size=10&search_query=c&is_active=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  page_size: 10
+  search_query: c
+  is_active: true
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
