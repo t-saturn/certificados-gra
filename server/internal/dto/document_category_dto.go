@@ -2,6 +2,7 @@ package dto
 
 // Request para crear categoría
 type DocumentCategoryCreateRequest struct {
+	DocTypeCode string  `json:"doc_type_code" validate:"required,max=50"` // nuevo
 	Code        string  `json:"code" validate:"required,max=50"`
 	Name        string  `json:"name" validate:"required,max=100"`
 	Description *string `json:"description,omitempty" validate:"omitempty,max=1000"`
@@ -14,6 +15,8 @@ type DocumentCategoryListQuery struct {
 	PageSize    int     `query:"page_size"`
 	SearchQuery *string `query:"search_query"`
 	IsActive    *bool   `query:"is_active"`
+	DocTypeCode *string `query:"doc_type_code"` // nuevo filtro
+	DocTypeName *string `query:"doc_type_name"` // nuevo filtro
 }
 
 // Item de la lista
@@ -41,6 +44,8 @@ type DocumentCategoryPagination struct {
 type DocumentCategoryListFilters struct {
 	SearchQuery *string `json:"search_query,omitempty"`
 	IsActive    *bool   `json:"is_active,omitempty"`
+	DocTypeCode *string `json:"doc_type_code,omitempty"`
+	DocTypeName *string `json:"doc_type_name,omitempty"`
 }
 
 // Respuesta de listado

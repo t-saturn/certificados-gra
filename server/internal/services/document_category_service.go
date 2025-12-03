@@ -32,6 +32,18 @@ func (s *documentCategoryServiceImpl) CreateCategory(ctx context.Context, in dto
 		return fmt.Errorf("database connection is nil")
 	}
 
+	// 1) Buscar el document_type por code
+	var docType models.DocumentType
+	if err := s.db.WithContext(ctx).
+		Where("code = ?", in.DocTypeCode).
+		First(&docType).Error; err != nil {
+
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("document type with code '%s' not found", in.DocTypeCode)
+		}
+		return fmt.Errorf("error fetching document type: %w", err)
+	}
+
 	now := time.Now().UTC()
 	isActive := true
 	if in.IsActive != nil {
@@ -39,12 +51,13 @@ func (s *documentCategoryServiceImpl) CreateCategory(ctx context.Context, in dto
 	}
 
 	category := models.DocumentCategory{
-		Code:        in.Code,
-		Name:        in.Name,
-		Description: in.Description,
-		IsActive:    isActive,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		DocumentTypeID: docType.ID,
+		Code:           in.Code,
+		Name:           in.Name,
+		Description:    in.Description,
+		IsActive:       isActive,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if err := s.db.WithContext(ctx).Create(&category).Error; err != nil {
@@ -77,13 +90,28 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 	query := s.db.WithContext(ctx).
 		Model(&models.DocumentCategory{})
 
+	// Si queremos filtrar por tipo, unimos con document_types
+	if (params.DocTypeCode != nil && *params.DocTypeCode != "") ||
+		(params.DocTypeName != nil && *params.DocTypeName != "") {
+		query = query.Joins("JOIN document_types dt ON dt.id = document_categories.document_type_id")
+	}
+
 	if params.IsActive != nil {
-		query = query.Where("is_active = ?", *params.IsActive)
+		query = query.Where("document_categories.is_active = ?", *params.IsActive)
 	}
 
 	if params.SearchQuery != nil && *params.SearchQuery != "" {
 		q := "%" + *params.SearchQuery + "%"
-		query = query.Where("(code ILIKE ? OR name ILIKE ?)", q, q)
+		query = query.Where("(document_categories.code ILIKE ? OR document_categories.name ILIKE ?)", q, q)
+	}
+
+	if params.DocTypeCode != nil && *params.DocTypeCode != "" {
+		query = query.Where("dt.code = ?", *params.DocTypeCode)
+	}
+
+	if params.DocTypeName != nil && *params.DocTypeName != "" {
+		nameLike := "%" + *params.DocTypeName + "%"
+		query = query.Where("dt.name ILIKE ?", nameLike)
 	}
 
 	var total int64
@@ -105,13 +133,15 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 			Filters: dto.DocumentCategoryListFilters{
 				SearchQuery: params.SearchQuery,
 				IsActive:    params.IsActive,
+				DocTypeCode: params.DocTypeCode,
+				DocTypeName: params.DocTypeName,
 			},
 		}, nil
 	}
 
 	offset := (page - 1) * pageSize
 	if err := query.
-		Order("created_at DESC, id ASC").
+		Order("document_categories.created_at DESC, document_categories.id ASC").
 		Offset(offset).
 		Limit(pageSize).
 		Find(&categories).Error; err != nil {
@@ -148,6 +178,8 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 		Filters: dto.DocumentCategoryListFilters{
 			SearchQuery: params.SearchQuery,
 			IsActive:    params.IsActive,
+			DocTypeCode: params.DocTypeCode,
+			DocTypeName: params.DocTypeName,
 		},
 	}
 
