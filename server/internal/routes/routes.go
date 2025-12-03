@@ -18,5 +18,6 @@ func RegisterRoutes(app *fiber.App) {
 
 	RegisterTemplateRoutes(app)
 	RegisterEventRoutes(app)
-	RegisterCertificateRoutes(app) // 👈 agregar
+	RegisterCertificateRoutes(app)
+	RegisterDocumentCategoryRoutes(app)
 }
