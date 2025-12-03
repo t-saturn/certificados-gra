@@ -74,6 +74,8 @@ type DocumentType struct {
 	CreatedAt   time.Time `gorm:"not null"`
 	UpdatedAt   time.Time `gorm:"not null"`
 
+	Categories []DocumentCategory `gorm:"foreignKey:DocumentTypeID"`
+
 	Events            []Event            `gorm:"foreignKey:DocumentTypeID"`
 	DocumentTemplates []DocumentTemplate `gorm:"foreignKey:DocumentTypeID"`
 	Documents         []Document         `gorm:"foreignKey:DocumentTypeID"`
