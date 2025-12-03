@@ -5,11 +5,22 @@ meta {
 }
 
 post {
-  url: {{base_url}}
-  body: none
+  url: {{base_url}}/document-category
+  body: json
   auth: inherit
+}
+
+body:json {
+  {
+    "doc_type_code": "CERTIFICATE",
+    "code": "CUR",
+    "name": "Curso",
+    "description": "Categoría para cursos",
+    "is_active": true
+  }
 }
 
 settings {
   encodeUrl: true
+  timeout: 0
 }

@@ -5,11 +5,19 @@ meta {
 }
 
 get {
-  url: http://127.0.0.1:8002/others/doc_cat?
+  url: {{base_url}}/document-categories?search_query=&page=1&page_size=10&is_active=true
   body: none
   auth: inherit
 }
 
+params:query {
+  search_query: 
+  page: 1
+  page_size: 10
+  is_active: true
+}
+
 settings {
   encodeUrl: true
+  timeout: 0
 }
