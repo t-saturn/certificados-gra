@@ -17,6 +17,7 @@ type DocumentCategoryService interface {
 	ListCategories(ctx context.Context, params dto.DocumentCategoryListQuery) (*dto.DocumentCategoryListResponse, error)
 	UpdateCategory(ctx context.Context, id uint, in dto.DocumentCategoryUpdateRequest) error
 	SoftDeleteCategory(ctx context.Context, id uint) error
+	EnableCategory(ctx context.Context, id uint) error
 }
 
 type documentCategoryServiceImpl struct {
@@ -227,6 +228,16 @@ func (s *documentCategoryServiceImpl) UpdateCategory(ctx context.Context, id uin
 }
 
 func (s *documentCategoryServiceImpl) SoftDeleteCategory(ctx context.Context, id uint) error {
+	// is_active = false
+	return s.setCategoryActive(ctx, id, false)
+}
+
+func (s *documentCategoryServiceImpl) EnableCategory(ctx context.Context, id uint) error {
+	// is_active = true
+	return s.setCategoryActive(ctx, id, true)
+}
+
+func (s *documentCategoryServiceImpl) setCategoryActive(ctx context.Context, id uint, active bool) error {
 	if s.db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
@@ -241,16 +252,11 @@ func (s *documentCategoryServiceImpl) SoftDeleteCategory(ctx context.Context, id
 		return fmt.Errorf("error fetching document category: %w", err)
 	}
 
-	// Borrado lógico
-	if !category.IsActive {
-		// ya estaba desactivada; no es error, pero igual actualizamos updated_at
-	}
-
-	category.IsActive = false
+	category.IsActive = active
 	category.UpdatedAt = time.Now().UTC()
 
 	if err := s.db.WithContext(ctx).Save(&category).Error; err != nil {
-		return fmt.Errorf("error soft-deleting document category: %w", err)
+		return fmt.Errorf("error updating document category active state: %w", err)
 	}
 
 	return nil

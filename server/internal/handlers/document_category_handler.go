@@ -154,3 +154,26 @@ func (h *DocumentCategoryHandler) SoftDeleteCategory(c fiber.Ctx) (interface{}, 
 		"message": "Document category disabled successfully",
 	}, "ok", nil
 }
+
+// PATCH /document-category/:id/enable
+func (h *DocumentCategoryHandler) EnableCategory(c fiber.Ctx) (interface{}, string, error) {
+	idStr := c.Params("id")
+	if idStr == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "id is required")
+	}
+
+	idUint64, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid id")
+	}
+	id := uint(idUint64)
+
+	ctx := context.Background()
+	if err := h.service.EnableCategory(ctx, id); err != nil {
+		return nil, "error", err
+	}
+
+	return fiber.Map{
+		"message": "Document category enabled successfully",
+	}, "ok", nil
+}

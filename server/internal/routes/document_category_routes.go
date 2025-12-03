@@ -25,4 +25,7 @@ func RegisterDocumentCategoryRoutes(app *fiber.App) {
 
 	// Borrado lógico (is_active = false)
 	app.Patch("/document-category/:id/disable", httpwrap.Wrap(categoryHandler.SoftDeleteCategory))
+
+	// Activar categoría (is_active = true)
+	app.Patch("/document-category/:id/enable", httpwrap.Wrap(categoryHandler.EnableCategory))
 }
