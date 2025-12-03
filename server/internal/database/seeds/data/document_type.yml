@@ -4,9 +4,11 @@
   is_active: true
   categories:
     - name: "trabajo"
+      code: "TRAB"
       description: "Certificados relacionados con actividades laborales o de desempeño en el trabajo."
       is_active: true
     - name: "sgd"
+      code: "SGD"
       description: "Uso del sistema de trámite documentario en el Gobierno Regional de Ayacucho."
       is_active: true
 

@@ -8,7 +8,7 @@ import (
 
 // CORE: USERS & USER DETAILS
 
-// User = usuario autenticado vía SSO
+// User = authenticated user via SSO
 type User struct {
 	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Email      string    `gorm:"size:150;not null;uniqueIndex"`
@@ -21,7 +21,7 @@ type User struct {
 	Events            []Event            `gorm:"foreignKey:CreatedBy"`
 	Documents         []Document         `gorm:"foreignKey:CreatedBy"`
 
-	// Relaciones con módulo de estudio / evaluaciones
+	// Relations with study / evaluations module
 	Evaluations      []Evaluation      `gorm:"foreignKey:UserID"`
 	StudyAnnotations []StudyAnnotation `gorm:"foreignKey:UserID"`
 	StudyProgresses  []StudyProgress   `gorm:"foreignKey:UserID"`
@@ -29,7 +29,7 @@ type User struct {
 
 func (User) TableName() string { return "users" }
 
-// UserDetail = beneficiario de certificados (puede o no tener cuenta)
+// UserDetail = certificate beneficiary (may or may not have an account)
 type UserDetail struct {
 	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	NationalID string    `gorm:"size:20;not null;uniqueIndex"` // DNI
@@ -81,15 +81,19 @@ type DocumentType struct {
 
 func (DocumentType) TableName() string { return "document_types" }
 
-// EXCEPCIÓN: Categorías numéricas autoincrementales
+// EXCEPTION: numeric autoincrement categories
 type DocumentCategory struct {
 	ID             uint      `gorm:"primaryKey;autoIncrement"`
-	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"` // a qué tipo pertenece
-	Name           string    `gorm:"size:100;not null"`
-	Description    *string   `gorm:"type:text"`
-	IsActive       bool      `gorm:"not null;default:true"`
-	CreatedAt      time.Time `gorm:"not null"`
-	UpdatedAt      time.Time `gorm:"not null"`
+	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"` // which type it belongs to
+
+	// New: short code used for serial pattern [CATEGORY], e.g. "CUR", "CAP"
+	Code string `gorm:"size:50;not null;default:''"`
+
+	Name        string    `gorm:"size:100;not null"`
+	Description *string   `gorm:"type:text"`
+	IsActive    bool      `gorm:"not null;default:true"`
+	CreatedAt   time.Time `gorm:"not null"`
+	UpdatedAt   time.Time `gorm:"not null"`
 
 	DocumentType      DocumentType       `gorm:"foreignKey:DocumentTypeID"`
 	DocumentTemplates []DocumentTemplate `gorm:"foreignKey:CategoryID"`
@@ -98,12 +102,20 @@ type DocumentCategory struct {
 func (DocumentCategory) TableName() string { return "document_categories" }
 
 type DocumentTemplate struct {
-	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+
+	// New: template code / series used for [TYPE / SERIES] in the serial
+	// e.g. "CERT", "CONST", "REC-OTIC"
+	Code string `gorm:"size:50;not null;default:''"`
+
 	Name           string    `gorm:"size:150;not null"`
 	Description    *string   `gorm:"type:text"`
 	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
 	CategoryID     *uint     `gorm:"index"`
 
+	// Both are PDF templates:
+	// - PrevFileID: previous/base version
+	// - FileID: current template in use
 	FileID     uuid.UUID `gorm:"type:uuid;not null"`
 	PrevFileID uuid.UUID `gorm:"type:uuid;not null"`
 
@@ -117,7 +129,7 @@ type DocumentTemplate struct {
 	User         *User             `gorm:"foreignKey:CreatedBy"`
 	Documents    []Document        `gorm:"foreignKey:TemplateID"`
 
-	// NUEVO: eventos que usan esta plantilla
+	// NEW: events that use this template
 	Events []Event `gorm:"foreignKey:TemplateID"`
 }
 
@@ -125,25 +137,43 @@ func (DocumentTemplate) TableName() string { return "document_templates" }
 
 // EVENTS & SCHEDULES
 
-// EVENTS & SCHEDULES
-
 type Event struct {
-	ID             uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ID uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+
+	// New: whether the event is visible to normal users.
+	// If false, only admins/owners can see it.
+	IsPublic bool `gorm:"not null;default:true"`
+
+	// New: event-level code / base identifier, can be used as part of document serials.
+	// Example: "EVT-2025-OTIC-01"
+	Code string `gorm:"size:100;not null;default:'';index"`
+
+	// New: certificate type/series used in the serial pattern [TYPE / SERIES].
+	// Usually comes from the template Code, but can be overridden here if needed.
+	CertificateSeries string `gorm:"size:50;not null;default:''"`
+
+	// New: hierarchical codes of the major body and issuing units.
+	// Example: "GGR|OTIC" or "GGR|OTIC|DEP-XYZ"
+	// Used to build [MAJOR BODY] - [ISSUING UNIT] part of the serial.
+	OrganizationalUnitsPath string `gorm:"size:255;not null;default:''"`
+
 	Title          string    `gorm:"size:200;not null"`
 	Description    *string   `gorm:"type:text"`
 	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
 
-	// Plantilla asociada al evento (opcional)
+	// Template associated with the event (optional)
 	TemplateID *uuid.UUID `gorm:"type:uuid;index"`
 
 	Location            string `gorm:"size:200;not null"`
 	MaxParticipants     *int
 	RegistrationOpenAt  *time.Time
 	RegistrationCloseAt *time.Time
-	Status              string    `gorm:"size:50;not null;default:'SCHEDULED'"`
-	CreatedBy           uuid.UUID `gorm:"type:uuid;not null;index"` // User (organizer/admin)
-	CreatedAt           time.Time `gorm:"not null"`
-	UpdatedAt           time.Time `gorm:"not null"`
+
+	// SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, etc.
+	Status    string    `gorm:"size:50;not null;default:'SCHEDULED'"`
+	CreatedBy uuid.UUID `gorm:"type:uuid;not null;index"` // User (organizer/admin)
+	CreatedAt time.Time `gorm:"not null"`
+	UpdatedAt time.Time `gorm:"not null"`
 
 	DocumentType DocumentType      `gorm:"foreignKey:DocumentTypeID"`
 	Template     *DocumentTemplate `gorm:"foreignKey:TemplateID"`
@@ -192,15 +222,15 @@ type Document struct {
 	EventID                *uuid.UUID `gorm:"type:uuid;index"` // nullable for ad-hoc documents
 	DocumentTypeID         uuid.UUID  `gorm:"type:uuid;not null;index"`
 	TemplateID             *uuid.UUID `gorm:"type:uuid;index"`
-	SerialCode             string     `gorm:"size:100;not null;uniqueIndex"`
+	SerialCode             string     `gorm:"size:100;not null;uniqueIndex"` // full serial built from event/template/category/year/correlative
 	VerificationCode       string     `gorm:"size:100;not null;uniqueIndex"`
 	HashValue              string     `gorm:"size:255;not null"`
 	QRText                 *string    `gorm:"size:255"`
-	IssueDate              time.Time  `gorm:"not null"` // date only, but stored as time.Time
+	IssueDate              time.Time  `gorm:"not null"`
 	SignedAt               *time.Time
-	DigitalSignatureStatus string    `gorm:"size:50;not null;default:'PENDING'"` // PENDING, SIGNED, FAILED
-	Status                 string    `gorm:"size:50;not null;default:'ISSUED'"`  // ISSUED, REVOKED, REPLACED
-	CreatedBy              uuid.UUID `gorm:"type:uuid;not null;index"`           // User who issued
+	DigitalSignatureStatus string    `gorm:"size:50;not null;default:'PENDING'"` // PENDING, PARTIALLY_SIGNED, SIGNED, ERROR
+	Status                 string    `gorm:"size:50;not null;default:'ISSUED'"`  // ISSUED, ANNULLED, REPLACED, DRAFT
+	CreatedBy              uuid.UUID `gorm:"type:uuid;not null;index"`
 	CreatedAt              time.Time `gorm:"not null"`
 	UpdatedAt              time.Time `gorm:"not null"`
 
@@ -211,7 +241,7 @@ type Document struct {
 	CreatedByUser User              `gorm:"foreignKey:CreatedBy"`
 	PDFs          []DocumentPDF     `gorm:"foreignKey:DocumentID"`
 
-	// Relaciones con evaluaciones / estudio
+	// Relations with evaluations / study
 	Evaluations []Evaluation `gorm:"foreignKey:DocumentID"`
 }
 
@@ -221,9 +251,12 @@ type DocumentPDF struct {
 	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	DocumentID uuid.UUID `gorm:"type:uuid;not null;index"`
 
-	// nuevo: qué etapa / versión es este PDF
-	Stage   string `gorm:"size:50;not null"`   // e.g. "draft", "signed", "final"
-	Version int    `gorm:"not null;default:1"` // opcional, por si quieres V1, V2, V3...
+	// Stage describes which step this PDF represents for the document:
+	// e.g.: "base", "signer_1", "signer_2", "final", "annulled"
+	Stage string `gorm:"size:50;not null"`
+
+	// Version: V1, V2, etc. for re-issues or corrections.
+	Version int `gorm:"not null;default:1"`
 
 	FileName        string    `gorm:"size:255;not null"`
 	FileID          uuid.UUID `gorm:"type:uuid;not null"`
@@ -240,7 +273,7 @@ func (DocumentPDF) TableName() string { return "document_pdfs" }
 type Evaluation struct {
 	ID          uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID      uuid.UUID  `gorm:"type:uuid;not null;index"`
-	DocumentID  *uuid.UUID `gorm:"type:uuid;index"` // evaluación asociada a un documento (cert / constancia / etc.)
+	DocumentID  *uuid.UUID `gorm:"type:uuid;index"` // evaluation associated to a document (cert / constancy / etc.)
 	Title       string     `gorm:"type:text;not null"`
 	Description *string    `gorm:"type:text"`
 	Status      string     `gorm:"size:20;not null;default:'pending'"` // pending, answered, reviewed
@@ -311,7 +344,7 @@ type EvaluationDoc struct {
 
 func (EvaluationDoc) TableName() string { return "evaluation_docs" }
 
-// STUDY MATERIALS / REFORCEMENT
+// STUDY MATERIALS / REINFORCEMENT
 
 type StudyMaterial struct {
 	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`

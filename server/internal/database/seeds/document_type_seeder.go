@@ -15,6 +15,7 @@ import (
 
 type seedDocumentCategory struct {
 	Name        string  `yaml:"name"`
+	Code        string  `yaml:"code"`
 	Description *string `yaml:"description"`
 	IsActive    *bool   `yaml:"is_active"`
 }
@@ -71,6 +72,7 @@ func SeedDocumentTypes(db *gorm.DB) error {
 			Where("code = ?", docType.Code).
 			Assign(models.DocumentType{
 				Name:        docType.Name,
+				Code:        docType.Code,
 				Description: docType.Description,
 				IsActive:    docType.IsActive,
 				UpdatedAt:   now,
@@ -92,6 +94,7 @@ func SeedDocumentTypes(db *gorm.DB) error {
 
 			cat := models.DocumentCategory{
 				DocumentTypeID: docType.ID,
+				Code:           sc.Code,
 				Name:           sc.Name,
 				Description:    sc.Description,
 				IsActive:       catIsActive,
@@ -103,6 +106,7 @@ func SeedDocumentTypes(db *gorm.DB) error {
 			if err := db.
 				Where("document_type_id = ? AND name = ?", cat.DocumentTypeID, cat.Name).
 				Assign(models.DocumentCategory{
+					Code:        cat.Code,
 					Description: cat.Description,
 					IsActive:    cat.IsActive,
 					UpdatedAt:   now,
