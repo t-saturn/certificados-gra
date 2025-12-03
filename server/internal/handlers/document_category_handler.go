@@ -21,7 +21,7 @@ func NewDocumentCategoryHandler(service services.DocumentCategoryService) *Docum
 	}
 }
 
-// GET /document-categories?search_query=&page=&page_size=&is_active=
+// GET /document-categories?search_query=&page=&page_size=&is_active=&doc_type_code=&doc_type_name=
 func (h *DocumentCategoryHandler) ListCategories(c fiber.Ctx) (interface{}, string, error) {
 	var params dto.DocumentCategoryListQuery
 
@@ -51,6 +51,17 @@ func (h *DocumentCategoryHandler) ListCategories(c fiber.Ctx) (interface{}, stri
 		if ia, err := strconv.ParseBool(iaStr); err == nil {
 			params.IsActive = &ia
 		}
+	}
+
+	// doc_type_code (ej: CERTIFICATE, CONSTANCY)
+	if dtc := strings.TrimSpace(c.Query("doc_type_code")); dtc != "" {
+		upper := strings.ToUpper(dtc)
+		params.DocTypeCode = &upper
+	}
+
+	// doc_type_name (ej: "Certificado de estudio")
+	if dtn := strings.TrimSpace(c.Query("doc_type_name")); dtn != "" {
+		params.DocTypeName = &dtn
 	}
 
 	ctx := context.Background()
