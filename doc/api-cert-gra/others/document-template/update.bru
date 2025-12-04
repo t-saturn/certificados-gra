@@ -1,0 +1,19 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{base_url}}/document-template/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 
+}
+
+settings {
+  encodeUrl: true
+}

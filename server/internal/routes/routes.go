@@ -21,4 +21,5 @@ func RegisterRoutes(app *fiber.App) {
 	RegisterCertificateRoutes(app)
 	RegisterDocumentCategoryRoutes(app)
 	RegisterDocumentTypeRoutes(app)
+	RegisterDocumentTemplateRoutes(app)
 }
