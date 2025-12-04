@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/document-categories?search_query=cur&page=1&page_size=10&doc_type_code=CERTIFICATE&doc_type_name=Certificado&is_active=true
+  url: {{base_url}}/document-categories?search_query=cur&page=1&page_size=10&doc_type_code=CERTIFICATE&doc_type_name=Certificado&is_active=false
   body: none
   auth: inherit
 }
@@ -16,7 +16,7 @@ params:query {
   page_size: 10
   doc_type_code: CERTIFICATE
   doc_type_name: Certificado
-  is_active: true
+  is_active: false
 }
 
 settings {

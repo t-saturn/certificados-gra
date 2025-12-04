@@ -1,17 +1,17 @@
 meta {
-  name: soft enable
+  name: soft disable
   type: http
-  seq: 5
+  seq: 4
 }
 
 patch {
-  url: {{base_url}}/document-type/:id/enable
+  url: {{base_url}}/document-template/:id/disable
   body: none
   auth: inherit
 }
 
 params:path {
-  id: c10d30f3-6de3-46dd-8b92-e402d5f358b1
+  id: 24766fab-a4b8-4362-a4ab-2604b2201fcf
 }
 
 settings {

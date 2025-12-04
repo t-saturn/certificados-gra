@@ -5,15 +5,30 @@ meta {
 }
 
 post {
-  url: {{base_url}}/document-template?user_id
-  body: none
+  url: {{base_url}}/document-template?user_id=bf8b1a90-6f0d-42f9-afd4-b34fd1d15358
+  body: json
   auth: inherit
 }
 
 params:query {
-  user_id: 
+  user_id: bf8b1a90-6f0d-42f9-afd4-b34fd1d15358
+}
+
+body:json {
+  {
+    "doc_type_code": "CERTIFICATE",
+    "doc_category_code": "CUR",
+    "code": "CERT_CURSO_BASICO",
+    "name": "Certificado de Curso Básico",
+    "description": "Plantilla para certificados de cursos básicos realizados en el GRA.",
+    "file_id": "3b728448-5d83-4803-b8c7-131a19a3d2cb",
+    "prev_file_id": "9f4a0b9a-2c11-4d2b-9a67-0c5cfe9a1234",
+    "is_active": true
+  }
+  
 }
 
 settings {
   encodeUrl: true
+  timeout: 0
 }
