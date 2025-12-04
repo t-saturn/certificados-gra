@@ -17,7 +17,7 @@ func RegisterTemplateRoutes(app *fiber.App) {
 
 	// Listar plantillas
 	app.Get("/templates", httpwrap.Wrap(templateHandler.ListTemplates))
-
-	// Actualizar plantilla
 	app.Patch("/template/:id", httpwrap.Wrap(templateHandler.UpdateTemplate))
+	app.Patch("/template/:id/disable", httpwrap.Wrap(templateHandler.DisableTemplate))
+	app.Patch("/template/:id/enable", httpwrap.Wrap(templateHandler.EnableTemplate))
 }
