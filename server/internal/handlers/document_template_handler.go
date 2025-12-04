@@ -20,7 +20,7 @@ func NewDocumentTemplateHandler(service services.DocumentTemplateService) *Docum
 	return &DocumentTemplateHandler{service: service}
 }
 
-// POST /template?user_id=<uuid>
+// POST /document-template?user_id=<uuid>
 func (h *DocumentTemplateHandler) CreateTemplate(c fiber.Ctx) (interface{}, string, error) {
 	userIDStr := strings.TrimSpace(c.Query("user_id"))
 	if userIDStr == "" {
@@ -71,7 +71,7 @@ func (h *DocumentTemplateHandler) CreateTemplate(c fiber.Ctx) (interface{}, stri
 	}, "ok", nil
 }
 
-// GET /templates
+// GET /document-templates
 func (h *DocumentTemplateHandler) ListTemplates(c fiber.Ctx) (interface{}, string, error) {
 	page := 1
 	if p := strings.TrimSpace(c.Query("page")); p != "" {
@@ -104,10 +104,23 @@ func (h *DocumentTemplateHandler) ListTemplates(c fiber.Ctx) (interface{}, strin
 		templateCategoryCode = &upper
 	}
 
+	// is_active: si no se envía, por defecto true
+	var isActive *bool
+	if iaStr := strings.TrimSpace(c.Query("is_active")); iaStr != "" {
+		if ia, err := strconv.ParseBool(iaStr); err == nil {
+			isActive = &ia
+		}
+	} else {
+		// default: true
+		v := true
+		isActive = &v
+	}
+
 	params := dto.DocumentTemplateListQuery{
 		Page:                 page,
 		PageSize:             pageSize,
 		SearchQuery:          searchQuery,
+		IsActive:             isActive,
 		TemplateTypeCode:     templateTypeCode,
 		TemplateCategoryCode: templateCategoryCode,
 	}
@@ -121,7 +134,7 @@ func (h *DocumentTemplateHandler) ListTemplates(c fiber.Ctx) (interface{}, strin
 	return resp, "ok", nil
 }
 
-// PATCH /template/:id
+// PATCH /document-template/:id
 func (h *DocumentTemplateHandler) UpdateTemplate(c fiber.Ctx) (interface{}, string, error) {
 	templateIDStr := strings.TrimSpace(c.Params("id"))
 	templateID, err := uuid.Parse(templateIDStr)
@@ -153,7 +166,7 @@ func (h *DocumentTemplateHandler) UpdateTemplate(c fiber.Ctx) (interface{}, stri
 	}, "ok", nil
 }
 
-// PATCH /template/:id/disable
+// PATCH /document-template/:id/disable
 func (h *DocumentTemplateHandler) DisableTemplate(c fiber.Ctx) (interface{}, string, error) {
 	templateIDStr := strings.TrimSpace(c.Params("id"))
 	templateID, err := uuid.Parse(templateIDStr)
@@ -171,7 +184,7 @@ func (h *DocumentTemplateHandler) DisableTemplate(c fiber.Ctx) (interface{}, str
 	}, "ok", nil
 }
 
-// PATCH /template/:id/enable
+// PATCH /document-template/:id/enable
 func (h *DocumentTemplateHandler) EnableTemplate(c fiber.Ctx) (interface{}, string, error) {
 	templateIDStr := strings.TrimSpace(c.Params("id"))
 	templateID, err := uuid.Parse(templateIDStr)

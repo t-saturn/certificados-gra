@@ -29,6 +29,7 @@ type DocumentTemplateListQuery struct {
 	Page                 int     `query:"page"`
 	PageSize             int     `query:"page_size"`
 	SearchQuery          *string `query:"search_query"`
+	IsActive             *bool   `query:"is_active"`
 	TemplateTypeCode     *string `query:"template_type_code"`
 	TemplateCategoryCode *string `query:"template_category_code"`
 }
@@ -63,6 +64,7 @@ type DocumentTemplatePagination struct {
 // DocumentTemplateListFilters echoes back the filters applied to the list query.
 type DocumentTemplateListFilters struct {
 	SearchQuery          *string `json:"search_query,omitempty"`
+	IsActive             *bool   `json:"is_active,omitempty"`
 	TemplateTypeCode     *string `json:"template_type_code,omitempty"`
 	TemplateCategoryCode *string `json:"template_category_code,omitempty"`
 }

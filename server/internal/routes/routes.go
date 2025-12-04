@@ -16,10 +16,10 @@ func RegisterRoutes(app *fiber.App) {
 
 	app.Get("/health", httpwrap.Wrap(handler.GetHealth))
 
-	RegisterDocumentTemplateRoutes(app)
 	RegisterTemplateRoutes(app)
 	RegisterEventRoutes(app)
 	RegisterCertificateRoutes(app)
 	RegisterDocumentCategoryRoutes(app)
 	RegisterDocumentTypeRoutes(app)
+	RegisterDocumentTemplateRoutes(app)
 }

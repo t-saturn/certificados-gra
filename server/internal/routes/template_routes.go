@@ -15,9 +15,7 @@ func RegisterTemplateRoutes(app *fiber.App) {
 	templateService := services.NewTemplateService(config.DB, notificationService)
 	templateHandler := handlers.NewTemplateHandler(templateService)
 
-	// Listar plantillas
+	app.Post("/template", httpwrap.Wrap(templateHandler.CreateTemplate))
 	app.Get("/templates", httpwrap.Wrap(templateHandler.ListTemplates))
 	app.Patch("/template/:id", httpwrap.Wrap(templateHandler.UpdateTemplate))
-	app.Patch("/template/:id/disable", httpwrap.Wrap(templateHandler.DisableTemplate))
-	app.Patch("/template/:id/enable", httpwrap.Wrap(templateHandler.EnableTemplate))
 }

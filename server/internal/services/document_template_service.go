@@ -35,6 +35,26 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 		return fmt.Errorf("database connection is nil")
 	}
 
+	// 1) Normalizar código (por seguridad)
+	code := strings.TrimSpace(in.Code)
+	if code == "" {
+		return fmt.Errorf("template code is required")
+	}
+
+	// 2) Verificar unicidad del código
+	var existing models.DocumentTemplate
+	if err := s.db.WithContext(ctx).
+		Where("code = ?", code).
+		First(&existing).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return fmt.Errorf("error checking existing document template code: %w", err)
+		}
+	} else {
+		// Si no hubo error, significa que encontró una plantilla con ese code
+		return fmt.Errorf("document template with code '%s' already exists", code)
+	}
+
+	// 3) Buscar document type por code
 	var docType models.DocumentType
 	if err := s.db.WithContext(ctx).
 		Where("code = ?", in.DocTypeCode).
@@ -45,6 +65,7 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 		return fmt.Errorf("error fetching document type: %w", err)
 	}
 
+	// 4) Resolver categoría opcional por doc_category_code
 	var categoryID *uint
 	if in.DocCategoryCode != nil && strings.TrimSpace(*in.DocCategoryCode) != "" {
 		catCode := strings.TrimSpace(*in.DocCategoryCode)
@@ -60,6 +81,7 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 		categoryID = &category.ID
 	}
 
+	// 5) Validar UUIDs de FileID y PrevFileID
 	fileID, err := uuid.Parse(in.FileID)
 	if err != nil {
 		return fmt.Errorf("invalid file_id")
@@ -70,6 +92,7 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 		return fmt.Errorf("invalid prev_file_id")
 	}
 
+	// 6) Setear campos base
 	now := time.Now().UTC()
 	isActive := true
 	if in.IsActive != nil {
@@ -79,7 +102,7 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 	template := models.DocumentTemplate{
 		DocumentTypeID: docType.ID,
 		CategoryID:     categoryID,
-		Code:           in.Code,
+		Code:           code,
 		Name:           in.Name,
 		Description:    in.Description,
 		FileID:         fileID,
@@ -120,6 +143,11 @@ func (s *documentTemplateServiceImpl) ListTemplates(ctx context.Context, params 
 		Preload("DocumentType").
 		Preload("Category")
 
+	// filtro por is_active (ya viene con default=true desde el handler)
+	if params.IsActive != nil {
+		query = query.Where("document_templates.is_active = ?", *params.IsActive)
+	}
+
 	if params.SearchQuery != nil && strings.TrimSpace(*params.SearchQuery) != "" {
 		q := "%" + strings.TrimSpace(*params.SearchQuery) + "%"
 		query = query.Where("document_templates.name ILIKE ?", q)
@@ -153,6 +181,7 @@ func (s *documentTemplateServiceImpl) ListTemplates(ctx context.Context, params 
 			},
 			Filters: dto.DocumentTemplateListFilters{
 				SearchQuery:          params.SearchQuery,
+				IsActive:             params.IsActive,
 				TemplateTypeCode:     params.TemplateTypeCode,
 				TemplateCategoryCode: params.TemplateCategoryCode,
 			},
@@ -212,6 +241,7 @@ func (s *documentTemplateServiceImpl) ListTemplates(ctx context.Context, params 
 		},
 		Filters: dto.DocumentTemplateListFilters{
 			SearchQuery:          params.SearchQuery,
+			IsActive:             params.IsActive,
 			TemplateTypeCode:     params.TemplateTypeCode,
 			TemplateCategoryCode: params.TemplateCategoryCode,
 		},

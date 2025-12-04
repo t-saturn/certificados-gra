@@ -15,4 +15,8 @@ func RegisterDocumentTemplateRoutes(app *fiber.App) {
 	templateHandler := handlers.NewDocumentTemplateHandler(templateService)
 
 	app.Post("/document-template", httpwrap.Wrap(templateHandler.CreateTemplate))
+	app.Get("/document-templates", httpwrap.Wrap(templateHandler.ListTemplates))
+	app.Patch("/document-template/:id", httpwrap.Wrap(templateHandler.UpdateTemplate))
+	app.Patch("/document-template/:id/disable", httpwrap.Wrap(templateHandler.DisableTemplate))
+	app.Patch("/document-template/:id/enable", httpwrap.Wrap(templateHandler.EnableTemplate))
 }
