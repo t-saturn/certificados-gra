@@ -14,5 +14,5 @@ func RegisterDocumentTemplateRoutes(app *fiber.App) {
 	templateService := services.NewDocumentTemplateService(config.DB)
 	templateHandler := handlers.NewDocumentTemplateHandler(templateService)
 
-	app.Post("/template", httpwrap.Wrap(templateHandler.CreateTemplate))
+	app.Post("/document-template", httpwrap.Wrap(templateHandler.CreateTemplate))
 }

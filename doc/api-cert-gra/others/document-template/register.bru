@@ -1,0 +1,19 @@
+meta {
+  name: register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/document-template?user_id
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user_id: 
+}
+
+settings {
+  encodeUrl: true
+}
