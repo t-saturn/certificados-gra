@@ -11,16 +11,12 @@ import (
 
 // RegisterTemplateRoutes registra las rutas relacionadas a plantillas
 func RegisterTemplateRoutes(app *fiber.App) {
-	notificationService := services.NewNotificationService(config.DB)
-	templateService := services.NewTemplateService(config.DB, notificationService)
-	templateHandler := handlers.NewTemplateHandler(templateService)
+	templateService := services.NewDocumentTemplateService(config.DB)
+	templateHandler := handlers.NewDocumentTemplateHandler(templateService)
 
-	// Crear plantilla
 	app.Post("/template", httpwrap.Wrap(templateHandler.CreateTemplate))
-
-	// Listar plantillas
 	app.Get("/templates", httpwrap.Wrap(templateHandler.ListTemplates))
-
-	// Actualizar plantilla
 	app.Patch("/template/:id", httpwrap.Wrap(templateHandler.UpdateTemplate))
+	app.Patch("/template/:id/disable", httpwrap.Wrap(templateHandler.DisableTemplate))
+	app.Patch("/template/:id/enable", httpwrap.Wrap(templateHandler.EnableTemplate))
 }
