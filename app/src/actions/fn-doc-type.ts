@@ -2,13 +2,11 @@
 
 const BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8002';
 
-/* ---------- TIPOS ---------- */
-
 export interface GetDocumentTypesParams {
   page?: number;
   page_size?: number;
   search_query?: string;
-  is_active?: boolean; // <- si viene undefined, mandamos true por defecto
+  is_active?: boolean;
 }
 
 export interface DocumentTypeCategory {
@@ -64,25 +62,21 @@ export type FnGetDocumentTypes = (
   params?: GetDocumentTypesParams,
 ) => Promise<DocumentTypesResult>;
 
-/* ---------- SERVER ACTION ---------- */
-
 export const fn_get_document_types: FnGetDocumentTypes = async (params = {}) => {
   const searchParams = new URLSearchParams();
 
-  // Todos opcionales
   if (params.page !== undefined) {
     searchParams.set('page', String(params.page));
   }
 
   if (params.page_size !== undefined) {
-    searchParams.set('page', String(params.page_size));
+    searchParams.set('page_size', String(params.page_size));
   }
 
   if (params.search_query) {
     searchParams.set('search_query', params.search_query);
   }
 
-  // is_active: por defecto true si no viene nada
   if (params.is_active === undefined) {
     searchParams.set('is_active', 'true');
   } else {
@@ -101,29 +95,12 @@ export const fn_get_document_types: FnGetDocumentTypes = async (params = {}) => 
   });
 
   if (!res.ok) {
-    let text = '';
-    try {
-      text = await res.text();
-    } catch {
-      text = '';
-    }
-
-    console.error('Error al consumir GET /document-types =>', {
-      status: res.status,
-      statusText: res.statusText,
-      body: text,
-    });
-
-    throw new Error(text || 'Error al obtener los tipos de documento');
+    const text = await res.text();
+    console.error('Error al consumir GET /document-types =>', text);
+    throw new Error('Error al obtener los tipos de documento');
   }
 
-  let json: DocumentTypesApiResponse;
-  try {
-    json = (await res.json()) as DocumentTypesApiResponse;
-  } catch (err) {
-    console.error('Error parseando JSON de /document-types =>', err);
-    throw new Error('Respuesta inválida del servicio de tipos de documento');
-  }
+  const json = (await res.json()) as DocumentTypesApiResponse;
 
   if (json.status !== 'success') {
     console.error('Servicio /document-types respondió failed =>', json);

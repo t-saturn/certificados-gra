@@ -18,8 +18,8 @@ import { toast } from 'sonner';
 import { fn_upload_template_file, fn_upload_preview_image, type UploadResult } from '@/actions/fn-file-upload';
 import { fn_get_file_preview, type FilePreviewResult } from '@/actions/fn-file-preview';
 
-import { fn_get_document_types, type DocumentTypeItem } from '@/actions/fn-doc-type';
-import { fn_get_document_categories, type DocumentCategoryItem } from '@/actions/fn-doc-category';
+import { fn_get_document_types } from '@/actions/fn-doc-type';
+import { fn_get_document_categories } from '@/actions/fn-doc-category';
 import { fn_create_document_template, type FnCreateDocumentTemplate } from '@/actions/fn-doc-template';
 
 type TemplateFormState = {
@@ -30,12 +30,25 @@ type TemplateFormState = {
   description: string;
 };
 
+// Opciones simples para UI (map de la respuesta del backend)
+type DocTypeOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type CategoryOption = {
+  id: number;
+  code: string;
+  name: string;
+};
+
 export default function NewTemplatePage() {
   const router = useRouter();
 
   // ---- catálogos dinámicos ----
-  const [documentTypes, setDocumentTypes] = useState<DocumentTypeItem[]>([]);
-  const [categories, setCategories] = useState<DocumentCategoryItem[]>([]);
+  const [docTypeOptions, setDocTypeOptions] = useState<DocTypeOption[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const [loadingDocTypes, setLoadingDocTypes] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
@@ -82,34 +95,45 @@ export default function NewTemplatePage() {
   const loadDocumentTypes = async (searchQuery: string, autoSelectFirst = false) => {
     setLoadingDocTypes(true);
     try {
-      const dtResult = await fn_get_document_types({
+      const params: any = {
         page: 1,
         page_size: 50,
         is_active: true,
-        search_query: searchQuery || undefined,
-      });
+      };
+      if (searchQuery.trim()) {
+        params.search_query = searchQuery.trim();
+      }
 
-      setDocumentTypes(dtResult.items);
+      const dtResult = await fn_get_document_types(params);
 
-      if (autoSelectFirst && dtResult.items.length > 0 && !templateData.document_type_id) {
+      const mapped: DocTypeOption[] = dtResult.items.map((dt) => ({
+        id: dt.id,
+        code: dt.code,
+        name: dt.name,
+      }));
+
+      setDocTypeOptions(mapped);
+
+      if (autoSelectFirst && mapped.length > 0 && !templateData.document_type_id) {
         setTemplateData((prev) => ({
           ...prev,
-          document_type_id: dtResult.items[0].id,
+          document_type_id: mapped[0].id,
         }));
       }
     } catch (error: any) {
       console.error('Error al cargar tipos de documento:', error);
       toast.error(error?.message || 'Error al cargar los tipos de documento');
+      setDocTypeOptions([]);
     } finally {
       setLoadingDocTypes(false);
     }
   };
 
   const loadCategories = async (searchQuery: string, autoSelectFirst = false) => {
-    const selectedDocType = documentTypes.find((dt) => dt.id === templateData.document_type_id);
+    const selectedDocType = docTypeOptions.find((dt) => dt.id === templateData.document_type_id);
 
     if (!selectedDocType) {
-      setCategories([]);
+      setCategoryOptions([]);
       if (autoSelectFirst) {
         setTemplateData((prev) => ({ ...prev, category_id: '' }));
       }
@@ -118,27 +142,37 @@ export default function NewTemplatePage() {
 
     setLoadingCategories(true);
     try {
-      const catResult = await fn_get_document_categories({
+      const params: any = {
         page: 1,
         page_size: 50,
         is_active: true,
-        search_query: searchQuery || undefined,
-        doc_type_code: selectedDocType.code, // filtramos por tipo
-      });
+        doc_type_code: selectedDocType.code,
+      };
+      if (searchQuery.trim()) {
+        params.search_query = searchQuery.trim();
+      }
 
-      setCategories(catResult.items);
+      const catResult = await fn_get_document_categories(params);
 
-      if (autoSelectFirst && !templateData.category_id && catResult.items.length > 0) {
+      const mapped: CategoryOption[] = catResult.items.map((cat) => ({
+        id: cat.id,
+        code: cat.code,
+        name: cat.name,
+      }));
+
+      setCategoryOptions(mapped);
+
+      if (autoSelectFirst && !templateData.category_id && mapped.length > 0) {
         setTemplateData((prev) => ({
           ...prev,
-          category_id: catResult.items[0].id.toString(),
+          category_id: mapped[0].id.toString(),
         }));
       }
     } catch (error: any) {
       console.error('Error al cargar categorías:', error);
-      setCategories([]);
-      setTemplateData((prev) => ({ ...prev, category_id: '' }));
       toast.error(error?.message || 'Error al cargar las categorías');
+      setCategoryOptions([]);
+      setTemplateData((prev) => ({ ...prev, category_id: '' }));
     } finally {
       setLoadingCategories(false);
     }
@@ -150,10 +184,13 @@ export default function NewTemplatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cuando cambia el tipo seleccionado y ya tenemos tipos, podemos cargar categorías por defecto
+  // Cuando cambia el tipo seleccionado cargamos categorías para ese tipo
   useEffect(() => {
     if (templateData.document_type_id) {
       void loadCategories('', true);
+    } else {
+      setCategoryOptions([]);
+      setTemplateData((prev) => ({ ...prev, category_id: '' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateData.document_type_id]);
@@ -235,7 +272,6 @@ export default function NewTemplatePage() {
           setMainPreviewKind(preview.kind);
           setMainPreviewSrc(preview.url);
         } else {
-          // kind === 'text' u otros
           setMainPreviewKind('text');
           setMainPreviewSrc(null);
           setMainPreviewError('Tipo de archivo no soportado para previsualización.');
@@ -324,8 +360,8 @@ export default function NewTemplatePage() {
       return;
     }
 
-    const selectedDocType = documentTypes.find((dt) => dt.id === templateData.document_type_id);
-    const selectedCategory = categories.find((c) => c.id === Number(templateData.category_id));
+    const selectedDocType = docTypeOptions.find((dt) => dt.id === templateData.document_type_id);
+    const selectedCategory = categoryOptions.find((c) => c.id === Number(templateData.category_id));
 
     if (!selectedDocType) {
       toast.error('Tipo de documento seleccionado no es válido');
@@ -364,8 +400,8 @@ export default function NewTemplatePage() {
     }
   };
 
-  const selectedDocType = documentTypes.find((dt) => dt.id === templateData.document_type_id);
-  const selectedCategory = categories.find((c) => c.id === Number(templateData.category_id));
+  const selectedDocType = docTypeOptions.find((dt) => dt.id === templateData.document_type_id);
+  const selectedCategory = categoryOptions.find((c) => c.id === Number(templateData.category_id));
   const isLoadingCatalogs = loadingDocTypes || loadingCategories;
 
   return (
@@ -457,7 +493,7 @@ export default function NewTemplatePage() {
                 >
                   <PopoverTrigger asChild>
                     <Button type="button" variant="outline" role="combobox" aria-expanded={openTypePopover} className="justify-between w-full" disabled={loadingDocTypes}>
-                      {selectedDocType ? `${selectedDocType.name} (${selectedDocType.code})` : 'Selecciona un tipo...'}
+                      {selectedDocType ? `${selectedDocType.name}` : 'Selecciona un tipo...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -474,23 +510,23 @@ export default function NewTemplatePage() {
                       <CommandList>
                         <CommandEmpty>No se encontraron tipos</CommandEmpty>
                         <CommandGroup>
-                          {documentTypes.map((dt) => (
+                          {docTypeOptions.map((dt) => (
                             <CommandItem
                               key={dt.id}
-                              value={`${dt.name} (${dt.code})`}
+                              value={dt.code}
                               onSelect={() => {
                                 setTemplateData((prev) => ({
                                   ...prev,
                                   document_type_id: dt.id,
                                   category_id: '', // reset categoría al cambiar tipo
                                 }));
-                                setCategories([]);
+                                setCategoryOptions([]);
                                 setCategorySearch('');
                                 setOpenTypePopover(false);
                               }}
                             >
                               <Check className={`mr-2 h-4 w-4 ${dt.id === templateData.document_type_id ? 'opacity-100' : 'opacity-0'}`} />
-                              {dt.name} ({dt.code})
+                              {dt.name}
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -525,7 +561,7 @@ export default function NewTemplatePage() {
                       className="justify-between w-full"
                       disabled={loadingCategories || !templateData.document_type_id}
                     >
-                      {selectedCategory ? `${selectedCategory.name} (${selectedCategory.code})` : 'Selecciona una categoría...'}
+                      {selectedCategory ? `${selectedCategory.name}` : 'Selecciona una categoría...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -542,10 +578,10 @@ export default function NewTemplatePage() {
                       <CommandList>
                         <CommandEmpty>No se encontraron categorías</CommandEmpty>
                         <CommandGroup>
-                          {categories.map((cat) => (
+                          {categoryOptions.map((cat) => (
                             <CommandItem
                               key={cat.id}
-                              value={`${cat.name} (${cat.code})`}
+                              value={cat.code}
                               onSelect={() => {
                                 setTemplateData((prev) => ({
                                   ...prev,
@@ -555,7 +591,7 @@ export default function NewTemplatePage() {
                               }}
                             >
                               <Check className={`mr-2 h-4 w-4 ${cat.id === Number(templateData.category_id) ? 'opacity-100' : 'opacity-0'}`} />
-                              {cat.name} ({cat.code})
+                              {cat.name}
                             </CommandItem>
                           ))}
                         </CommandGroup>
