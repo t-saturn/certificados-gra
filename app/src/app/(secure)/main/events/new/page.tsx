@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Card } from '@/components/ui/card';
@@ -15,9 +15,6 @@ import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// 🔹 Server actions: tipos / categorías / plantillas / eventos / preview
-import { fn_get_document_types, type DocumentTypeItem } from '@/actions/fn-doc-type';
-import { fn_get_document_categories, type DocumentCategoryItem } from '@/actions/fn-doc-category';
 import { fn_get_document_templates, type DocumentTemplateItem } from '@/actions/fn-doc-template';
 import { fn_create_event, type CreateEventBody } from '@/actions/fn-events';
 import { fn_get_file_preview, type FilePreviewResult } from '@/actions/fn-file-preview';
@@ -35,20 +32,11 @@ type TemplatePreviewState = {
 export default function Page() {
   const router = useRouter();
 
-  // ------------------------------
-  // Catálogos
-  // ------------------------------
-  const [documentTypes, setDocumentTypes] = useState<DocumentTypeItem[]>([]);
-  const [loadingDocTypes, setLoadingDocTypes] = useState(false);
-  const [categories, setCategories] = useState<DocumentCategoryItem[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-
+  // Catálogo de plantillas
   const [templates, setTemplates] = useState<DocumentTemplateItem[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
-  // ------------------------------
-  // Form state
-  // ------------------------------
+  // Form state (solo campos del body real)
   const [isPublic, setIsPublic] = useState(true);
   const [code, setCode] = useState('');
   const [certificateSeries, setCertificateSeries] = useState('CERT');
@@ -57,18 +45,13 @@ export default function Page() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  const [documentTypeId, setDocumentTypeId] = useState<string>('');
-  const [categoryId, setCategoryId] = useState<number | null>(null);
-
   const [location, setLocation] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number | ''>('');
 
   const [registrationOpenAt, setRegistrationOpenAt] = useState('');
   const [registrationCloseAt, setRegistrationCloseAt] = useState('');
 
-  const [status, setStatus] = useState('SCHEDULED');
-
-  // Template opcional (pero recomendado)
+  // Plantilla (obligatoria en este flujo)
   const [templateId, setTemplateId] = useState<string | null>(null);
 
   // Vista previa del prev_file_id de la plantilla
@@ -84,83 +67,9 @@ export default function Page() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ------------------------------
-  // Helpers
-  // ------------------------------
-  const selectedDocType = documentTypes.find((dt) => dt.id === documentTypeId) || null;
-  const selectedCategory = categories.find((c) => c.id === categoryId) || null;
   const selectedTemplate = templates.find((t) => t.id === templateId) || null;
 
-  // ------------------------------
-  // Load Doc Types on mount
-  // ------------------------------
-  useEffect(() => {
-    const loadDocTypes = async () => {
-      setLoadingDocTypes(true);
-      try {
-        const result = await fn_get_document_types({
-          page: 1,
-          page_size: 50,
-          is_active: true,
-        });
-
-        setDocumentTypes(result.items);
-
-        if (!documentTypeId && result.items.length > 0) {
-          setDocumentTypeId(result.items[0].id);
-        }
-      } catch (err: any) {
-        console.error(err);
-        toast.error('No se pudieron cargar los tipos de documento', {
-          description: err?.message,
-        });
-      } finally {
-        setLoadingDocTypes(false);
-      }
-    };
-
-    void loadDocTypes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ------------------------------
-  // Load Categories when docType changes
-  // ------------------------------
-  useEffect(() => {
-    if (!selectedDocType) {
-      setCategories([]);
-      setCategoryId(null);
-      return;
-    }
-
-    const loadCategories = async () => {
-      setLoadingCategories(true);
-      try {
-        const result = await fn_get_document_categories({
-          page: 1,
-          page_size: 50,
-          is_active: true,
-          doc_type_code: selectedDocType.code,
-        });
-
-        setCategories(result.items);
-        setCategoryId(null); // por defecto: todas
-      } catch (err: any) {
-        console.error(err);
-        toast.error('No se pudieron cargar las categorías', {
-          description: err?.message,
-        });
-      } finally {
-        setLoadingCategories(false);
-      }
-    };
-
-    void loadCategories();
-  }, [selectedDocType?.code]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ------------------------------
-  // Load Templates on demand (en función de tipo + categoría)
-  // ------------------------------
+  // Cargar plantillas on demand
   const handleLoadTemplates = async () => {
     setLoadingTemplates(true);
     try {
@@ -168,8 +77,6 @@ export default function Page() {
         page: 1,
         page_size: 50,
         is_active: true,
-        template_type_code: selectedDocType?.code,
-        template_category_code: selectedCategory?.code,
       });
 
       setTemplates(result.items);
@@ -183,9 +90,7 @@ export default function Page() {
     }
   };
 
-  // ------------------------------
   // Preview de la plantilla seleccionada (prev_file_id)
-  // ------------------------------
   const loadTemplatePreview = async (prevFileId: string | null | undefined) => {
     if (!prevFileId) {
       setTemplatePreview({
@@ -233,9 +138,7 @@ export default function Page() {
     }
   };
 
-  // ------------------------------
   // Schedules handlers
-  // ------------------------------
   const addSchedule = () => {
     setSchedules([...schedules, { start_datetime: '', end_datetime: '' }]);
   };
@@ -250,9 +153,7 @@ export default function Page() {
     setSchedules(updated);
   };
 
-  // ------------------------------
   // Submit
-  // ------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -262,7 +163,6 @@ export default function Page() {
 
     if (!title.trim()) return toast.error('El título es obligatorio');
     if (!description.trim()) return toast.error('La descripción es obligatoria');
-    if (!documentTypeId) return toast.error('Debes seleccionar un tipo de documento');
     if (!location.trim()) return toast.error('La ubicación es obligatoria');
 
     if (!registrationOpenAt) return toast.error('La fecha de apertura de inscripciones es obligatoria');
@@ -292,7 +192,7 @@ export default function Page() {
     try {
       const body: CreateEventBody = {
         is_public: isPublic,
-        code,
+        code, // oficina (ej: OTIC) → el backend genera EVT-YYYY-OTIC-0001
         certificate_series: certificateSeries,
         organizational_units_path: organizationalUnitsPath,
         title,
@@ -302,9 +202,9 @@ export default function Page() {
         max_participants: maxParticipants === '' ? undefined : Number(maxParticipants) || undefined,
         registration_open_at: registrationOpenAtIso,
         registration_close_at: registrationCloseAtIso,
-        status,
+        status: 'SCHEDULED', // siempre SCHEDULED por defecto
         schedules: schedulesIso,
-        participants: [], // por ahora no registramos participantes desde esta pantalla
+        participants: [], // puede ser [] según comentaste
       };
 
       const result = await fn_create_event(body);
@@ -343,8 +243,8 @@ export default function Page() {
 
             <div className="gap-4 grid md:grid-cols-3">
               <div className="flex flex-col gap-2">
-                <Label>Código *</Label>
-                <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ej: EVT-2025-OTIC-01" />
+                <Label>Oficina / Dependencia / Unidad Orgánica *</Label>
+                <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ej: OTIC" />
               </div>
 
               <div className="flex flex-col gap-2">
@@ -383,63 +283,6 @@ export default function Page() {
 
             <div className="gap-4 grid md:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <Label>Tipo de Documento *</Label>
-                <Select value={documentTypeId} onValueChange={(value) => setDocumentTypeId(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingDocTypes ? 'Cargando tipos...' : 'Selecciona un tipo'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingDocTypes ? (
-                      <div className="flex items-center justify-center p-2 text-xs text-muted-foreground">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Cargando...
-                      </div>
-                    ) : (
-                      documentTypes.map((dt) => (
-                        <SelectItem key={dt.id} value={dt.id}>
-                          {dt.name} ({dt.code})
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label>Categoría (para filtrar plantillas)</Label>
-                <Select
-                  value={categoryId ? String(categoryId) : 'all'}
-                  onValueChange={(value) => {
-                    if (value === 'all') setCategoryId(null);
-                    else setCategoryId(Number(value));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingCategories ? 'Cargando categorías...' : 'Todas'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingCategories ? (
-                      <div className="flex items-center justify-center p-2 text-xs text-muted-foreground">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Cargando...
-                      </div>
-                    ) : (
-                      <>
-                        <SelectItem value="all">Todas</SelectItem>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>
-                            {cat.name} ({cat.code})
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="gap-4 grid md:grid-cols-2">
-              <div className="flex flex-col gap-2">
                 <Label>Ubicación *</Label>
                 <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ej: Auditorio Principal" />
               </div>
@@ -469,24 +312,9 @@ export default function Page() {
               </div>
             </div>
 
-            {/* estado */}
-            <div className="flex flex-col gap-2">
-              <Label>Estado</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SCHEDULED">Programado</SelectItem>
-                  <SelectItem value="CANCELLED">Cancelado</SelectItem>
-                  <SelectItem value="COMPLETED">Completado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Plantilla */}
             <div className="flex flex-col gap-2">
-              <Label>Plantilla (certificado / documento)</Label>
+              <Label>Plantilla (certificado / documento) *</Label>
               <Select
                 value={templateId ?? 'none'}
                 onOpenChange={(open) => open && handleLoadTemplates()}
@@ -533,7 +361,7 @@ export default function Page() {
               {/* Vista previa del PDF asociado */}
               <div className="mt-3 space-y-1">
                 <Label className="text-xs">Vista previa de la plantilla (PDF asociado)</Label>
-                <div className="bg-muted border border-dashed border-border rounded-md w-full h-64 overflow-hidden flex items-center justify-center">
+                <div className="bg-muted border border-dashed border-border rounded-md w-full h-96 overflow-hidden flex items-center justify-center">
                   {!templateId ? (
                     <p className="text-xs text-muted-foreground">Selecciona una plantilla para ver su PDF asociado.</p>
                   ) : templatePreview.loading ? (
@@ -548,8 +376,7 @@ export default function Page() {
                   ) : templatePreview.kind === 'pdf' ? (
                     <iframe src={templatePreview.src} title="Vista previa PDF" className="w-full h-full" />
                   ) : templatePreview.kind === 'image' ? (
-                    // por si algún día usas imagen como prev_file_id
-                    <Image src={templatePreview.src} alt="Vista previa plantilla" fill className="object-contain" />
+                    <Image src={templatePreview.src} alt="Vista previa plantilla" className="object-contain w-full h-full" />
                   ) : (
                     <p className="text-xs text-muted-foreground">Tipo de archivo no soportado para previsualización.</p>
                   )}

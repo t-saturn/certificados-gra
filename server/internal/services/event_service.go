@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,10 +36,12 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 
 	// -------- Normalización y validaciones básicas --------
 
-	code := strings.TrimSpace(in.Code)
-	if code == "" {
-		return fmt.Errorf("event code is required")
+	// AHORA in.Code es el "código de oficina" (ej: OTIC)
+	officeCode := strings.TrimSpace(in.Code)
+	if officeCode == "" {
+		return fmt.Errorf("office code is required")
 	}
+	officeCode = strings.ToUpper(officeCode)
 
 	certSeries := strings.TrimSpace(in.CertificateSeries)
 	if certSeries == "" {
@@ -94,45 +97,69 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 	}
 
 	now := time.Now().UTC()
+	year := now.Year()
 
-	event := models.Event{
-		ID:                      uuid.New(),
-		IsPublic:                isPublic,
-		Code:                    code,
-		CertificateSeries:       certSeries,
-		OrganizationalUnitsPath: orgPath,
-		Title:                   title,
-		Description:             in.Description,
-		TemplateID:              templateID,
-		Location:                location,
-		MaxParticipants:         in.MaxParticipants,
-		RegistrationOpenAt:      in.RegistrationOpenAt,
-		RegistrationCloseAt:     in.RegistrationCloseAt,
-		Status:                  status,
-		CreatedBy:               userID,
-		CreatedAt:               now,
-		UpdatedAt:               now,
-	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// -------- Generar código EVT-<year>-<office>-0001 --------
+		codePrefix := fmt.Sprintf("EVT-%d-%s-", year, officeCode)
 
-	// -------- Transacción: Event + Schedules + (UserDetail + Participants) --------
+		var lastEvent models.Event
+		if err := tx.
+			Where("code LIKE ?", codePrefix+"%").
+			Order("code DESC").
+			Limit(1).
+			Find(&lastEvent).Error; err != nil && err != gorm.ErrRecordNotFound {
+			return fmt.Errorf("error getting last event code: %w", err)
+		}
 
-	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Unicidad del code
+		seq := 1
+		if lastEvent.ID != uuid.Nil {
+			parts := strings.Split(lastEvent.Code, "-")
+			if len(parts) >= 4 {
+				nStr := parts[len(parts)-1]
+				if n, err := strconv.Atoi(nStr); err == nil && n >= seq {
+					seq = n + 1
+				}
+			}
+		}
+
+		generatedCode := fmt.Sprintf("%s%04d", codePrefix, seq)
+
+		// Por si acaso, verificación de unicidad del código generado
 		var existing models.Event
-		if err := tx.Where("code = ?", code).First(&existing).Error; err != nil {
+		if err := tx.Where("code = ?", generatedCode).First(&existing).Error; err != nil {
 			if err != gorm.ErrRecordNotFound {
 				return fmt.Errorf("error checking existing event code: %w", err)
 			}
 		} else {
-			return fmt.Errorf("event with code '%s' already exists", code)
+			return fmt.Errorf("event with code '%s' already exists", generatedCode)
 		}
 
-		// Crear evento
+		// -------- Crear evento --------
+		event := models.Event{
+			ID:                      uuid.New(),
+			IsPublic:                isPublic,
+			Code:                    generatedCode,
+			CertificateSeries:       certSeries,
+			OrganizationalUnitsPath: orgPath,
+			Title:                   title,
+			Description:             in.Description,
+			TemplateID:              templateID,
+			Location:                location,
+			MaxParticipants:         in.MaxParticipants,
+			RegistrationOpenAt:      in.RegistrationOpenAt,
+			RegistrationCloseAt:     in.RegistrationCloseAt,
+			Status:                  status,
+			CreatedBy:               userID,
+			CreatedAt:               now,
+			UpdatedAt:               now,
+		}
+
 		if err := tx.Create(&event).Error; err != nil {
 			return fmt.Errorf("error creating event: %w", err)
 		}
 
-		// Crear schedules
+		// -------- Crear schedules --------
 		for _, schReq := range in.Schedules {
 			sch := models.EventSchedule{
 				ID:            uuid.New(),
@@ -146,7 +173,7 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 			}
 		}
 
-		// Participantes: buscar/crear UserDetail por DNI y luego EventParticipant
+		// -------- Participantes --------
 		for idx, pReq := range in.Participants {
 			nationalID := strings.TrimSpace(pReq.NationalID)
 			if nationalID == "" {
@@ -157,7 +184,6 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 			err := tx.Where("national_id = ?", nationalID).First(&userDetail).Error
 			if err != nil {
 				if err == gorm.ErrRecordNotFound {
-					// No existe → debemos crear un UserDetail nuevo
 					if pReq.FirstName == nil || strings.TrimSpace(*pReq.FirstName) == "" {
 						return fmt.Errorf("participant %d missing first_name for new user_detail", idx)
 					}
@@ -198,7 +224,6 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 				}
 			}
 
-			// RegistrationSource normalizado
 			var regSource *string
 			if pReq.RegistrationSource != nil {
 				trimmed := strings.TrimSpace(*pReq.RegistrationSource)
@@ -224,11 +249,7 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 		}
 
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 // -------- ListEvents --------

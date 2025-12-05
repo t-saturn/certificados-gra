@@ -80,9 +80,10 @@ func (h *EventHandler) CreateEvent(c fiber.Ctx) (interface{}, string, error) {
 		}
 	}
 
-	// Validaciones mínimas como antes
+	// Validaciones mínimas
 	if in.Code == "" {
-		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "code is required")
+		// in.Code ahora representa el código de oficina (ej. "OTIC")
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "office code is required")
 	}
 	if in.CertificateSeries == "" {
 		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "certificate_series is required")
