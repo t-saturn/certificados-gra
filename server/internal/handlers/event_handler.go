@@ -134,8 +134,8 @@ func (h *EventHandler) ListEvents(c fiber.Ctx) (interface{}, string, error) {
 	}
 
 	var status *string
-	if s := strings.TrimSpace(c.Query("status")); s != "" {
-		status = &s
+	if sStr := strings.TrimSpace(c.Query("status")); sStr != "" {
+		status = &sStr
 	}
 
 	var templateID *string
@@ -160,6 +160,20 @@ func (h *EventHandler) ListEvents(c fiber.Ctx) (interface{}, string, error) {
 		isTemplateActive = &v
 	}
 
+	// is_public (sin default, solo filtra si viene)
+	var isPublic *bool
+	if ipStr := strings.TrimSpace(c.Query("is_public")); ipStr != "" {
+		if v, err := strconv.ParseBool(ipStr); err == nil {
+			isPublic = &v
+		}
+	}
+
+	// user_id (uuid string, lo parseamos en service)
+	var userID *string
+	if u := strings.TrimSpace(c.Query("user_id")); u != "" {
+		userID = &u
+	}
+
 	var dateFrom *string
 	if df := strings.TrimSpace(c.Query("date_from")); df != "" {
 		dateFrom = &df
@@ -177,6 +191,8 @@ func (h *EventHandler) ListEvents(c fiber.Ctx) (interface{}, string, error) {
 		TemplateID:         templateID,
 		DocumentTypeCode:   docTypeCode,
 		IsTemplateActive:   isTemplateActive,
+		IsPublic:           isPublic, // nuevo
+		UserID:             userID,   // nuevo
 		CreatedDateFromStr: dateFrom,
 		CreatedDateToStr:   dateTo,
 	}

@@ -267,6 +267,19 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 		db = db.Where("events.status = ?", status)
 	}
 
+	// NUEVO: is_public
+	if params.IsPublic != nil {
+		db = db.Where("events.is_public = ?", *params.IsPublic)
+	}
+
+	// NUEVO: user_id -> created_by
+	if params.UserID != nil && strings.TrimSpace(*params.UserID) != "" {
+		userIDStr := strings.TrimSpace(*params.UserID)
+		if userID, err := uuid.Parse(userIDStr); err == nil {
+			db = db.Where("events.created_by = ?", userID)
+		}
+	}
+
 	// template_id
 	if params.TemplateID != nil && strings.TrimSpace(*params.TemplateID) != "" {
 		tidStr := strings.TrimSpace(*params.TemplateID)
@@ -275,7 +288,7 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 		}
 	}
 
-	// document_type_code + is_template_active: join con template y tipo
+	// document_type_code + is_template_active
 	joinedTemplate := false
 
 	if params.DocumentTypeCode != nil && strings.TrimSpace(*params.DocumentTypeCode) != "" {
@@ -305,7 +318,6 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 	if params.CreatedDateToStr != nil && strings.TrimSpace(*params.CreatedDateToStr) != "" {
 		toStr := strings.TrimSpace(*params.CreatedDateToStr)
 		if to, err := time.Parse("2006-01-02", toStr); err == nil {
-			// < día siguiente
 			db = db.Where("events.created_at < ?", to.Add(24*time.Hour))
 		}
 	}
@@ -333,6 +345,8 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 				TemplateID:       params.TemplateID,
 				DocumentTypeCode: params.DocumentTypeCode,
 				IsTemplateActive: params.IsTemplateActive,
+				IsPublic:         params.IsPublic,
+				UserID:           params.UserID,
 				CreatedDateFrom:  params.CreatedDateFromStr,
 				CreatedDateTo:    params.CreatedDateToStr,
 			},
@@ -379,11 +393,11 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 			item.TemplateID = &ev.Template.ID
 			item.TemplateCode = &ev.Template.Code
 			item.TemplateName = &ev.Template.Name
+
 			if ev.Template.DocumentTypeID != uuid.Nil {
 				item.DocumentTypeID = &ev.Template.DocumentTypeID
 			}
 			if ev.Template.DocumentType.ID != uuid.Nil {
-				item.DocumentTypeID = &ev.Template.DocumentType.ID
 				item.DocumentTypeCode = &ev.Template.DocumentType.Code
 				item.DocumentTypeName = &ev.Template.DocumentType.Name
 			}
@@ -412,6 +426,8 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 			TemplateID:       params.TemplateID,
 			DocumentTypeCode: params.DocumentTypeCode,
 			IsTemplateActive: params.IsTemplateActive,
+			IsPublic:         params.IsPublic,
+			UserID:           params.UserID,
 			CreatedDateFrom:  params.CreatedDateFromStr,
 			CreatedDateTo:    params.CreatedDateToStr,
 		},
@@ -420,7 +436,6 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 	return resp, nil
 }
 
-// -------- GetEventByID (detalle completo) --------
 
 // -------- GetEventByID (detalle completo) --------
 

@@ -54,12 +54,16 @@ type EventListQuery struct {
 	PageSize    int     `query:"page_size"`
 	SearchQuery *string `query:"search_query"` // por título
 
-	Status             *string `query:"status"`             // SCHEDULED, COMPLETED, etc.
-	TemplateID         *string `query:"template_id"`        // UUID string
-	DocumentTypeCode   *string `query:"document_type_code"` // ej. CERT
-	IsTemplateActive   *bool   `query:"is_template_active"` // filtra por template.is_active
-	CreatedDateFromStr *string `query:"date_from"`          // YYYY-MM-DD
-	CreatedDateToStr   *string `query:"date_to"`            // YYYY-MM-DD
+	Status           *string `query:"status"`             // SCHEDULED, COMPLETED, etc.
+	TemplateID       *string `query:"template_id"`        // UUID string
+	DocumentTypeCode *string `query:"document_type_code"` // ej. CERT
+	IsTemplateActive *bool   `query:"is_template_active"` // filtra por template.is_active
+
+	IsPublic *bool   `query:"is_public"` // filtra por events.is_public
+	UserID   *string `query:"user_id"`   // UUID del usuario (created_by)
+
+	CreatedDateFromStr *string `query:"date_from"` // YYYY-MM-DD
+	CreatedDateToStr   *string `query:"date_to"`   // YYYY-MM-DD
 }
 
 type EventListItem struct {
@@ -100,8 +104,12 @@ type EventListFilters struct {
 	TemplateID       *string `json:"template_id,omitempty"`
 	DocumentTypeCode *string `json:"document_type_code,omitempty"`
 	IsTemplateActive *bool   `json:"is_template_active,omitempty"`
-	CreatedDateFrom  *string `json:"date_from,omitempty"`
-	CreatedDateTo    *string `json:"date_to,omitempty"`
+
+	IsPublic *bool   `json:"is_public,omitempty"`
+	UserID   *string `json:"user_id,omitempty"`
+
+	CreatedDateFrom *string `json:"date_from,omitempty"`
+	CreatedDateTo   *string `json:"date_to,omitempty"`
 }
 
 type EventListResponse struct {
