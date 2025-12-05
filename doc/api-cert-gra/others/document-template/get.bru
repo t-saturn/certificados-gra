@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/document-templates?page=1&page_size=20&search_query=curso&is_active=true&template_type_code=CERTIFICATE&template_category_code=cur
+  url: {{base_url}}/document-templates?page=1&page_size=20&is_active=true
   body: none
   auth: inherit
 }
@@ -13,10 +13,10 @@ get {
 params:query {
   page: 1
   page_size: 20
-  search_query: curso
   is_active: true
-  template_type_code: CERTIFICATE
-  template_category_code: cur
+  ~search_query: curso
+  ~template_type_code: CERTIFICATE
+  ~template_category_code: cur
 }
 
 settings {

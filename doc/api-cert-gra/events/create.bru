@@ -5,15 +5,45 @@ meta {
 }
 
 post {
-  url: {{base_url}}/event?user_id=
-  body: none
+  url: {{base_url}}/event?user_id=980014a4-7574-4b2d-b061-0660868b120a
+  body: json
   auth: inherit
 }
 
 params:query {
-  user_id: 
+  user_id: 980014a4-7574-4b2d-b061-0660868b120a
+}
+
+body:json {
+  {
+    "is_public": true,
+    "code": "EVT-2025-OTIC-01",
+    "certificate_series": "CERT",
+    "organizational_units_path": "GGR|OTIC",
+    "title": "Curso de Transformación Digital",
+    "description": "Capacitación para funcionarios públicos.",
+    "template_id": "e0b051a2-8a22-4f14-bb27-3f41b9c9a9f1",
+    "location": "Auditorio Principal",
+    "max_participants": 100,
+    "registration_open_at": "2025-01-01T09:00:00Z",
+    "registration_close_at": "2025-01-10T23:59:59Z",
+    "status": "SCHEDULED",
+    "schedules": [
+      {
+        "start_datetime": "2025-01-15T09:00:00Z",
+        "end_datetime": "2025-01-15T13:00:00Z"
+      },
+      {
+        "start_datetime": "2025-01-16T09:00:00Z",
+        "end_datetime": "2025-01-16T13:00:00Z"
+      }
+    ],
+    "participants": []
+  }
+  
 }
 
 settings {
   encodeUrl: true
+  timeout: 0
 }

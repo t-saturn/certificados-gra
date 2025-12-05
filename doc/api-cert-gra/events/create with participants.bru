@@ -17,28 +17,40 @@ params:query {
 body:json {
   {
     "is_public": true,
-    "code": "EVT-2025-OTIC-01",
+    "code": "EVT-2025-OTIC-03",
     "certificate_series": "CERT",
     "organizational_units_path": "GGR|OTIC",
-    "title": "Curso de Transformación Digital",
-    "description": "Capacitación para funcionarios públicos.",
+    "title": "Seminario de Gobierno Digital",
+    "description": "Evento para personal de TI.",
     "template_id": "e0b051a2-8a22-4f14-bb27-3f41b9c9a9f1",
-    "location": "Auditorio Principal",
-    "max_participants": 100,
-    "registration_open_at": "2025-01-01T09:00:00Z",
-    "registration_close_at": "2025-01-10T23:59:59Z",
+    "location": "Auditorio Central",
+    "max_participants": 80,
+    "registration_open_at": "2025-03-01T08:00:00Z",
+    "registration_close_at": "2025-03-05T23:59:59Z",
     "status": "SCHEDULED",
     "schedules": [
       {
-        "start_datetime": "2025-01-15T09:00:00Z",
-        "end_datetime": "2025-01-15T13:00:00Z"
-      },
-      {
-        "start_datetime": "2025-01-16T09:00:00Z",
-        "end_datetime": "2025-01-16T13:00:00Z"
+        "start_datetime": "2025-03-10T09:00:00Z",
+        "end_datetime": "2025-03-10T13:00:00Z"
       }
     ],
-    "participants": []
+    "participants": [
+      {
+        "national_id": "12345678",
+        "first_name": "Juan",
+        "last_name": "Pérez",
+        "phone": "999999999",
+        "email": "juan.perez@example.com",
+        "registration_source": "SELF"
+      },
+      {
+        "national_id": "87654321",
+        "first_name": "María",
+        "last_name": "García",
+        "email": "maria.garcia@example.com",
+        "registration_source": "ADMIN"
+      }
+    ]
   }
   
 }
