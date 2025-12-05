@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 
 type EventService interface {
 	CreateEvent(ctx context.Context, userID uuid.UUID, in dto.EventCreateRequest) error
+	ListEvents(ctx context.Context, params dto.EventListQuery) (*dto.EventListResponse, error)
+	GetEventByID(ctx context.Context, id uuid.UUID) (*dto.EventDetailResponse, error)
 }
 
 type eventServiceImpl struct {
@@ -226,4 +229,307 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 	}
 
 	return nil
+}
+
+// -------- ListEvents --------
+
+func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQuery) (*dto.EventListResponse, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	db := s.db.WithContext(ctx).
+		Model(&models.Event{}).
+		Preload("Template").
+		Preload("Template.DocumentType")
+
+	// search_query: título
+	if params.SearchQuery != nil && strings.TrimSpace(*params.SearchQuery) != "" {
+		q := "%" + strings.TrimSpace(*params.SearchQuery) + "%"
+		db = db.Where("events.title ILIKE ?", q)
+	}
+
+	// status
+	if params.Status != nil && strings.TrimSpace(*params.Status) != "" {
+		status := strings.TrimSpace(*params.Status)
+		db = db.Where("events.status = ?", status)
+	}
+
+	// template_id
+	if params.TemplateID != nil && strings.TrimSpace(*params.TemplateID) != "" {
+		tidStr := strings.TrimSpace(*params.TemplateID)
+		if tid, err := uuid.Parse(tidStr); err == nil {
+			db = db.Where("events.template_id = ?", tid)
+		}
+	}
+
+	// document_type_code + is_template_active: join con template y tipo
+	joinedTemplate := false
+
+	if params.DocumentTypeCode != nil && strings.TrimSpace(*params.DocumentTypeCode) != "" {
+		joinedTemplate = true
+		docTypeCode := strings.TrimSpace(*params.DocumentTypeCode)
+		db = db.Joins(`
+			JOIN document_templates dtpl ON dtpl.id = events.template_id
+			JOIN document_types dt ON dt.id = dtpl.document_type_id`,
+		).Where("dt.code = ?", docTypeCode)
+	}
+
+	if params.IsTemplateActive != nil {
+		if !joinedTemplate {
+			db = db.Joins(`JOIN document_templates dtpl ON dtpl.id = events.template_id`)
+			joinedTemplate = true
+		}
+		db = db.Where("dtpl.is_active = ?", *params.IsTemplateActive)
+	}
+
+	// filtros de fecha sobre created_at (YYYY-MM-DD)
+	if params.CreatedDateFromStr != nil && strings.TrimSpace(*params.CreatedDateFromStr) != "" {
+		fromStr := strings.TrimSpace(*params.CreatedDateFromStr)
+		if from, err := time.Parse("2006-01-02", fromStr); err == nil {
+			db = db.Where("events.created_at >= ?", from)
+		}
+	}
+	if params.CreatedDateToStr != nil && strings.TrimSpace(*params.CreatedDateToStr) != "" {
+		toStr := strings.TrimSpace(*params.CreatedDateToStr)
+		if to, err := time.Parse("2006-01-02", toStr); err == nil {
+			// < día siguiente
+			db = db.Where("events.created_at < ?", to.Add(24*time.Hour))
+		}
+	}
+
+	// count
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, fmt.Errorf("error counting events: %w", err)
+	}
+
+	if total == 0 {
+		return &dto.EventListResponse{
+			Items: []dto.EventListItem{},
+			Pagination: dto.EventListPagination{
+				Page:        page,
+				PageSize:    pageSize,
+				TotalItems:  0,
+				TotalPages:  0,
+				HasPrevPage: page > 1,
+				HasNextPage: false,
+			},
+			Filters: dto.EventListFilters{
+				SearchQuery:      params.SearchQuery,
+				Status:           params.Status,
+				TemplateID:       params.TemplateID,
+				DocumentTypeCode: params.DocumentTypeCode,
+				IsTemplateActive: params.IsTemplateActive,
+				CreatedDateFrom:  params.CreatedDateFromStr,
+				CreatedDateTo:    params.CreatedDateToStr,
+			},
+		}, nil
+	}
+
+	offset := (page - 1) * pageSize
+
+	var events []models.Event
+	if err := db.
+		Order("events.created_at DESC, events.id ASC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&events).Error; err != nil {
+		return nil, fmt.Errorf("error listing events: %w", err)
+	}
+
+	items := make([]dto.EventListItem, 0, len(events))
+	for _, ev := range events {
+		item := dto.EventListItem{
+			ID:                      ev.ID,
+			Code:                    ev.Code,
+			Title:                   ev.Title,
+			Status:                  ev.Status,
+			IsPublic:                ev.IsPublic,
+			CertificateSeries:       ev.CertificateSeries,
+			OrganizationalUnitsPath: ev.OrganizationalUnitsPath,
+			Location:                ev.Location,
+			MaxParticipants:         ev.MaxParticipants,
+			CreatedAt:               ev.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:               ev.UpdatedAt.Format(time.RFC3339),
+		}
+
+		if ev.RegistrationOpenAt != nil {
+			s := ev.RegistrationOpenAt.Format(time.RFC3339)
+			item.RegistrationOpenAt = &s
+		}
+		if ev.RegistrationCloseAt != nil {
+			s := ev.RegistrationCloseAt.Format(time.RFC3339)
+			item.RegistrationCloseAt = &s
+		}
+
+		if ev.Template != nil {
+			item.TemplateID = &ev.Template.ID
+			item.TemplateCode = &ev.Template.Code
+			item.TemplateName = &ev.Template.Name
+			if ev.Template.DocumentTypeID != uuid.Nil {
+				item.DocumentTypeID = &ev.Template.DocumentTypeID
+			}
+			if ev.Template.DocumentType.ID != uuid.Nil {
+				item.DocumentTypeID = &ev.Template.DocumentType.ID
+				item.DocumentTypeCode = &ev.Template.DocumentType.Code
+				item.DocumentTypeName = &ev.Template.DocumentType.Name
+			}
+		}
+
+		items = append(items, item)
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+	hasNext := page < totalPages
+	hasPrev := page > 1
+
+	resp := &dto.EventListResponse{
+		Items: items,
+		Pagination: dto.EventListPagination{
+			Page:        page,
+			PageSize:    pageSize,
+			TotalItems:  int(total),
+			TotalPages:  totalPages,
+			HasPrevPage: hasPrev,
+			HasNextPage: hasNext,
+		},
+		Filters: dto.EventListFilters{
+			SearchQuery:      params.SearchQuery,
+			Status:           params.Status,
+			TemplateID:       params.TemplateID,
+			DocumentTypeCode: params.DocumentTypeCode,
+			IsTemplateActive: params.IsTemplateActive,
+			CreatedDateFrom:  params.CreatedDateFromStr,
+			CreatedDateTo:    params.CreatedDateToStr,
+		},
+	}
+
+	return resp, nil
+}
+
+// -------- GetEventByID (detalle completo) --------
+
+// -------- GetEventByID (detalle completo) --------
+
+func (s *eventServiceImpl) GetEventByID(ctx context.Context, id uuid.UUID) (*dto.EventDetailResponse, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	var ev models.Event
+	if err := s.db.WithContext(ctx).
+		Preload("Template").
+		Preload("Template.DocumentType").
+		Preload("Schedules").
+		Preload("EventParticipants").
+		Preload("EventParticipants.UserDetail").
+		Preload("Documents").
+		Preload("Documents.Template").
+		Preload("Documents.Template.DocumentType").
+		First(&ev, "id = ?", id).Error; err != nil {
+
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("event not found")
+		}
+		return nil, fmt.Errorf("error fetching event: %w", err)
+	}
+
+	resp := dto.EventDetailResponse{
+		ID:                      ev.ID,
+		IsPublic:                ev.IsPublic,
+		Code:                    ev.Code,
+		CertificateSeries:       ev.CertificateSeries,
+		OrganizationalUnitsPath: ev.OrganizationalUnitsPath,
+		Title:                   ev.Title,
+		Description:             ev.Description,
+		Location:                ev.Location,
+		MaxParticipants:         ev.MaxParticipants,
+		RegistrationOpenAt:      ev.RegistrationOpenAt,
+		RegistrationCloseAt:     ev.RegistrationCloseAt,
+		Status:                  ev.Status,
+		CreatedBy:               ev.CreatedBy,
+		CreatedAt:               ev.CreatedAt,
+		UpdatedAt:               ev.UpdatedAt,
+	}
+
+	if ev.Template != nil {
+		resp.Template = &dto.EventDetailTemplateInfo{
+			ID:               ev.Template.ID,
+			Code:             ev.Template.Code,
+			Name:             ev.Template.Name,
+			IsActive:         ev.Template.IsActive,
+			DocumentTypeID:   ev.Template.DocumentTypeID,
+			DocumentTypeCode: ev.Template.DocumentType.Code,
+			DocumentTypeName: ev.Template.DocumentType.Name,
+		}
+	}
+
+	for _, s := range ev.Schedules {
+		resp.Schedules = append(resp.Schedules, dto.EventDetailScheduleItem{
+			ID:            s.ID,
+			StartDatetime: s.StartDatetime,
+			EndDatetime:   s.EndDatetime,
+		})
+	}
+
+	for _, p := range ev.EventParticipants {
+		pi := dto.EventDetailParticipantItem{
+			ID:                 p.ID,
+			UserDetailID:       p.UserDetailID,
+			RegistrationSource: p.RegistrationSource,
+			RegistrationStatus: p.RegistrationStatus,
+			AttendanceStatus:   p.AttendanceStatus,
+			CreatedAt:          p.CreatedAt,
+			UpdatedAt:          p.UpdatedAt,
+		}
+		if p.UserDetail.ID != uuid.Nil {
+			pi.NationalID = p.UserDetail.NationalID
+			pi.FirstName = p.UserDetail.FirstName
+			pi.LastName = p.UserDetail.LastName
+			pi.Phone = p.UserDetail.Phone
+			pi.Email = p.UserDetail.Email
+		}
+		resp.Participants = append(resp.Participants, pi)
+	}
+
+	for _, d := range ev.Documents {
+		di := dto.EventDetailDocumentItem{
+			ID:               d.ID,
+			UserDetailID:     d.UserDetailID,
+			SerialCode:       d.SerialCode,
+			VerificationCode: d.VerificationCode,
+			Status:           d.Status,
+			IssueDate:        d.IssueDate,
+			TemplateID:       d.TemplateID,
+			// DocumentTypeID lo sacamos del template si existe
+		}
+
+		if d.Template != nil {
+			// ID del tipo
+			di.DocumentTypeID = d.Template.DocumentTypeID
+
+			// Código y nombre del tipo (si el preload trajo el DocumentType)
+			if d.Template.DocumentType.ID != uuid.Nil {
+				di.DocumentTypeCode = d.Template.DocumentType.Code
+				di.DocumentTypeName = d.Template.DocumentType.Name
+			}
+		}
+
+		resp.Documents = append(resp.Documents, di)
+	}
+
+	return &resp, nil
 }

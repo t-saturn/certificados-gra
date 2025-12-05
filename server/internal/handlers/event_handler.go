@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"server/internal/dto"
@@ -107,4 +108,107 @@ func (h *EventHandler) CreateEvent(c fiber.Ctx) (interface{}, string, error) {
 	return fiber.Map{
 		"message": "Event created successfully",
 	}, "ok", nil
+}
+
+// GET /events
+func (h *EventHandler) ListEvents(c fiber.Ctx) (interface{}, string, error) {
+	// page
+	page := 1
+	if p := strings.TrimSpace(c.Query("page")); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+
+	// page_size
+	pageSize := 10
+	if ps := strings.TrimSpace(c.Query("page_size")); ps != "" {
+		if parsed, err := strconv.Atoi(ps); err == nil && parsed > 0 {
+			pageSize = parsed
+		}
+	}
+
+	var searchQuery *string
+	if q := strings.TrimSpace(c.Query("search_query")); q != "" {
+		searchQuery = &q
+	}
+
+	var status *string
+	if s := strings.TrimSpace(c.Query("status")); s != "" {
+		status = &s
+	}
+
+	var templateID *string
+	if t := strings.TrimSpace(c.Query("template_id")); t != "" {
+		templateID = &t
+	}
+
+	var docTypeCode *string
+	if dtc := strings.TrimSpace(c.Query("document_type_code")); dtc != "" {
+		upper := strings.ToUpper(dtc)
+		docTypeCode = &upper
+	}
+
+	// is_template_active: si no se envía, por defecto true
+	var isTemplateActive *bool
+	if iaStr := strings.TrimSpace(c.Query("is_template_active")); iaStr != "" {
+		if ia, err := strconv.ParseBool(iaStr); err == nil {
+			isTemplateActive = &ia
+		}
+	} else {
+		v := true
+		isTemplateActive = &v
+	}
+
+	var dateFrom *string
+	if df := strings.TrimSpace(c.Query("date_from")); df != "" {
+		dateFrom = &df
+	}
+	var dateTo *string
+	if dt := strings.TrimSpace(c.Query("date_to")); dt != "" {
+		dateTo = &dt
+	}
+
+	params := dto.EventListQuery{
+		Page:               page,
+		PageSize:           pageSize,
+		SearchQuery:        searchQuery,
+		Status:             status,
+		TemplateID:         templateID,
+		DocumentTypeCode:   docTypeCode,
+		IsTemplateActive:   isTemplateActive,
+		CreatedDateFromStr: dateFrom,
+		CreatedDateToStr:   dateTo,
+	}
+
+	ctx := context.Background()
+	resp, err := h.service.ListEvents(ctx, params)
+	if err != nil {
+		return nil, "error", err
+	}
+
+	return resp, "ok", nil
+}
+
+// GET /event/:id
+func (h *EventHandler) GetEvent(c fiber.Ctx) (interface{}, string, error) {
+	idStr := strings.TrimSpace(c.Params("id"))
+	if idStr == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid event id")
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid event id")
+	}
+
+	ctx := context.Background()
+	detail, err := h.service.GetEventByID(ctx, id)
+	if err != nil {
+		// Podrías mejorar esto detectando "event not found" y devolver 404,
+		// pero para ser consistente con otros handlers, lo dejamos así.
+		return nil, "error", err
+	}
+
+	return detail, "ok", nil
 }

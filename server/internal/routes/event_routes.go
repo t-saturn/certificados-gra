@@ -16,4 +16,10 @@ func RegisterEventRoutes(app *fiber.App) {
 
 	// Crear evento (+ schedules + participantes opcionales)
 	app.Post("/event", httpwrap.Wrap(eventHandler.CreateEvent))
+
+	// Listar eventos
+	app.Get("/events", httpwrap.Wrap(eventHandler.ListEvents))
+
+	// Obtener detalle de un evento
+	app.Get("/event/:id", httpwrap.Wrap(eventHandler.GetEvent))
 }
