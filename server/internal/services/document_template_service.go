@@ -206,6 +206,8 @@ func (s *documentTemplateServiceImpl) ListTemplates(ctx context.Context, params 
 			Code:             t.Code,
 			Name:             t.Name,
 			Description:      t.Description,
+			FileID:           t.FileID.String(),
+			PrevFileID:       t.PrevFileID.String(),
 			IsActive:         t.IsActive,
 			CreatedAt:        t.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:        t.UpdatedAt.Format(time.RFC3339),

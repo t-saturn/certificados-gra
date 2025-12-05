@@ -40,6 +40,8 @@ type DocumentTemplateListItem struct {
 	Code             string    `json:"code"`
 	Name             string    `json:"name"`
 	Description      *string   `json:"description,omitempty"`
+	FileID           string    `json:"file_id"`
+	PrevFileID       string    `json:"prev_file_id"`
 	IsActive         bool      `json:"is_active"`
 	CreatedAt        string    `json:"created_at"`
 	UpdatedAt        string    `json:"updated_at"`

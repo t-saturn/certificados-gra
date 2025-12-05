@@ -37,6 +37,8 @@ export interface DocumentTemplateItem {
   category_id: number;
   category_code: string;
   category_name: string;
+  file_id: string;
+  prev_file_id: string;
 }
 
 export interface DocumentTemplatesPagination {
@@ -71,9 +73,7 @@ export interface DocumentTemplatesResult {
   filters: DocumentTemplatesFilters;
 }
 
-export type FnGetDocumentTemplates = (
-  params?: GetDocumentTemplatesParams,
-) => Promise<DocumentTemplatesResult>;
+export type FnGetDocumentTemplates = (  params?: GetDocumentTemplatesParams,) => Promise<DocumentTemplatesResult>;
 
 /* ---------- SERVER ACTION: GET /document-templates ---------- */
 
