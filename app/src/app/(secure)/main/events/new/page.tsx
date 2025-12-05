@@ -4,6 +4,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import * as XLSX from 'xlsx';
+import yaml from 'js-yaml';
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,6 +87,74 @@ export default function Page() {
 
   // Participantes (opcionales)
   const [participants, setParticipants] = useState<ParticipantForm[]>([]);
+
+  // Participantes cargados desde archivo
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
+
+  const parseParticipantsFromData = (rows: any[]): ParticipantForm[] => {
+    return rows
+      .map((row) => ({
+        national_id: String(row.national_id ?? '').trim(),
+        first_name: row.first_name ? String(row.first_name).trim() : '',
+        last_name: row.last_name ? String(row.last_name).trim() : '',
+        phone: row.phone ? String(row.phone).trim() : '',
+        email: row.email ? String(row.email).trim() : '',
+        registration_source: row.registration_source ? String(row.registration_source).trim() : 'SELF',
+      }))
+      .filter((p) => p.national_id !== '');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileError(null);
+    setIsParsingFile(true);
+    setFileName(file.name);
+
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      let rows: any[] = [];
+
+      if (ext === 'json') {
+        const json = JSON.parse(await file.text());
+        if (Array.isArray(json)) rows = json;
+        else if (Array.isArray(json.participants)) rows = json.participants;
+        else throw new Error('El JSON debe ser un arreglo de participantes o tener la clave "participants".');
+      } else if (ext === 'yml' || ext === 'yaml') {
+        const doc = yaml.load(await file.text());
+        if (Array.isArray(doc)) rows = doc as any[];
+        else if (doc && Array.isArray((doc as any).participants)) rows = (doc as any).participants;
+        else throw new Error('El YAML debe ser un arreglo de participantes o tener la clave "participants".');
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet);
+      } else {
+        throw new Error('Formato no soportado. Usa .xlsx, .xls, .json, .yml o .yaml.');
+      }
+
+      const parsed = parseParticipantsFromData(rows);
+
+      if (!parsed.length) {
+        throw new Error('No se encontraron participantes válidos en el archivo.');
+      }
+
+      setParticipants(parsed);
+    } catch (err: any) {
+      console.error(err);
+      setParticipants([]);
+      setFileError(err?.message ?? 'Error al procesar el archivo.');
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  const hasParticipants = participants.length > 0;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -199,14 +270,17 @@ export default function Page() {
   };
 
   // Participants handlers
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const addParticipant = () => {
     setParticipants((prev) => [...prev, { national_id: '', first_name: '', last_name: '', phone: '', email: '', registration_source: 'SELF' }]);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const removeParticipant = (idx: number) => {
     setParticipants((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const updateParticipant = (idx: number, field: keyof ParticipantForm, value: string) => {
     setParticipants((prev) => {
       const copy = [...prev];
@@ -369,7 +443,6 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Stepper */}
       {/* Stepper */}
       <div className="flex justify-center mb-6">
         <div className="flex w-full max-w-3xl items-center">
@@ -654,69 +727,68 @@ export default function Page() {
 
           {step === 3 && (
             <>
-              {/* Paso 3: participantes */}
+              {/* Paso 3: participantes por archivo */}
               <div className="space-y-4">
                 <h2 className="font-semibold text-lg">Participantes (opcional)</h2>
-                <p className="text-xs text-muted-foreground">Puedes registrar participantes desde ahora o dejar esta sección vacía y agregarlos más adelante.</p>
+                <p className="text-xs text-muted-foreground">
+                  Puedes cargar un archivo <strong>Excel (.xlsx/.xls)</strong>, <strong>JSON</strong> o <strong>YAML</strong> con la lista de participantes. Si no cargas ningún
+                  archivo, el evento se guardará sin participantes.
+                </p>
 
-                {participants.length === 0 && (
-                  <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">No hay participantes registrados aún.</div>
-                )}
+                <div className="space-y-3">
+                  <Label className="text-xs">Archivo de participantes</Label>
+                  <input type="file" accept=".xlsx,.xls,.json,.yml,.yaml" onChange={handleFileUpload} className="block text-xs" />
 
-                {participants.map((p, idx) => (
-                  <Card key={idx} className="space-y-3 p-4 border-border bg-muted/40">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold">Participante #{idx + 1}</span>
-                      <Button type="button" variant="ghost" size="sm" className="gap-1 text-destructive" onClick={() => removeParticipant(idx)}>
-                        <Trash2 className="w-3 h-3" />
-                        Quitar
-                      </Button>
+                  {fileName && (
+                    <p className="text-xs text-muted-foreground">
+                      Archivo seleccionado: <span className="font-medium">{fileName}</span>
+                    </p>
+                  )}
+
+                  {isParsingFile && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Procesando archivo...</span>
                     </div>
+                  )}
 
-                    <div className="gap-3 grid md:grid-cols-3">
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">DNI *</Label>
-                        <Input value={p.national_id} onChange={(e) => updateParticipant(idx, 'national_id', e.target.value)} placeholder="Ej: 12345678" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Nombre</Label>
-                        <Input value={p.first_name} onChange={(e) => updateParticipant(idx, 'first_name', e.target.value)} placeholder="Ej: Juan" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Apellido</Label>
-                        <Input value={p.last_name} onChange={(e) => updateParticipant(idx, 'last_name', e.target.value)} placeholder="Ej: Pérez" />
-                      </div>
+                  {fileError && <p className="text-xs text-destructive">{fileError}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Participantes detectados {hasParticipants && `(${participants.length})`}</h3>
+
+                  {!hasParticipants ? (
+                    <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">No hay participantes cargados todavía.</div>
+                  ) : (
+                    <div className="rounded-md border border-border max-h-72 overflow-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold">DNI</th>
+                            <th className="px-3 py-2 text-left font-semibold">Nombre</th>
+                            <th className="px-3 py-2 text-left font-semibold">Apellido</th>
+                            <th className="px-3 py-2 text-left font-semibold">Teléfono</th>
+                            <th className="px-3 py-2 text-left font-semibold">Email</th>
+                            <th className="px-3 py-2 text-left font-semibold">Origen</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {participants.map((p, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-3 py-1 font-mono">{p.national_id}</td>
+                              <td className="px-3 py-1">{p.first_name}</td>
+                              <td className="px-3 py-1">{p.last_name}</td>
+                              <td className="px-3 py-1">{p.phone}</td>
+                              <td className="px-3 py-1">{p.email}</td>
+                              <td className="px-3 py-1">{p.registration_source}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-
-                    <div className="gap-3 grid md:grid-cols-3">
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Teléfono</Label>
-                        <Input value={p.phone} onChange={(e) => updateParticipant(idx, 'phone', e.target.value)} placeholder="Ej: 999999999" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Email</Label>
-                        <Input type="email" value={p.email} onChange={(e) => updateParticipant(idx, 'email', e.target.value)} placeholder="juan.perez@example.com" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Origen de registro</Label>
-                        <Select value={p.registration_source} onValueChange={(val) => updateParticipant(idx, 'registration_source', val)}>
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Selecciona origen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SELF">Autoregistro</SelectItem>
-                            <SelectItem value="ADMIN">Registrado por admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-
-                <Button type="button" variant="outline" className="gap-2" onClick={addParticipant}>
-                  <Plus className="w-4 h-4" />
-                  Agregar participante
-                </Button>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -740,7 +812,7 @@ export default function Page() {
             ) : (
               <Button type="submit" disabled={isSubmitting} className="gap-2">
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Registrar evento
+                {hasParticipants ? 'Guardar' : 'Omitir y guardar'}
               </Button>
             )}
           </div>
