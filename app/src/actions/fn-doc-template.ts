@@ -325,3 +325,132 @@ export const fn_update_document_template: FnUpdateDocumentTemplate = async (id, 
     message: json.data?.message ?? 'Plantilla de documento actualizada correctamente',
   };
 };
+
+/* ---------- DISABLE: PATCH /document-template/:id/disable ---------- */
+
+interface ToggleDocumentTemplateApiData {
+  message: string; // "Document template disabled successfully" / "enabled successfully"
+}
+
+interface ToggleDocumentTemplateApiResponse {
+  data: ToggleDocumentTemplateApiData | null;
+  status: 'success' | 'failed';
+  message: string;
+}
+
+export interface ToggleDocumentTemplateResult {
+  message: string;
+}
+
+export type FnDisableDocumentTemplate = (id: string) => Promise<ToggleDocumentTemplateResult>;
+export type FnEnableDocumentTemplate = (id: string) => Promise<ToggleDocumentTemplateResult>;
+
+export const fn_disable_document_template: FnDisableDocumentTemplate = async (id) => {
+  if (!id) {
+    throw new Error('El id de la plantilla de documento es obligatorio');
+  }
+
+  const url = `${BASE_URL}/document-template/${encodeURIComponent(id)}/disable`;
+
+  console.log('[fn_disable_document_template] URL:', url);
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    let text = '';
+    try {
+      text = await res.text();
+    } catch {
+      text = '';
+    }
+
+    console.error('Error al consumir PATCH /document-template/:id/disable =>', {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
+
+    throw new Error(
+      text || `Error al deshabilitar la plantilla de documento (status ${res.status})`,
+    );
+  }
+
+  let json: ToggleDocumentTemplateApiResponse;
+  try {
+    json = (await res.json()) as ToggleDocumentTemplateApiResponse;
+  } catch (err) {
+    console.error('Error parseando JSON de PATCH /document-template/:id/disable =>', err);
+    throw new Error('Respuesta inválida del servicio de plantillas de documento');
+  }
+
+  if (json.status !== 'success') {
+    console.error('Servicio PATCH /document-template/:id/disable respondió failed =>', json);
+    throw new Error(json.message || 'Error en el servicio de plantillas de documento');
+  }
+
+  return {
+    message: json.data?.message ?? 'Plantilla de documento deshabilitada correctamente',
+  };
+};
+
+/* ---------- ENABLE: PATCH /document-template/:id/enable ---------- */
+
+export const fn_enable_document_template: FnEnableDocumentTemplate = async (id) => {
+  if (!id) {
+    throw new Error('El id de la plantilla de documento es obligatorio');
+  }
+
+  const url = `${BASE_URL}/document-template/${encodeURIComponent(id)}/enable`;
+
+  console.log('[fn_enable_document_template] URL:', url);
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    let text = '';
+    try {
+      text = await res.text();
+    } catch {
+      text = '';
+    }
+
+    console.error('Error al consumir PATCH /document-template/:id/enable =>', {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
+
+    throw new Error(
+      text || `Error al habilitar la plantilla de documento (status ${res.status})`,
+    );
+  }
+
+  let json: ToggleDocumentTemplateApiResponse;
+  try {
+    json = (await res.json()) as ToggleDocumentTemplateApiResponse;
+  } catch (err) {
+    console.error('Error parseando JSON de PATCH /document-template/:id/enable =>', err);
+    throw new Error('Respuesta inválida del servicio de plantillas de documento');
+  }
+
+  if (json.status !== 'success') {
+    console.error('Servicio PATCH /document-template/:id/enable respondió failed =>', json);
+    throw new Error(json.message || 'Error en el servicio de plantillas de documento');
+  }
+
+  return {
+    message: json.data?.message ?? 'Plantilla de documento habilitada correctamente',
+  };
+};
