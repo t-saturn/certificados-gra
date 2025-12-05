@@ -587,11 +587,11 @@ export default function Page() {
                 </div>
 
                 {/* Previews */}
-                <div className="gap-4 grid md:grid-cols-2">
+                <div className="gap-4 grid md:grid-cols-2 md:h-[60vh]">
                   {/* PDF principal (file_id) */}
-                  <div className="space-y-1">
-                    <Label className="text-xs">PDF principal (plantilla) — file_id</Label>
-                    <div className="bg-muted border border-dashed border-border rounded-md w-full h-64 overflow-hidden flex items-center justify-center">
+                  <div className="flex flex-col space-y-1 h-full">
+                    <Label className="text-xs">Pantilla del documento</Label>
+                    <div className="flex-1 bg-muted border border-dashed border-border rounded-md w-full overflow-hidden flex items-center justify-center">
                       {!templateId ? (
                         <p className="text-xs text-muted-foreground">Selecciona una plantilla para ver su PDF principal.</p>
                       ) : mainPreview.loading ? (
@@ -619,9 +619,9 @@ export default function Page() {
                   </div>
 
                   {/* PDF asociado (prev_file_id) */}
-                  <div className="space-y-1">
-                    <Label className="text-xs">PDF asociado / referencia — prev_file_id</Label>
-                    <div className="bg-muted border border-dashed border-border rounded-md w-full h-64 overflow-hidden flex items-center justify-center">
+                  <div className="flex flex-col space-y-1 h-full">
+                    <Label className="text-xs">Previsualización del documento</Label>
+                    <div className="flex-1 bg-muted border border-dashed border-border rounded-md w-full overflow-hidden flex items-center justify-center">
                       {!templateId ? (
                         <p className="text-xs text-muted-foreground">Selecciona una plantilla para ver su PDF asociado.</p>
                       ) : associatedPreview.loading ? (
