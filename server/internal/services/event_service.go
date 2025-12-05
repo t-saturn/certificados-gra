@@ -30,7 +30,8 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 		return fmt.Errorf("database connection is nil")
 	}
 
-	// Normalizar / defaults
+	// -------- Normalización y validaciones básicas --------
+
 	code := strings.TrimSpace(in.Code)
 	if code == "" {
 		return fmt.Errorf("event code is required")
@@ -60,7 +61,6 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 		return fmt.Errorf("at least one schedule is required")
 	}
 
-	// Validar schedule dates básicos
 	for i, sch := range in.Schedules {
 		if sch.StartDatetime.IsZero() || sch.EndDatetime.IsZero() {
 			return fmt.Errorf("schedule %d has invalid datetime", i)
@@ -70,7 +70,7 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 		}
 	}
 
-	// Parsear TemplateID (si viene)
+	// TemplateID opcional
 	var templateID *uuid.UUID
 	if in.TemplateID != nil && strings.TrimSpace(*in.TemplateID) != "" {
 		tid, err := uuid.Parse(strings.TrimSpace(*in.TemplateID))
@@ -78,39 +78,6 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 			return fmt.Errorf("invalid template_id")
 		}
 		templateID = &tid
-	}
-
-	// Parsear participantes
-	participants := make([]models.EventParticipant, 0, len(in.Participants))
-	for idx, p := range in.Participants {
-		userDetailStr := strings.TrimSpace(p.UserDetailID)
-		if userDetailStr == "" {
-			return fmt.Errorf("participant %d has empty user_detail_id", idx)
-		}
-
-		udID, err := uuid.Parse(userDetailStr)
-		if err != nil {
-			return fmt.Errorf("participant %d has invalid user_detail_id", idx)
-		}
-
-		var regSource *string
-		if p.RegistrationSource != nil {
-			trimmed := strings.TrimSpace(*p.RegistrationSource)
-			if trimmed != "" {
-				regSource = &trimmed
-			}
-		}
-
-		participants = append(participants, models.EventParticipant{
-			ID:                 uuid.New(),
-			EventID:            uuid.Nil, // se setea después de crear el evento
-			UserDetailID:       udID,
-			RegistrationSource: regSource,
-			RegistrationStatus: "REGISTERED",
-			AttendanceStatus:   "PENDING",
-			CreatedAt:          time.Now().UTC(),
-			UpdatedAt:          time.Now().UTC(),
-		})
 	}
 
 	isPublic := true
@@ -144,9 +111,10 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 		UpdatedAt:               now,
 	}
 
-	// Transaction: Event + Schedules + Participants
+	// -------- Transacción: Event + Schedules + (UserDetail + Participants) --------
+
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Asegurar unicidad del code
+		// Unicidad del code
 		var existing models.Event
 		if err := tx.Where("code = ?", code).First(&existing).Error; err != nil {
 			if err != gorm.ErrRecordNotFound {
@@ -175,11 +143,80 @@ func (s *eventServiceImpl) CreateEvent(ctx context.Context, userID uuid.UUID, in
 			}
 		}
 
-		// Crear participantes opcionales
-		for i := range participants {
-			participants[i].EventID = event.ID
-			if err := tx.Create(&participants[i]).Error; err != nil {
-				return fmt.Errorf("error creating event participant: %w", err)
+		// Participantes: buscar/crear UserDetail por DNI y luego EventParticipant
+		for idx, pReq := range in.Participants {
+			nationalID := strings.TrimSpace(pReq.NationalID)
+			if nationalID == "" {
+				return fmt.Errorf("participant %d has empty national_id", idx)
+			}
+
+			var userDetail models.UserDetail
+			err := tx.Where("national_id = ?", nationalID).First(&userDetail).Error
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					// No existe → debemos crear un UserDetail nuevo
+					if pReq.FirstName == nil || strings.TrimSpace(*pReq.FirstName) == "" {
+						return fmt.Errorf("participant %d missing first_name for new user_detail", idx)
+					}
+					if pReq.LastName == nil || strings.TrimSpace(*pReq.LastName) == "" {
+						return fmt.Errorf("participant %d missing last_name for new user_detail", idx)
+					}
+
+					firstName := strings.TrimSpace(*pReq.FirstName)
+					lastName := strings.TrimSpace(*pReq.LastName)
+
+					var phone *string
+					if pReq.Phone != nil && strings.TrimSpace(*pReq.Phone) != "" {
+						ph := strings.TrimSpace(*pReq.Phone)
+						phone = &ph
+					}
+					var email *string
+					if pReq.Email != nil && strings.TrimSpace(*pReq.Email) != "" {
+						em := strings.TrimSpace(*pReq.Email)
+						email = &em
+					}
+
+					userDetail = models.UserDetail{
+						ID:         uuid.New(),
+						NationalID: nationalID,
+						FirstName:  firstName,
+						LastName:   lastName,
+						Phone:      phone,
+						Email:      email,
+						CreatedAt:  now,
+						UpdatedAt:  now,
+					}
+
+					if createErr := tx.Create(&userDetail).Error; createErr != nil {
+						return fmt.Errorf("error creating user_detail for participant %d: %w", idx, err)
+					}
+				} else {
+					return fmt.Errorf("error fetching user_detail for participant %d: %w", idx, err)
+				}
+			}
+
+			// RegistrationSource normalizado
+			var regSource *string
+			if pReq.RegistrationSource != nil {
+				trimmed := strings.TrimSpace(*pReq.RegistrationSource)
+				if trimmed != "" {
+					regSource = &trimmed
+				}
+			}
+
+			participant := models.EventParticipant{
+				ID:                 uuid.New(),
+				EventID:            event.ID,
+				UserDetailID:       userDetail.ID,
+				RegistrationSource: regSource,
+				RegistrationStatus: "REGISTERED",
+				AttendanceStatus:   "PENDING",
+				CreatedAt:          now,
+				UpdatedAt:          now,
+			}
+
+			if err := tx.Create(&participant).Error; err != nil {
+				return fmt.Errorf("error creating event participant %d: %w", idx, err)
 			}
 		}
 

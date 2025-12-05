@@ -1,39 +1,38 @@
 package dto
 
-import (
-	"time"
-)
+import "time"
 
-// EventScheduleCreateRequest representa un bloque de horario del evento.
+// EventScheduleCreateRequest se mantiene igual
 type EventScheduleCreateRequest struct {
-	StartDatetime time.Time `json:"start_datetime"` // requerido
-	EndDatetime   time.Time `json:"end_datetime"`   // requerido, > StartDatetime
+	StartDatetime time.Time `json:"start_datetime"`
+	EndDatetime   time.Time `json:"end_datetime"`
 }
 
-// EventParticipantCreateRequest representa el registro de un participante para el evento.
+// Ahora recibimos los datos del usuario en vez de user_detail_id
 type EventParticipantCreateRequest struct {
-	UserDetailID       string  `json:"user_detail_id"`                // UUID en string
+	// DNI del participante (obligatorio)
+	NationalID string `json:"national_id"`
+
+	// Datos del usuario (solo obligatorios si no existe en BD)
+	FirstName *string `json:"first_name,omitempty"`
+	LastName  *string `json:"last_name,omitempty"`
+	Phone     *string `json:"phone,omitempty"`
+	Email     *string `json:"email,omitempty"`
+
 	RegistrationSource *string `json:"registration_source,omitempty"` // SELF, IMPORTED, ADMIN
 }
 
-// EventCreateRequest representa el payload para crear un evento con horarios y participantes opcionales.
+// EventCreateRequest sigue igual excepto que usa el struct de arriba
 type EventCreateRequest struct {
-	// Si es nil, en el service se asume true.
 	IsPublic *bool `json:"is_public,omitempty"`
 
-	// Código del evento, ej. "EVT-2025-OTIC-01"
-	Code string `json:"code"`
-
-	// Series de certificado [TYPE / SERIES], ej. "CERT"
-	CertificateSeries string `json:"certificate_series"`
-
-	// Path jerárquico de unidades, ej. "GGR|OTIC" o "GGR|OTIC|DEP-XYZ"
+	Code                    string `json:"code"`
+	CertificateSeries       string `json:"certificate_series"`
 	OrganizationalUnitsPath string `json:"organizational_units_path"`
 
 	Title       string  `json:"title"`
 	Description *string `json:"description,omitempty"`
 
-	// Template asociado (opcional) - UUID en string
 	TemplateID *string `json:"template_id,omitempty"`
 
 	Location        string `json:"location"`
@@ -42,12 +41,8 @@ type EventCreateRequest struct {
 	RegistrationOpenAt  *time.Time `json:"registration_open_at,omitempty"`
 	RegistrationCloseAt *time.Time `json:"registration_close_at,omitempty"`
 
-	// SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, etc. (opcional, default SCHEDULED)
 	Status *string `json:"status,omitempty"`
 
-	// Al menos 1 horario
-	Schedules []EventScheduleCreateRequest `json:"schedules"`
-
-	// Participantes opcionales
+	Schedules    []EventScheduleCreateRequest    `json:"schedules"`
 	Participants []EventParticipantCreateRequest `json:"participants,omitempty"`
 }
