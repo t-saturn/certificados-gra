@@ -39,7 +39,7 @@ export const baseMenus: SidebarMenuGroup[] = [
         label: 'Auditoría',
         icon: ShieldCheck,
         url: '/main/audit',
-        roles: ['org', 'admin'],
+        roles: ['admin'],
       },
       {
         label: 'Configuración',

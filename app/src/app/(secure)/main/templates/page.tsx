@@ -441,7 +441,7 @@ const TemplatesPage: FC = () => {
                       {/* Preview Area usando prev_file_id de la plantilla */}
                       <div className="flex justify-center items-center bg-muted p-4 border border-border rounded min-h-32">
                         <div className="w-full">
-                          <p className="text-muted-foreground text-xs text-center">Vista previa de la imagen</p>
+                          <p className="text-muted-foreground text-xs text-center">Vista previa</p>
 
                           <div
                             className={`relative flex justify-center items-center bg-background mx-auto mt-2 border border-border border-dashed rounded max-w-xs h-40 overflow-hidden ${

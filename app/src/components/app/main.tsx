@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, CheckCircle, Search, ArrowRight, Mail } from 'lucide-react';
+import { FileText, CheckCircle, Search, ArrowRight, Mail, Key } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,8 +20,8 @@ export const Main = () => {
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="#servicios">
-              <FileText className="mr-2 w-4 h-4" /> Ver Servicios
+            <Link href="/main">
+              <Key className="mr-2 w-4 h-4" /> Iniciar Sesión
             </Link>
           </Button>
         </div>
