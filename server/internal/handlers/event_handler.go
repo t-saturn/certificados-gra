@@ -2,9 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"strconv"
 	"strings"
 
 	"server/internal/dto"
@@ -15,444 +12,83 @@ import (
 )
 
 type EventHandler struct {
-	svc services.EventService
+	service services.EventService
 }
 
-func NewEventHandler(svc services.EventService) *EventHandler {
-	return &EventHandler{svc: svc}
+func NewEventHandler(service services.EventService) *EventHandler {
+	return &EventHandler{service: service}
 }
 
-// ... CreateEvent, UpdateEvent, ListEvents, etc.
-
-// GET /event-detail?event_id=<uuid>&user_id=<uuid_opcional>
-func (h *EventHandler) GetEventDetail(c fiber.Ctx) (interface{}, string, error) {
-	eventIDStr := c.Query("event_id")
-	if eventIDStr == "" {
-		return nil, "bad_request", fmt.Errorf("event_id query param is required")
-	}
-
-	eventID, err := uuid.Parse(eventIDStr)
-	if err != nil {
-		return nil, "bad_request", fmt.Errorf("invalid event_id")
-	}
-
-	var userIDPtr *uuid.UUID
-	if userIDStr := c.Query("user_id"); userIDStr != "" {
-		uid, parseErr := uuid.Parse(userIDStr)
-		if parseErr != nil {
-			return nil, "bad_request", fmt.Errorf("invalid user_id")
-		}
-		userIDPtr = &uid
-	}
-
-	resp, err := h.svc.GetEventDetail(context.Background(), eventID, userIDPtr)
-	if err != nil {
-		// Aquí diferenciamos el tipo de error para que httpwrap pueda decidir mejor
-		switch {
-		case errors.Is(err, services.ErrEventNotFound):
-			return nil, "not_found", err
-		case errors.Is(err, services.ErrEventForbidden):
-			return nil, "forbidden", err
-		default:
-			return nil, "error", err
-		}
-	}
-
-	return resp, "ok", nil
-}
-
-// POST /events/:event_id/certificate/generate?user_id=...
-func (h *EventHandler) GenerateCertificates(c fiber.Ctx) (interface{}, string, error) {
-	var req dto.CertificateActionRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return nil, "", fmt.Errorf("invalid request body")
-	}
-
-	eventIDParam := c.Params("event_id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event_id param")
-	}
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event_id")
-	}
-
-	actorIDParam := c.Query("user_id")
-	if actorIDParam == "" {
-		return nil, "", fmt.Errorf("missing user_id query param")
-	}
-	actorID, err := uuid.Parse(actorIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid user_id")
-	}
-
-	evID, evTitle, count, err := h.svc.GenerateEventCertificates(
-		context.Background(),
-		eventID,
-		actorID,
-		req.ParticipantIDs,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"id":    evID,
-		"name":  evTitle,
-		"count": count,
-		"message": fmt.Sprintf(
-			"Se generaron %d certificado(s) en estado pending_sign para el evento: %s",
-			count,
-			evTitle,
-		),
-	}
-
-	return data, "ok", nil
-}
-
-// POST /events/:event_id/certificate/sign?user_id=...
-func (h *EventHandler) SignCertificates(c fiber.Ctx) (interface{}, string, error) {
-	var req dto.CertificateActionRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return nil, "", fmt.Errorf("invalid request body")
-	}
-
-	eventIDParam := c.Params("event_id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event_id param")
-	}
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event_id")
-	}
-
-	actorIDParam := c.Query("user_id")
-	if actorIDParam == "" {
-		return nil, "", fmt.Errorf("missing user_id query param")
-	}
-	actorID, err := uuid.Parse(actorIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid user_id")
-	}
-
-	evID, evTitle, count, err := h.svc.SignEventCertificates(
-		context.Background(),
-		eventID,
-		actorID,
-		req.ParticipantIDs,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"id":    evID,
-		"name":  evTitle,
-		"count": count,
-		"message": fmt.Sprintf(
-			"Se firmaron %d certificado(s) del evento: %s",
-			count,
-			evTitle,
-		),
-	}
-
-	return data, "ok", nil
-}
-
-// POST /events/:event_id/certificate/publish?user_id=...
-func (h *EventHandler) PublishCertificates(c fiber.Ctx) (interface{}, string, error) {
-	var req dto.CertificateActionRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return nil, "", fmt.Errorf("invalid request body")
-	}
-
-	eventIDParam := c.Params("event_id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event_id param")
-	}
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event_id")
-	}
-
-	actorIDParam := c.Query("user_id")
-	if actorIDParam == "" {
-		return nil, "", fmt.Errorf("missing user_id query param")
-	}
-	actorID, err := uuid.Parse(actorIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid user_id")
-	}
-
-	evID, evTitle, count, err := h.svc.PublishEventCertificates(
-		context.Background(),
-		eventID,
-		actorID,
-		req.ParticipantIDs,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"id":    evID,
-		"name":  evTitle,
-		"count": count,
-		"message": fmt.Sprintf(
-			"Se publicaron %d certificado(s) del evento: %s",
-			count,
-			evTitle,
-		),
-	}
-
-	return data, "ok", nil
-}
-
-func (h *EventHandler) ListEventParticipants(c fiber.Ctx) (interface{}, string, error) {
-	// event_id por path param /events/:event_id/participant/list
-	eventIDParam := c.Params("event_id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event_id param")
-	}
-
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event_id")
-	}
-
-	searchQuery := c.Query("search_query", "")
-	pageStr := c.Query("page", "1")
-	pageSizeStr := c.Query("page_size", "10")
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page <= 0 {
-		page = 1
-	}
-	pageSize, err := strconv.Atoi(pageSizeStr)
-	if err != nil || pageSize <= 0 {
-		pageSize = 10
-	}
-
-	in := dto.ListEventParticipantsQuery{
-		SearchQuery: strings.TrimSpace(searchQuery),
-		Page:        page,
-		PageSize:    pageSize,
-	}
-
-	result, err := h.svc.ListEventParticipants(context.Background(), eventID, in)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"participants": result.Participants,
-		"filters":      result.Filters,
-	}
-
-	return data, "ok", nil
-}
-
-func (h *EventHandler) RemoveParticipant(c fiber.Ctx) (interface{}, string, error) {
-	// ID del evento por path param /events/:event_id/participants/remove/:participant_id
-	eventIDParam := c.Params("event_id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event_id param")
-	}
-
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event_id")
-	}
-
-	// ID del participant (UserDetailID) por path param
-	participantIDParam := c.Params("participant_id")
-	if participantIDParam == "" {
-		return nil, "", fmt.Errorf("missing participant_id param")
-	}
-
-	participantID, err := uuid.Parse(participantIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid participant_id")
-	}
-
-	// user_id (actor) por query param ?user_id=
-	actorIDParam := c.Query("user_id")
-	if actorIDParam == "" {
-		return nil, "", fmt.Errorf("missing user_id query param")
-	}
-
-	actorID, err := uuid.Parse(actorIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid user_id")
-	}
-
-	evID, evTitle, err := h.svc.RemoveEventParticipant(
-		context.Background(),
-		eventID,
-		participantID,
-		actorID,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"id":   evID,
-		"name": evTitle,
-		"message": fmt.Sprintf(
-			"Participante removido del evento: %s",
-			evTitle,
-		),
-	}
-
-	return data, "ok", nil
-}
-
-func (h *EventHandler) UploadParticipants(c fiber.Ctx) (interface{}, string, error) {
-	var req dto.UploadEventParticipantsRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return nil, "", fmt.Errorf("invalid request body")
-	}
-
-	if len(req.Participants) == 0 {
-		return nil, "", fmt.Errorf("participants list cannot be empty")
-	}
-
-	// ID del evento por path param /events/:id/participants/upload
-	eventIDParam := c.Params("id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event id param")
-	}
-
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event id")
-	}
-
-	evID, evTitle, count, err := h.svc.UploadEventParticipants(
-		context.Background(),
-		eventID,
-		req.Participants,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"id":    evID,
-		"name":  evTitle,
-		"count": count,
-		"message": fmt.Sprintf(
-			"Se registraron %d participante(s) al evento: %s",
-			count,
-			evTitle,
-		),
-	}
-
-	return data, "ok", nil
-}
-
-// GET /events?search_query=...&status=...&page=...&page_size=...
-func (h *EventHandler) ListEvents(c fiber.Ctx) (interface{}, string, error) {
-	searchQuery := c.Query("search_query", "")
-	status := c.Query("status", "") // scheduled, in_progress, completed, all, "" (todos)
-
-	pageStr := c.Query("page", "1")
-	pageSizeStr := c.Query("page_size", "10")
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page <= 0 {
-		page = 1
-	}
-	pageSize, err := strconv.Atoi(pageSizeStr)
-	if err != nil || pageSize <= 0 {
-		pageSize = 10
-	}
-
-	in := dto.ListEventsQuery{
-		SearchQuery: strings.TrimSpace(searchQuery),
-		Status:      strings.TrimSpace(status),
-		Page:        page,
-		PageSize:    pageSize,
-	}
-
-	result, err := h.svc.ListEvents(context.Background(), in)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"events":  result.Events,
-		"filters": result.Filters,
-	}
-
-	return data, "ok", nil
-}
-
-func (h *EventHandler) UpdateEvent(c fiber.Ctx) (interface{}, string, error) {
-	var req dto.UpdateEventRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return nil, "", fmt.Errorf("invalid request body")
-	}
-
-	// ID del evento por path param /events/:id
-	eventIDParam := c.Params("id")
-	if eventIDParam == "" {
-		return nil, "", fmt.Errorf("missing event id param")
-	}
-
-	eventID, err := uuid.Parse(eventIDParam)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid event id")
-	}
-
-	updatedID, updatedTitle, err := h.svc.UpdateEvent(context.Background(), eventID, req)
-	if err != nil {
-		return nil, "", err
-	}
-
-	data := fiber.Map{
-		"id":      updatedID,
-		"name":    updatedTitle,
-		"message": fmt.Sprintf("Evento actualizado con éxito: %s", updatedTitle),
-	}
-
-	return data, "ok", nil
-}
-
-// Compatible con httpwrap.HandlerFunc
+// POST /event?user_id=<uuid>
 func (h *EventHandler) CreateEvent(c fiber.Ctx) (interface{}, string, error) {
-	var req dto.CreateEventRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return nil, "", fmt.Errorf("invalid request body")
+	// user_id desde query (igual que en DocumentTemplate)
+	userIDStr := strings.TrimSpace(c.Query("user_id"))
+	if userIDStr == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid user_id")
 	}
 
-	userIDParam := c.Query("user_id")
-	if userIDParam == "" {
-		return nil, "", fmt.Errorf("missing user_id query param")
-	}
-
-	userID, err := uuid.Parse(userIDParam)
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return nil, "", fmt.Errorf("invalid user_id")
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid user_id")
 	}
 
-	eventID, eventTitle, err := h.svc.CreateEvent(context.Background(), userID, req)
-	if err != nil {
-		return nil, "", err
+	var in dto.EventCreateRequest
+	if err := c.Bind().Body(&in); err != nil {
+		return nil, "error", err
 	}
 
-	data := fiber.Map{
-		"id":      eventID,
-		"name":    eventTitle,
-		"message": fmt.Sprintf("Evento registrado con éxito: %s", eventTitle),
+	// Normalizar/trim de strings básicos
+	in.Code = strings.TrimSpace(in.Code)
+	in.CertificateSeries = strings.TrimSpace(in.CertificateSeries)
+	in.OrganizationalUnitsPath = strings.TrimSpace(in.OrganizationalUnitsPath)
+	in.Title = strings.TrimSpace(in.Title)
+	in.Location = strings.TrimSpace(in.Location)
+
+	if in.TemplateID != nil {
+		trimmed := strings.TrimSpace(*in.TemplateID)
+		in.TemplateID = &trimmed
 	}
 
-	return data, "ok", nil
+	if in.Status != nil {
+		trimmed := strings.TrimSpace(*in.Status)
+		in.Status = &trimmed
+	}
+
+	// Trim en participantes
+	for i := range in.Participants {
+		in.Participants[i].UserDetailID = strings.TrimSpace(in.Participants[i].UserDetailID)
+		if in.Participants[i].RegistrationSource != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].RegistrationSource)
+			in.Participants[i].RegistrationSource = &trimmed
+		}
+	}
+
+	// Validaciones mínimas (como en DocumentTemplateHandler)
+	if in.Code == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "code is required")
+	}
+	if in.CertificateSeries == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "certificate_series is required")
+	}
+	if in.OrganizationalUnitsPath == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "organizational_units_path is required")
+	}
+	if in.Title == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "title is required")
+	}
+	if in.Location == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "location is required")
+	}
+	if len(in.Schedules) == 0 {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "at least one schedule is required")
+	}
+
+	ctx := context.Background()
+	if err := h.service.CreateEvent(ctx, userID, in); err != nil {
+		return nil, "error", err
+	}
+
+	return fiber.Map{
+		"message": "Event created successfully",
+	}, "ok", nil
 }

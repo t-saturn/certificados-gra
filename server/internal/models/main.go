@@ -74,11 +74,9 @@ type DocumentType struct {
 	CreatedAt   time.Time `gorm:"not null"`
 	UpdatedAt   time.Time `gorm:"not null"`
 
-	Categories []DocumentCategory `gorm:"foreignKey:DocumentTypeID"`
-
-	Events            []Event            `gorm:"foreignKey:DocumentTypeID"`
+	// Solo esto:
+	Categories        []DocumentCategory `gorm:"foreignKey:DocumentTypeID"`
 	DocumentTemplates []DocumentTemplate `gorm:"foreignKey:DocumentTypeID"`
-	Documents         []Document         `gorm:"foreignKey:DocumentTypeID"`
 }
 
 func (DocumentType) TableName() string { return "document_types" }
@@ -159,9 +157,8 @@ type Event struct {
 	// Used to build [MAJOR BODY] - [ISSUING UNIT] part of the serial.
 	OrganizationalUnitsPath string `gorm:"size:255;not null;default:''"`
 
-	Title          string    `gorm:"size:200;not null"`
-	Description    *string   `gorm:"type:text"`
-	DocumentTypeID uuid.UUID `gorm:"type:uuid;not null;index"`
+	Title       string  `gorm:"size:200;not null"`
+	Description *string `gorm:"type:text"`
 
 	// Template associated with the event (optional)
 	TemplateID *uuid.UUID `gorm:"type:uuid;index"`
@@ -177,9 +174,8 @@ type Event struct {
 	CreatedAt time.Time `gorm:"not null"`
 	UpdatedAt time.Time `gorm:"not null"`
 
-	DocumentType DocumentType      `gorm:"foreignKey:DocumentTypeID"`
-	Template     *DocumentTemplate `gorm:"foreignKey:TemplateID"`
-	User         User              `gorm:"foreignKey:CreatedBy"`
+	Template *DocumentTemplate `gorm:"foreignKey:TemplateID"`
+	User     User              `gorm:"foreignKey:CreatedBy"`
 
 	Schedules         []EventSchedule    `gorm:"foreignKey:EventID"`
 	EventParticipants []EventParticipant `gorm:"foreignKey:EventID"`
@@ -219,16 +215,16 @@ func (EventParticipant) TableName() string { return "event_participants" }
 // DOCUMENTS & PDF STORAGE
 
 type Document struct {
-	ID                     uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserDetailID           uuid.UUID  `gorm:"type:uuid;not null;index"`
-	EventID                *uuid.UUID `gorm:"type:uuid;index"` // nullable for ad-hoc documents
-	DocumentTypeID         uuid.UUID  `gorm:"type:uuid;not null;index"`
-	TemplateID             *uuid.UUID `gorm:"type:uuid;index"`
-	SerialCode             string     `gorm:"size:100;not null;uniqueIndex"` // full serial built from event/template/category/year/correlative
-	VerificationCode       string     `gorm:"size:100;not null;uniqueIndex"`
-	HashValue              string     `gorm:"size:255;not null"`
-	QRText                 *string    `gorm:"size:255"`
-	IssueDate              time.Time  `gorm:"not null"`
+	ID           uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserDetailID uuid.UUID  `gorm:"type:uuid;not null;index"`
+	EventID      *uuid.UUID `gorm:"type:uuid;index"` // nullable for ad-hoc documents
+	TemplateID   *uuid.UUID `gorm:"type:uuid;index"`
+
+	SerialCode             string    `gorm:"size:100;not null;uniqueIndex"` // full serial built from event/template/category/year/correlative
+	VerificationCode       string    `gorm:"size:100;not null;uniqueIndex"`
+	HashValue              string    `gorm:"size:255;not null"`
+	QRText                 *string   `gorm:"size:255"`
+	IssueDate              time.Time `gorm:"not null"`
 	SignedAt               *time.Time
 	DigitalSignatureStatus string    `gorm:"size:50;not null;default:'PENDING'"` // PENDING, PARTIALLY_SIGNED, SIGNED, ERROR
 	Status                 string    `gorm:"size:50;not null;default:'ISSUED'"`  // ISSUED, ANNULLED, REPLACED, DRAFT
@@ -238,7 +234,6 @@ type Document struct {
 
 	UserDetail    UserDetail        `gorm:"foreignKey:UserDetailID"`
 	Event         *Event            `gorm:"foreignKey:EventID"`
-	DocumentType  DocumentType      `gorm:"foreignKey:DocumentTypeID"`
 	Template      *DocumentTemplate `gorm:"foreignKey:TemplateID"`
 	CreatedByUser User              `gorm:"foreignKey:CreatedBy"`
 	PDFs          []DocumentPDF     `gorm:"foreignKey:DocumentID"`

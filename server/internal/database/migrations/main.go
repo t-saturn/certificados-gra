@@ -57,9 +57,11 @@ func MigrateUp() error {
 		&models.User{},
 		&models.UserDetail{},
 		&models.Notification{},
-		&models.DocumentCategory{},
-		&models.DocumentType{},
-		&models.DocumentTemplate{},
+
+		&models.DocumentType{},     // primero type
+		&models.DocumentCategory{}, // luego category
+		&models.DocumentTemplate{}, // luego template
+
 		&models.Event{},
 		&models.EventSchedule{},
 		&models.EventParticipant{},
@@ -89,7 +91,6 @@ func MigrateDown() error {
 
 	fmt.Println("▶ Running migrate-down (dropping tables)...")
 
-	// Orden inverso por dependencias
 	return db.Migrator().DropTable(
 		// STUDY MATERIALS (hijas primero)
 		&models.StudyProgress{},

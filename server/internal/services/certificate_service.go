@@ -117,7 +117,7 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 			HasNextPage: false,
 			HasPrevPage: page > 1,
 			SearchQuery: search,
-			Status:      statusFilterOrAll(statusFilter),
+			// Status:      statusFilterOrAll(statusFilter),
 		}
 		return []models.Document{}, filters, nil
 	}
@@ -141,7 +141,7 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 			HasNextPage: false,
 			HasPrevPage: page > 1,
 			SearchQuery: search,
-			Status:      statusFilterOrAll(statusFilter),
+			// Status:      statusFilterOrAll(statusFilter),
 		}
 		return []models.Document{}, filters, nil
 	}
@@ -171,7 +171,7 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 		HasNextPage: hasNext,
 		HasPrevPage: hasPrev,
 		SearchQuery: search,
-		Status:      statusFilterOrAll(statusFilter),
+		// Status:      statusFilterOrAll(statusFilter),
 	}
 
 	return documents, filters, nil
