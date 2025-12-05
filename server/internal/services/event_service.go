@@ -436,7 +436,6 @@ func (s *eventServiceImpl) ListEvents(ctx context.Context, params dto.EventListQ
 	return resp, nil
 }
 
-
 // -------- GetEventByID (detalle completo) --------
 
 func (s *eventServiceImpl) GetEventByID(ctx context.Context, id uuid.UUID) (*dto.EventDetailResponse, error) {
