@@ -160,6 +160,11 @@ export default function Page() {
 
   const selectedTemplate = templates.find((t) => t.id === templateId) || null;
 
+  // NUEVO: elegir qué preview mostrar (prioriza el asociado)
+  const previewToShow = associatedPreview.src || associatedPreview.error ? associatedPreview : mainPreview;
+
+  const previewFileId = (associatedPreview.src || associatedPreview.error) && selectedTemplate?.prev_file_id ? selectedTemplate.prev_file_id : selectedTemplate?.file_id;
+
   // Cargar plantillas on demand
   const handleLoadTemplates = async () => {
     if (templates.length > 0) return; // ya cargado
@@ -489,7 +494,7 @@ export default function Page() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="space-y-6 p-6 border-border">
+        <Card className="space-y-6 p-6 border-border rounded-md shadow-none">
           {step === 1 && (
             <>
               {/* Paso 1: datos del evento */}
@@ -659,67 +664,36 @@ export default function Page() {
                   </Select>
                 </div>
 
-                {/* Previews */}
-                <div className="gap-4 grid md:grid-cols-2 md:h-[60vh]">
-                  {/* PDF principal (file_id) */}
-                  <div className="flex flex-col space-y-1 h-full">
-                    <Label className="text-xs">Pantilla del documento</Label>
-                    <div className="flex-1 bg-muted border border-dashed border-border rounded-md w-full overflow-hidden flex items-center justify-center">
-                      {!templateId ? (
-                        <p className="text-xs text-muted-foreground">Selecciona una plantilla para ver su PDF principal.</p>
-                      ) : mainPreview.loading ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Cargando vista previa...</span>
-                        </div>
-                      ) : mainPreview.error ? (
-                        <p className="text-xs text-muted-foreground">{mainPreview.error}</p>
-                      ) : !mainPreview.src ? (
-                        <p className="text-xs text-muted-foreground">No hay vista previa disponible.</p>
-                      ) : mainPreview.kind === 'pdf' ? (
-                        <iframe src={mainPreview.src} title="Vista previa PDF principal" className="w-full h-full" />
-                      ) : mainPreview.kind === 'image' ? (
-                        <Image src={mainPreview.src} alt="Vista previa plantilla principal" className="object-contain w-full h-full" />
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Tipo de archivo no soportado.</p>
-                      )}
-                    </div>
-                    {selectedTemplate?.file_id && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        file_id: <span className="font-mono">{selectedTemplate.file_id}</span>
-                      </p>
+                {/* Preview única centrada */}
+                <div className="mt-2 flex flex-col items-stretch md:h-[70vh]">
+                  <Label className="text-xs mb-1 self-start">Previsualización del documento</Label>
+
+                  <div className="flex-1 bg-muted border border-dashed border-border rounded-md w-full overflow-hidden flex items-center justify-center">
+                    {!templateId ? (
+                      <p className="text-xs text-muted-foreground">Selecciona una plantilla para ver su previsualización.</p>
+                    ) : previewToShow.loading ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Cargando vista previa...</span>
+                      </div>
+                    ) : previewToShow.error ? (
+                      <p className="text-xs text-muted-foreground">{previewToShow.error}</p>
+                    ) : !previewToShow.src ? (
+                      <p className="text-xs text-muted-foreground">No hay vista previa disponible.</p>
+                    ) : previewToShow.kind === 'pdf' ? (
+                      <iframe src={previewToShow.src} title="Vista previa del documento" className="w-full h-full" />
+                    ) : previewToShow.kind === 'image' ? (
+                      <Image src={previewToShow.src} alt="Vista previa del documento" className="object-contain w-full h-full" />
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Tipo de archivo no soportado.</p>
                     )}
                   </div>
 
-                  {/* PDF asociado (prev_file_id) */}
-                  <div className="flex flex-col space-y-1 h-full">
-                    <Label className="text-xs">Previsualización del documento</Label>
-                    <div className="flex-1 bg-muted border border-dashed border-border rounded-md w-full overflow-hidden flex items-center justify-center">
-                      {!templateId ? (
-                        <p className="text-xs text-muted-foreground">Selecciona una plantilla para ver su PDF asociado.</p>
-                      ) : associatedPreview.loading ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Cargando vista previa...</span>
-                        </div>
-                      ) : associatedPreview.error ? (
-                        <p className="text-xs text-muted-foreground">{associatedPreview.error}</p>
-                      ) : !associatedPreview.src ? (
-                        <p className="text-xs text-muted-foreground">No hay vista previa disponible.</p>
-                      ) : associatedPreview.kind === 'pdf' ? (
-                        <iframe src={associatedPreview.src} title="Vista previa PDF asociado" className="w-full h-full" />
-                      ) : associatedPreview.kind === 'image' ? (
-                        <Image src={associatedPreview.src} alt="Vista previa asociada" className="object-contain w-full h-full" />
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Tipo de archivo no soportado.</p>
-                      )}
-                    </div>
-                    {selectedTemplate?.prev_file_id && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        prev_file_id: <span className="font-mono">{selectedTemplate.prev_file_id}</span>
-                      </p>
-                    )}
-                  </div>
+                  {previewFileId && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      file_id: <span className="font-mono">{previewFileId}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </>
