@@ -19,14 +19,16 @@ COPY app/. .
 
 # ---------- SOLO Build-time ENV ----------
 # Vienen desde docker-compose como build.args
-ARG APP_NEXT_PUBLIC_APP_CLIENT_ID
+ARG NEXT_PUBLIC_APP_CLIENT_ID
 
 # Next necesita que se llame EXACTAMENTE así para exponerla al cliente
-ENV NEXT_PUBLIC_APP_CLIENT_ID=${APP_NEXT_PUBLIC_APP_CLIENT_ID}
+ENV NEXT_PUBLIC_APP_CLIENT_ID=${NEXT_PUBLIC_APP_CLIENT_ID}
 
 # Si tienes más NEXT_PUBLIC_*, las agregas igual:
 # ARG APP_NEXT_PUBLIC_OTRA
 # ENV NEXT_PUBLIC_OTRA=${APP_NEXT_PUBLIC_OTRA}
+
+RUN chmod +x node_modules/.bin/next
 
 RUN bun run build
 
