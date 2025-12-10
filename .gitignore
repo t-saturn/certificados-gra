@@ -68,9 +68,9 @@ server/.modcache/
 *.pid.lock
 docker-compose.override.yml
 docker-data/
-.docker/
-.dockerignore
-docker-compose*.yml
+# .docker/
+# .dockerignore
+# docker-compose*.yml
 .env.docker
 .env.production
 .env.development

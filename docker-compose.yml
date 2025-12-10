@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: certgra_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_POSTGRES_DB}
+      - POSTGRES_USER=${DB_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${DB_POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: certgra_server
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - SERVER_PORT=${SERVER_PORT}
+      # Mapeamos las variables "con sufijo" del .env a las que usa Go (sin sufijo)
+      - DB_HOST=${SERVER_DB_HOST}
+      - DB_PORT=${SERVER_DB_PORT}
+      - DB_USER=${SERVER_DB_USER}
+      - DB_PASSWORD=${SERVER_DB_PASSWORD}
+      - DB_NAME=${SERVER_DB_NAME}
+      - DB_SSLMODE=${SERVER_DB_SSLMODE}
+    ports:
+      - "8002:8002"
+
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+      args:
+        # Build-time ARG del Dockerfile de app
+        APP_NEXT_PUBLIC_APP_CLIENT_ID: ${APP_NEXT_PUBLIC_APP_CLIENT_ID}
+    container_name: certgra_app
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      # Runtime env del frontend (Next/Bun), usando valores con sufijo del .env
+      - AUTH_SECRET=${APP_AUTH_SECRET}
+      - AUTH_TRUST_HOST=${APP_AUTH_TRUST_HOST}
+
+      - NEXTAUTH_URL=${APP_NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${APP_NEXTAUTH_SECRET}
+      - NEXT_PUBLIC_APP_CLIENT_ID=${APP_NEXT_PUBLIC_APP_CLIENT_ID}
+
+      - API_BASE_URL=${APP_API_BASE_URL}
+      - API_SGD_BASE_URL=${APP_API_SGD_BASE_URL}
+      - API_CUM_URL=${APP_API_CUM_URL}
+
+      - KEYCLOAK_CLIENT_SECRET=${APP_KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_CLIENT_ID=${APP_KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_ISSUER=${APP_KEYCLOAK_ISSUER}
+
+      - FILE_SERVER=${APP_FILE_SERVER}
+      - FILE_ACCESS_KEY=${APP_FILE_ACCESS_KEY}
+      - FILE_SECRET_KEY=${APP_FILE_SECRET_KEY}
+      - FILE_PROJECT_ID=${APP_FILE_PROJECT_ID}
+    ports:
+      - "30002:30002"
+
+volumes:
+  db_data:
