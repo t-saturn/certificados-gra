@@ -2,7 +2,7 @@ package main
 
 import (
 	"server/internal/config"
-	middlewares "server/internal/niddlewares"
+	"server/internal/middlewares"
 	"server/internal/routes"
 	"server/pkgs/logger"
 	"server/pkgs/validator"

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRole } from '@/providers/role';
 
@@ -24,30 +24,17 @@ function initialFromName(name?: string, emailFallback?: string) {
 
 export const ProfileProvider = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSession();
-  const roleCtx = useRole(); // { id: string; name: string } | null
+  const roleCtx = useRole();
 
-  const [profile, setProfile] = useState<ProfileSchema>({
-    name: 'Usuario',
-    role: 'invitado',
-    avatar: 'U',
-  });
-
-  const computeProfile = () => {
-    const name = session?.user?.name ?? session?.user?.email ?? 'Usuario';
-    const avatar = initialFromName(session?.user?.name ?? undefined, session?.user?.email ?? undefined);
-    const roleName = roleCtx?.name ?? 'invitado';
-    return { name, role: roleName, avatar };
+  // Derivado directamente del contexto y la sesión
+  const profile: ProfileSchema = {
+    name: session?.user?.name ?? session?.user?.email ?? 'Usuario',
+    role: roleCtx?.name ?? 'invitado',
+    avatar: initialFromName(session?.user?.name ?? undefined, session?.user?.email ?? undefined),
   };
 
-  useEffect(() => {
-    setProfile(computeProfile());
-    // deps: cuando cambie nombre/email o el nombre del rol, recomputa
-  }, [session?.user?.name, session?.user?.email, roleCtx?.name]);
-
-  // Compat: si pides “refrescar perfil”, re-sincroniza desde los contexts
-  const fetchProfile = async (_userId: string) => {
-    setProfile(computeProfile());
-  };
+  // Compat: si piden refrescar, no hace nada porque todo está derivado
+  const fetchProfile = async () => {};
 
   return <ProfileContext.Provider value={{ profile, fetchProfile }}>{children}</ProfileContext.Provider>;
 };

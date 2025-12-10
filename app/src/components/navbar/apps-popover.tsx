@@ -98,7 +98,7 @@ export function AppsPopover() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative hover:bg-accent/50 rounded-xl hover:scale-105 transition-all duration-200">
+        <Button variant="ghost" size="icon" className="relative hover:bg-accent/50 hover:scale-105 transition-all duration-200">
           <LayoutGrid className="w-5 h-5" />
           <span className="sr-only">Aplicaciones</span>
         </Button>

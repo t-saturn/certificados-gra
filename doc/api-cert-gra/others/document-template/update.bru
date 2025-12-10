@@ -1,0 +1,31 @@
+meta {
+  name: update
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{base_url}}/document-template/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: a1a518a1-7b63-4974-974a-c86eeebb7c5b
+}
+
+body:json {
+  {
+    "code": "CERT_C",
+    "name": "Certificado",
+    "description": "Plantilla para certificados de cursos básicos realizados en el GRA.",
+    "file_id": "3b728448-5d83-4803-b8c7-131a19a3d2cb",
+    "prev_file_id": "9f4a0b9a-2c11-4d2b-9a67-0c5cfe9a1234"
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
