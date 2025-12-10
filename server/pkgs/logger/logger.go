@@ -1,37 +1,44 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
-var Log *logrus.Logger
+var Log zerolog.Logger
 
 func InitLogger() {
-	Log = logrus.New()
+	zerolog.TimeFieldFormat = time.RFC3339
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 
 	logDir := "logs"
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
-		logrus.Fatalf("No se pudo crear el directorio de logs: %v", err)
+		fmt.Fprintf(os.Stderr, "No se pudo crear el directorio de logs: %v\n", err)
+		os.Exit(1)
 	}
 
 	logFile := filepath.Join(logDir, time.Now().Format("2006-01-02")+".log")
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 
-	if err != nil {
-		Log.SetOutput(os.Stdout)
-		Log.Warn("No se pudo abrir el archivo de log, se usará solo salida estándar")
-	} else {
-		multiWriter := io.MultiWriter(os.Stdout, file)
-		Log.SetOutput(multiWriter)
+	consoleWriter := zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
 	}
 
-	Log.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-	})
-	Log.SetLevel(logrus.DebugLevel)
+	writers := []io.Writer{consoleWriter}
+	if err == nil {
+		writers = append(writers, file)
+	}
+
+	multiWriter := zerolog.MultiLevelWriter(writers...)
+	Log = zerolog.New(multiWriter).With().Timestamp().Logger()
+
+	if err != nil {
+		Log.Warn().Msg("No se pudo abrir el archivo de log, se usará solo salida estándar")
+	}
 }

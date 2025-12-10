@@ -15,13 +15,13 @@ func main() {
 	_ = godotenv.Load()
 
 	logger.InitLogger()
-	logger.Log.Info("Iniciando servidor...")
+	logger.Log.Info().Msg("Iniciando servidor...")
 
 	config.LoadConfig()
 	config.ConnectDB()
 
 	if err := validator.InitValidator(); err != nil {
-		logger.Log.Fatalf("Error al inicializar el validador: %v", err)
+		logger.Log.Fatal().Msgf("Error al inicializar el validador: %v", err)
 	}
 
 	app := fiber.New(fiber.Config{
@@ -34,8 +34,8 @@ func main() {
 	routes.RegisterRoutes(app)
 
 	port := config.GetConfig().SERVERPort
-	logger.Log.Infof("server-listening-in http://localhost:%s", port)
+	logger.Log.Info().Msgf("server-listening-in http://localhost:%s", port)
 	if err := app.Listen(":" + port); err != nil {
-		logger.Log.Fatalf("error-at-the-start-of-the-server: %v", err)
+		logger.Log.Fatal().Msgf("error-at-the-start-of-the-server: %v", err)
 	}
 }

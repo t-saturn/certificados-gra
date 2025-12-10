@@ -18,6 +18,6 @@ func Run(db *gorm.DB) error {
 		}
 	}
 
-	logger.Log.Info("Todos los seeders se ejecutaron correctamente")
+	logger.Log.Info().Msg("Todos los seeders se ejecutaron correctamente")
 	return nil
 }

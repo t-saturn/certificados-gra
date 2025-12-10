@@ -22,7 +22,7 @@ type seedUser struct {
 // SeedUsers lee internal/database/seeds/data/user.yml
 // y hace upsert de los usuarios en la tabla `users`.
 func SeedUsers(db *gorm.DB) error {
-	logger.Log.Info("Iniciando seeder de usuarios...")
+	logger.Log.Info().Msg("Iniciando seeder de usuarios...")
 
 	// Ruta relativa desde el root del proyecto
 	path := filepath.Join("internal", "database", "seeds", "data", "user.yml")
@@ -62,6 +62,6 @@ func SeedUsers(db *gorm.DB) error {
 		}
 	}
 
-	logger.Log.Infof("Seeder de usuarios completado. Total usuarios: %d", len(seedUsers))
+	logger.Log.Info().Msgf("Seeder de usuarios completado. Total usuarios: %d", len(seedUsers))
 	return nil
 }

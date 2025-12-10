@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
 )
 
 func LoggerMiddleware() fiber.Handler {
@@ -17,19 +16,19 @@ func LoggerMiddleware() fiber.Handler {
 		stop := time.Now()
 		latency := stop.Sub(start)
 
-		entry := logger.Log.WithFields(logrus.Fields{
-			"status":    c.Response().StatusCode(),
-			"method":    c.Method(),
-			"path":      c.OriginalURL(),
-			"latency":   latency,
-			"ip":        c.IP(),
-			"userAgent": c.Get("User-Agent"),
-		})
+		entry := logger.Log.With().
+			Int("status", c.Response().StatusCode()).
+			Str("method", c.Method()).
+			Str("path", c.OriginalURL()).
+			Dur("latency", latency).
+			Str("ip", c.IP()).
+			Str("userAgent", c.Get("User-Agent")).
+			Logger()
 
 		if err != nil {
-			entry.Error(err)
+			entry.Error().Err(err).Msg("HTTP request")
 		} else {
-			entry.Info("HTTP request")
+			entry.Info().Msg("HTTP request")
 		}
 
 		return err
