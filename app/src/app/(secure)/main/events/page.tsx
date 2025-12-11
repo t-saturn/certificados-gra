@@ -1,6 +1,8 @@
+'use server';
+
 import type { JSX } from 'react';
 import { fn_get_events } from '@/actions/fn-events';
-import ContentPage from './content-page';
+import EventsPage from './_components/page';
 
 export default async function Page({ searchParams }: { searchParams: Record<string, string | undefined> }): Promise<JSX.Element> {
   // limpiar y convertir filtros
@@ -16,17 +18,7 @@ export default async function Page({ searchParams }: { searchParams: Record<stri
   const date_from = searchParams.date_from || undefined;
   const date_to = searchParams.date_to || undefined;
 
-  // FETCH desde SERVER COMPONENT
-  const { items, pagination, filters } = await fn_get_events({
-    page,
-    page_size,
-    search_query,
-    status,
-    is_public,
-    user_id,
-    date_from,
-    date_to,
-  });
+  const { items, pagination, filters } = await fn_get_events({ page, page_size, search_query, status, is_public, user_id, date_from, date_to });
 
-  return <ContentPage events={items} pagination={pagination} filters={filters} originalSearchParams={searchParams} />;
+  return <EventsPage events={items} pagination={pagination} filters={filters} originalSearchParams={searchParams} />;
 }

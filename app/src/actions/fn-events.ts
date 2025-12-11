@@ -8,9 +8,8 @@ const BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8002';
 
 export const getCurrentUserId = async (): Promise<string> => {
   const session = await auth();
-  if (!session?.user?.id) {
-    throw new Error('Sesión inválida: no se encontró el usuario autenticado');
-  }
+  if (!session?.user?.id) throw new Error('Sesión inválida: no se encontró el usuario autenticado');
+
   return session.user.id;
 };
 
@@ -29,7 +28,7 @@ export interface EventTemplateSummary {
 export interface EventSchedule {
   id?: string;
   start_datetime: string; // ISO string
-  end_datetime: string;   // ISO string
+  end_datetime: string; // ISO string
 }
 
 export interface EventParticipant {
@@ -125,7 +124,7 @@ export interface GetEventsParams {
   status?: string; // "SCHEDULED", etc.
   user_id?: string;
   date_from?: string; // "YYYY-MM-DD"
-  date_to?: string;   // "YYYY-MM-DD"
+  date_to?: string; // "YYYY-MM-DD"
 }
 
 export interface EventListItem {
@@ -276,7 +275,7 @@ export interface CreateEventParticipantBody {
   last_name: string;
   phone?: string;
   email?: string;
-  registration_source: string; // "SELF" | "ADMIN" | etc.
+  registration_source: string;
 }
 
 export interface CreateEventBody {
@@ -320,9 +319,7 @@ export const fn_create_event: FnCreateEvent = async (body) => {
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     cache: 'no-store',
   });
