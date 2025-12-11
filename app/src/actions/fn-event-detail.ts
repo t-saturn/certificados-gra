@@ -1,34 +1,31 @@
 'use server';
 
-import { auth } from '@/lib/auth';
-
 const BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8002';
 
-/* ---------------------------------------------
- *  Tipos
- * --------------------------------------------- */
-
-export interface EventDetailDocumentType {
+export interface EventDetailTemplate {
   id: string;
   code: string;
   name: string;
+  is_active: boolean;
+  document_type_id: string;
+  document_type_code: string;
+  document_type_name: string;
 }
 
 export interface EventDetailSchedule {
+  id: string;
   start_datetime: string;
   end_datetime: string;
 }
 
-export type RegistrationSource = 'ADMIN' | 'IMPORTED' | 'SELF_REGISTERED' | string;
-
+export type RegistrationSource = 'ADMIN' | 'IMPORTED' | 'SELF' | 'SELF_REGISTERED' | string;
 export type RegistrationStatus = 'REGISTERED' | 'PENDING' | 'CANCELLED' | 'REJECTED' | string;
-
 export type AttendanceStatus = 'PENDING' | 'ATTENDED' | 'ABSENT' | string;
 
 export interface EventDetailParticipant {
+  id: string;
   user_detail_id: string;
   national_id: string;
-  full_name: string;
   first_name: string;
   last_name: string;
   email?: string | null;
@@ -36,20 +33,30 @@ export interface EventDetailParticipant {
   registration_source: RegistrationSource;
   registration_status: RegistrationStatus;
   attendance_status: AttendanceStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface EventDetail {
   id: string;
+  is_public: boolean;
+  code: string;
+  certificate_series: string;
+  organizational_units_path: string;
   title: string;
   description: string;
-  document_type: EventDetailDocumentType;
   location: string;
+  max_participants: number | null;
+  registration_open_at: string;
+  registration_close_at: string;
   status: string;
   created_by: string;
   created_at: string;
   updated_at: string;
+  template: EventDetailTemplate | null;
   schedules: EventDetailSchedule[];
   participants: EventDetailParticipant[];
+  documents: unknown | null;
 }
 
 interface EventDetailApiResponse {
@@ -61,46 +68,14 @@ interface EventDetailApiResponse {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface EventDetailResult extends EventDetail {}
 
-/* ---------------------------------------------
- *  Helper para user_id
- * --------------------------------------------- */
+export type FnGetEventDetail = (eventId: string) => Promise<EventDetailResult>;
 
-const getCurrentUserId = async (): Promise<string> => {
-  const session = await auth();
-  if (!session?.user?.id) {
-    throw new Error('Sesión inválida');
-  }
-  return session.user.id;
-};
+export const fn_get_event_detail: FnGetEventDetail = async (eventId) => {
+  if (!eventId) throw new Error('El event_id es obligatorio');
 
-/* ---------------------------------------------
- *  Server Action
- * --------------------------------------------- */
+  const url = `${BASE_URL}/event/${encodeURIComponent(eventId)}`;
 
-export type FnGetEventDetail = (eventId: string, options?: { send_user_id?: boolean }) => Promise<EventDetailResult>;
-
-export const fn_get_event_detail: FnGetEventDetail = async (eventId, options = {}) => {
-  if (!eventId) {
-    throw new Error('El event_id es obligatorio');
-  }
-
-  const searchParams = new URLSearchParams();
-  searchParams.set('event_id', eventId);
-
-  if (options.send_user_id) {
-    const userId = await getCurrentUserId();
-    searchParams.set('user_id', userId);
-  }
-
-  const url = `${BASE_URL}/event-detail?${searchParams.toString()}`;
-
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  });
+  const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
 
   if (!res.ok) {
     let text = '';
@@ -110,12 +85,7 @@ export const fn_get_event_detail: FnGetEventDetail = async (eventId, options = {
       text = '';
     }
 
-    console.error('Error al consumir GET /event-detail =>', {
-      url,
-      status: res.status,
-      statusText: res.statusText,
-      body: text,
-    });
+    console.error('Error al consumir GET /event/:id =>', { url, status: res.status, statusText: res.statusText, body: text });
 
     throw new Error(text || 'Error al obtener el detalle del evento');
   }
@@ -124,12 +94,12 @@ export const fn_get_event_detail: FnGetEventDetail = async (eventId, options = {
   try {
     json = (await res.json()) as EventDetailApiResponse;
   } catch (err) {
-    console.error('Error parseando JSON de /event-detail =>', err);
+    console.error('Error parseando JSON de GET /event/:id =>', err);
     throw new Error('Respuesta inválida del servicio de eventos');
   }
 
   if (json.status !== 'success') {
-    console.error('Servicio /event-detail respondió failed =>', json);
+    console.error('Servicio GET /event/:id respondió failed =>', json);
     throw new Error(json.message || 'Error en el servicio de eventos');
   }
 

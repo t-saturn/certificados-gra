@@ -347,7 +347,5 @@ export const fn_create_event: FnCreateEvent = async (body) => {
     throw new Error(json.message || 'Error en el servicio de eventos');
   }
 
-  return {
-    message: json.data?.message ?? 'Event created successfully',
-  };
+  return { message: json.data?.message ?? 'Event created successfully' };
 };
