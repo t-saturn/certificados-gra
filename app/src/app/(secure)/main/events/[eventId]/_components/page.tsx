@@ -1,11 +1,12 @@
+/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import type { FC } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { ArrowLeft, FileText, Users, Clock, Loader2, Trash2, Plus, Search, FileBadge, Pencil, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Clock, Loader2, Trash2, Plus, Search, FileBadge, Pencil } from 'lucide-react';
 
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +21,7 @@ import { toast } from 'sonner';
 
 import type { EventDetailResult } from '@/actions/fn-event-detail';
 import type { EventParticipant, EventSchedule, UpdateEventParticipantPatchItem, UpdateEventBody } from '@/actions/fn-events';
-import { fn_update_event, fn_update_event_participants } from '@/actions/fn-events';
+import { fn_get_event_by_id, fn_update_event, fn_update_event_participants } from '@/actions/fn-events';
 import { fn_event_action } from '@/actions/fn-event-actions';
 
 export interface EventDetailPageProps {
@@ -46,9 +47,9 @@ const toLocalInputValue = (iso: string | null | undefined): string => {
 
 // Calcula el offset local actual en formato ±HH:MM (ej: -05:00)
 const getLocalOffset = (): string => {
-  const offsetMinutes = new Date().getTimezoneOffset();
+  const offsetMinutes = new Date().getTimezoneOffset(); // ej: 300 para -05:00
   const sign = offsetMinutes > 0 ? '-' : '+';
-  const abs = Math.abs(offsetMinutes);
+  const abs = Math.max(Math.abs(offsetMinutes), 0);
   const hh = String(Math.floor(abs / 60)).padStart(2, '0');
   const mm = String(abs % 60).padStart(2, '0');
   return `${sign}${hh}:${mm}`;
@@ -77,6 +78,8 @@ type EditableSchedule = {
   end: string; // datetime-local
 };
 
+type CertLabel = 'NINGUNO' | 'PENDIENTE' | 'CREADO' | 'RECHAZADO';
+
 const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   const router = useRouter();
 
@@ -86,25 +89,58 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
   const documentTypeName = event.template?.document_type_name ?? '—';
 
-  /* ----------------- Index de documentos ----------------- */
-  const documentsByUserDetailId = useMemo(() => {
-    const map = new Map<string, { status: string }>();
-    (event.documents ?? []).forEach((d: any) => {
-      if (d?.user_detail_id) map.set(d.user_detail_id, { status: d.status });
-    });
-    return map;
-  }, [event.documents]);
+  const [eventDocuments, setEventDocuments] = useState<any[]>(() => (event.documents ?? []) as any[]);
+  const [, setRefreshingEvent] = useState(false);
 
-  const getCertificateLabel = (rawStatus?: string): 'PENDIENTE' | 'CREADO' | 'COMPLETADO' | 'RECHAZADO' => {
-    if (!rawStatus) return 'PENDIENTE';
+  const refreshEventDocuments = async (): Promise<void> => {
+    try {
+      setRefreshingEvent(true);
+      const fresh = await fn_get_event_by_id(event.id);
+      setEventDocuments((fresh as any).documents ?? []);
+    } catch (e) {
+      // opcional: toast aquí
+      console.error('[refreshEventDocuments]', e);
+    } finally {
+      setRefreshingEvent(false);
+    }
+  };
+
+  /* ----------------- Tipado "documents" y map de status ----------------- */
+
+  const getCertificateLabel = (rawStatus?: string): CertLabel => {
+    if (!rawStatus) return 'NINGUNO';
+
     const s = String(rawStatus).toUpperCase();
-    if (s === 'CREATED') return 'CREADO';
-    if (s === 'GENERATED') return 'COMPLETADO';
     if (s === 'REJECTED') return 'RECHAZADO';
+    if (s === 'CREATED') return 'CREADO';
+    if (s === 'GENERATED') return 'PENDIENTE';
+
     return 'PENDIENTE';
   };
 
-  /* ----------------- Estado: Guardar evento ----------------- */
+  const certBadgeClass = (label: CertLabel): string => {
+    switch (label) {
+      case 'CREADO':
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      case 'RECHAZADO':
+        return 'border-rose-200 bg-rose-50 text-rose-700';
+      case 'PENDIENTE':
+        return 'border-amber-200 bg-amber-50 text-amber-700';
+      case 'NINGUNO':
+      default:
+        return 'border-gray-200 bg-gray-50 text-gray-700';
+    }
+  };
+
+  const documentsByUserDetailId = useMemo(() => {
+    const map = new Map<string, { status: string }>();
+    (eventDocuments ?? []).forEach((d: any) => {
+      if (d?.user_detail_id) map.set(d.user_detail_id, { status: d.status });
+    });
+    return map;
+  }, [eventDocuments]);
+
+  /* ----------------- TAB: Información principal (editable) ----------------- */
 
   const [savingEvent, setSavingEvent] = useState(false);
 
@@ -120,7 +156,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   const [eventSchedules, setEventSchedules] = useState<EditableSchedule[]>(
     schedules.length
       ? schedules.map((s) => ({
-          id: s.id,
+          id: (s as any).id,
           start: toLocalInputValue(s.start_datetime),
           end: toLocalInputValue(s.end_datetime),
         }))
@@ -158,36 +194,36 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       return;
     }
 
-    if (eventSchedules.some((s) => !s.start || !s.end)) {
+    const invalidSchedule = eventSchedules.some((s) => !s.start || !s.end);
+    if (invalidSchedule) {
       toast.error('Todas las fechas / horarios del evento deben estar completas');
       return;
     }
 
     const body: UpdateEventBody = {};
 
-    // title
+    // Campos simples
     if (eventForm.title.trim() !== event.title) body.title = eventForm.title.trim();
 
-    // description
     const originalDesc = event.description ?? '';
     if (eventForm.description.trim() !== originalDesc) body.description = eventForm.description.trim() || null;
 
-    // location
     const originalLoc = event.location ?? '';
     if (eventForm.location.trim() !== originalLoc) body.location = eventForm.location.trim() || '';
 
-    // max_participants
     const originalMax = event.max_participants ?? null;
     const newMax = eventForm.max_participants ? Number(eventForm.max_participants) : null;
     const normalizedNewMax = Number.isNaN(newMax) ? null : newMax;
 
     if (normalizedNewMax !== originalMax) body.max_participants = normalizedNewMax;
 
-    // registration open/close (comparar por string local)
+    // Fechas inscripción (comparación local)
     const originalOpenLocal = toLocalInputValue(event.registration_open_at);
     const originalCloseLocal = toLocalInputValue(event.registration_close_at);
 
-    if (eventForm.registration_open_at !== originalOpenLocal || eventForm.registration_close_at !== originalCloseLocal) {
+    const registrationChanged = eventForm.registration_open_at !== originalOpenLocal || eventForm.registration_close_at !== originalCloseLocal;
+
+    if (registrationChanged) {
       const openStr = fromLocalInputToServer(eventForm.registration_open_at);
       const closeStr = fromLocalInputToServer(eventForm.registration_close_at);
 
@@ -200,7 +236,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       body.registration_close_at = closeStr;
     }
 
-    // schedules (comparar por string local)
+    // Schedules
     const originalSchedulesLocal: EditableSchedule[] = (event.schedules ?? []).map((s) => ({
       start: toLocalInputValue(s.start_datetime),
       end: toLocalInputValue(s.end_datetime),
@@ -221,7 +257,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       const schedulesIso = eventSchedules.map((s) => {
         const startStr = fromLocalInputToServer(s.start);
         const endStr = fromLocalInputToServer(s.end);
-        if (!startStr || !endStr) throw new Error('Formato inválido en fechas del evento');
+        if (!startStr || !endStr) throw new Error('Fechas inválidas');
         return { start_datetime: startStr, end_datetime: endStr };
       });
 
@@ -246,21 +282,13 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     }
   };
 
-  /* ----------------- Participantes (CRUD) ----------------- */
+  /* ----------------- TAB: Participantes (CRUD) ----------------- */
 
   const [editableParticipants, setEditableParticipants] = useState<EditableParticipant[]>(originalParticipants);
   const [savingParticipants, setSavingParticipants] = useState(false);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
-
-  const [editForm, setEditForm] = useState<{
-    national_id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-  }>({
+  const [editForm, setEditForm] = useState<{ national_id: string; first_name: string; last_name: string; email: string; phone: string }>({
     national_id: '',
     first_name: '',
     last_name: '',
@@ -268,13 +296,13 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     phone: '',
   });
 
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
+
   const originalByDni = useMemo(() => {
     const map = new Map<string, EditableParticipant>();
     originalParticipants.forEach((p) => map.set(p.national_id, p));
     return map;
   }, [originalParticipants]);
-
-  const visibleParticipants = useMemo(() => editableParticipants.filter((p) => !p._deleted), [editableParticipants]);
 
   const openEditModal = (idx: number): void => {
     const p = editableParticipants[idx];
@@ -291,6 +319,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   const closeEditModal = (): void => setEditingIndex(null);
 
   const openDeleteModal = (idx: number): void => setDeleteIndex(idx);
+
   const closeDeleteModal = (): void => setDeleteIndex(null);
 
   const handleSaveEditParticipant = (): void => {
@@ -328,18 +357,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   };
 
   const handleAddParticipantRow = (): void => {
-    setEditableParticipants((prev) => [
-      ...prev,
-      {
-        national_id: '',
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        registration_source: 'IMPORTED',
-        _isNew: true,
-      },
-    ]);
+    setEditableParticipants((prev) => [...prev, { national_id: '', first_name: '', last_name: '', email: '', phone: '', registration_source: 'IMPORTED', _isNew: true }]);
   };
 
   const handleSaveParticipants = async (): Promise<void> => {
@@ -355,6 +373,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
       if (p._isNew) {
         if (!p.national_id.trim()) return;
+
         patches.push({
           national_id: p.national_id.trim(),
           first_name: p.first_name?.trim() || undefined,
@@ -399,53 +418,63 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     }
   };
 
-  const toggleSelectCertByRowClick = (dni: string): void => {
-    // si estamos en modo "Generar" (no requiere selección), no hacemos nada
-    if (hasAnyPending) return;
-
-    setSelectedForCert((prev) => {
-      const next = new Set(prev);
-      if (next.has(dni)) next.delete(dni);
-      else next.add(dni);
-      return next;
-    });
-  };
-
-  /* ----------------- Certificados ----------------- */
+  /* ----------------- TAB: Certificados ----------------- */
 
   const [certSearch, setCertSearch] = useState('');
   const [selectedForCert, setSelectedForCert] = useState<Set<string>>(new Set());
   const [runningEventAction, setRunningEventAction] = useState(false);
 
+  const visibleParticipants = editableParticipants.filter((p) => !p._deleted);
+
   const filteredForCert = useMemo(() => {
-    const base = visibleParticipants;
-    if (!certSearch.trim()) return base;
+    if (!certSearch.trim()) return visibleParticipants;
     const term = certSearch.trim().toLowerCase();
-    return base.filter((p) => {
+    return visibleParticipants.filter((p) => {
       const fullName = `${p.first_name ?? ''} ${p.last_name ?? ''}`.toLowerCase();
       return p.national_id.toLowerCase().includes(term) || fullName.includes(term) || (p.email ?? '').toLowerCase().includes(term);
     });
   }, [certSearch, visibleParticipants]);
 
-  const certStatusForParticipant = (p: EditableParticipant): 'PENDIENTE' | 'CREADO' | 'COMPLETADO' | 'RECHAZADO' => {
+  // DNI -> user_detail_id (para enviar al backend en firmar/rechazar)
+  const userDetailIdByDni = useMemo(() => {
+    const map = new Map<string, string>();
+    visibleParticipants.forEach((p) => {
+      const udid = (p as any).user_detail_id as string | undefined;
+      if (udid) map.set(p.national_id, udid);
+    });
+    return map;
+  }, [visibleParticipants]);
+
+  const selectedUserDetailIds = useMemo(() => {
+    const ids: string[] = [];
+    selectedForCert.forEach((dni) => {
+      const udid = userDetailIdByDni.get(dni);
+      if (udid) ids.push(udid);
+    });
+    return ids;
+  }, [selectedForCert, userDetailIdByDni]);
+
+  const certStatusLabelFor = (p: EditableParticipant): CertLabel => {
     const udid = (p as any).user_detail_id as string | undefined;
     const doc = udid ? documentsByUserDetailId.get(udid) : undefined;
     return getCertificateLabel(doc?.status);
   };
 
+  // Si hay al menos 1 PENDIENTE => se muestra "Generar certificados" (sin selección)
   const hasAnyPending = useMemo(() => {
-    if (filteredForCert.length === 0) return false;
-    return filteredForCert.some((p) => certStatusForParticipant(p) === 'PENDIENTE');
+    return filteredForCert.some((p) => {
+      const s = certStatusLabelFor(p);
+      return s === 'PENDIENTE' || s === 'NINGUNO';
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredForCert, documentsByUserDetailId]);
 
-  // Regla: si al menos uno está PENDIENTE => mostrar "Generar certificados"
-  // si TODOS los visibles están en CREADO => mostrar "Emitir firma certificado"
-  const allVisibleCreated = useMemo(() => {
-    if (filteredForCert.length === 0) return false;
-    return filteredForCert.every((p) => certStatusForParticipant(p) === 'CREADO');
-  }, [filteredForCert, documentsByUserDetailId]);
+  // Selección solo se habilita cuando NO hay pendientes (para firmar / rechazar)
+  const canSelectRows = !hasAnyPending;
 
   const toggleSelectAllCert = (checked: boolean): void => {
+    if (!canSelectRows) return;
+
     if (checked) {
       const next = new Set<string>();
       filteredForCert.forEach((p) => next.add(p.national_id));
@@ -456,6 +485,8 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   };
 
   const toggleSelectCert = (dni: string, checked: boolean): void => {
+    if (!canSelectRows) return;
+
     setSelectedForCert((prev) => {
       const next = new Set(prev);
       if (checked) next.add(dni);
@@ -464,42 +495,25 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     });
   };
 
-  const handlePrimaryCertificatesAction = async (): Promise<void> => {
-    if (filteredForCert.length === 0) {
-      toast.info('No hay participantes para procesar');
-      return;
-    }
-
-    // Si hay al menos uno PENDIENTE => generar certificados (no requiere check)
-    const shouldCreate = hasAnyPending;
-
-    // Si NO hay pendientes y todos están CREADO => emitir firma (requiere check)
-    const shouldSign = !hasAnyPending && allVisibleCreated;
-
-    if (shouldSign && selectedForCert.size === 0) {
-      toast.info('Selecciona al menos un participante para emitir firma');
-      return;
-    }
-
-    const action = shouldCreate ? 'create_certificates' : 'generate_certificates';
-
+  const runEventAction = async (action: 'generate_certificates' | 'sign_certificates' | 'rejected_certificates', participantsId?: string[]): Promise<void> => {
     try {
       setRunningEventAction(true);
 
-      // Tu backend action actual NO recibe lista de participantes.
-      // - create_certificates: típicamente aplica a todos (o crea los faltantes)
-      // - generate_certificates: típicamente firma/genera para el evento (backend decide)
-      // Aquí seguimos la API actual.
-      const resp = await fn_event_action(event.id, action);
+      const resp = await fn_event_action(event.id, action, participantsId);
 
-      toast.success(shouldCreate ? 'Certificados generados' : 'Firma emitida / certificados finalizados', {
+      const label = action === 'generate_certificates' ? 'Certificados generados' : action === 'sign_certificates' ? 'Certificados firmados' : 'Certificados rechazados';
+
+      toast.success(label, {
         description: `created: ${resp.result.created} · skipped: ${resp.result.skipped} · updated: ${resp.result.updated}`,
       });
 
-      // limpiar selección SIEMPRE al terminar una acción
+      // limpiar selección siempre
       setSelectedForCert(new Set());
 
-      router.refresh();
+      // refresca documents para que la tabla actualice sin F5
+      await refreshEventDocuments();
+
+      router.refresh(); // opcional (puedes dejarlo)
     } catch (err: any) {
       console.error(err);
       toast.error('No se pudo ejecutar la acción', { description: err?.message });
@@ -508,29 +522,42 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     }
   };
 
-  const handleRejectCertificates = (): void => {
-    if (selectedForCert.size === 0) {
-      toast.info('Selecciona al menos un participante');
+  const handlePrimaryCertificatesAction = async (): Promise<void> => {
+    // 1) Si hay pendientes => GENERAR para todos (sin selección)
+    if (hasAnyPending) {
+      await runEventAction('generate_certificates'); // participantsId undefined => a todos
       return;
     }
 
-    // TODO: conectar endpoint real
-    toast.info(`TODO: rechazar certificados para ${selectedForCert.size} participante(s).`);
+    // 2) Si NO hay pendientes => FIRMAR requiere selección
+    if (selectedUserDetailIds.length === 0) {
+      toast.info('Selecciona al menos un participante para firmar');
+      return;
+    }
 
-    // limpiar selección cuando se ejecute la acción
-    setSelectedForCert(new Set());
+    await runEventAction('sign_certificates', selectedUserDetailIds);
   };
 
-  useEffect(() => {
+  const handleRejectCertificates = async (): Promise<void> => {
+    // Si está en modo "generar", no tiene sentido "rechazar" todavía
     if (hasAnyPending) {
-      setSelectedForCert(new Set());
+      toast.info('Primero genera certificados. Luego podrás rechazar por selección.');
+      return;
     }
-  }, [hasAnyPending]);
+
+    if (selectedUserDetailIds.length === 0) {
+      toast.info('Selecciona al menos un participante para rechazar');
+      return;
+    }
+
+    await runEventAction('rejected_certificates', selectedUserDetailIds);
+  };
 
   /* ----------------- Render ----------------- */
 
   return (
     <section className="flex flex-col gap-6 p-4">
+      {/* Header */}
       <header className="flex items-center gap-4">
         <button type="button" onClick={() => router.back()} className="rounded-lg p-2 transition-colors hover:bg-muted">
           <ArrowLeft className="h-5 w-5" />
@@ -557,6 +584,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
         </div>
       </header>
 
+      {/* Tabs */}
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="general" className="text-xs sm:text-sm">
@@ -570,8 +598,9 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           </TabsTrigger>
         </TabsList>
 
-        {/* ----------------- TAB: General ----------------- */}
+        {/* TAB: Información principal (editable) */}
         <TabsContent value="general" className="space-y-4">
+          {/* Datos principales */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
@@ -579,14 +608,12 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                   <FileText className="h-4 w-4" />
                   <span>Datos del evento</span>
                 </div>
-
                 <Button size="sm" className="gap-2" onClick={handleSaveEventInfo} disabled={savingEvent}>
                   {savingEvent && <Loader2 className="h-4 w-4 animate-spin" />}
                   Guardar cambios
                 </Button>
               </div>
             </CardHeader>
-
             <CardContent className="space-y-4 text-sm">
               <div className="space-y-2">
                 <Label>Título *</Label>
@@ -623,6 +650,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </CardContent>
           </Card>
 
+          {/* Fechas / horarios del evento */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
@@ -637,32 +665,34 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                 </Button>
               </div>
             </CardHeader>
-
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <div className="space-y-3">
-                {eventSchedules.map((s, idx) => (
-                  <div key={idx} className="grid items-end gap-3 md:grid-cols-[1fr,1fr,auto]">
-                    <div className="space-y-2">
-                      <Label>Inicio *</Label>
-                      <Input type="datetime-local" value={s.start} onChange={(e) => handleChangeSchedule(idx, 'start', e.target.value)} />
+              {eventSchedules.length === 0 ? (
+                <p>No hay sesiones configuradas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {eventSchedules.map((s, idx) => (
+                    <div key={idx} className="grid gap-3 md:grid-cols-[1fr,1fr,auto] items-end">
+                      <div className="space-y-2">
+                        <Label>Inicio *</Label>
+                        <Input type="datetime-local" value={s.start} onChange={(e) => handleChangeSchedule(idx, 'start', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fin *</Label>
+                        <Input type="datetime-local" value={s.end} onChange={(e) => handleChangeSchedule(idx, 'end', e.target.value)} />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => handleRemoveScheduleRow(idx)} disabled={eventSchedules.length <= 1}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Fin *</Label>
-                      <Input type="datetime-local" value={s.end} onChange={(e) => handleChangeSchedule(idx, 'end', e.target.value)} />
-                    </div>
-                    <div className="flex justify-end">
-                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => handleRemoveScheduleRow(idx)} disabled={eventSchedules.length <= 1}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ----------------- TAB: Participants ----------------- */}
         <TabsContent value="participants">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
@@ -737,8 +767,13 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </CardContent>
           </Card>
 
-          {/* Modal EDIT */}
-          <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && closeEditModal()}>
+          {/* Modal EDITAR participante */}
+          <Dialog
+            open={editingIndex !== null}
+            onOpenChange={(open) => {
+              if (!open) closeEditModal();
+            }}
+          >
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Editar participante</DialogTitle>
@@ -787,8 +822,12 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </DialogContent>
           </Dialog>
 
-          {/* Modal DELETE */}
-          <Dialog open={deleteIndex !== null} onOpenChange={(open) => !open && closeDeleteModal()}>
+          <Dialog
+            open={deleteIndex !== null}
+            onOpenChange={(open) => {
+              if (!open) closeDeleteModal();
+            }}
+          >
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Quitar participante</DialogTitle>
@@ -807,7 +846,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           </Dialog>
         </TabsContent>
 
-        {/* ----------------- TAB: Certificates ----------------- */}
+        {/* TAB: Certificados */}
         <TabsContent value="certificates">
           <Card>
             <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
@@ -826,12 +865,22 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleRejectCertificates} disabled={selectedForCert.size === 0}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                    onClick={handleRejectCertificates}
+                    disabled={runningEventAction || hasAnyPending}
+                    title={hasAnyPending ? 'Primero genera certificados' : 'Rechazar seleccionados'}
+                  >
                     <Trash2 className="h-3 w-3" />
                     Rechazar
                   </Button>
-                  <Button type="button" size="sm" className="gap-1" onClick={handlePrimaryCertificatesAction} disabled={runningEventAction || filteredForCert.length === 0}>
-                    {runningEventAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileBadge className="h-3 w-3" />}
+
+                  <Button type="button" size="sm" className="gap-1" onClick={handlePrimaryCertificatesAction} disabled={runningEventAction}>
+                    {runningEventAction && <Loader2 className="h-3 w-3 animate-spin" />}
+                    <FileBadge className="h-3 w-3" />
                     {hasAnyPending ? 'Generar certificados' : 'Emitir firma certificado'}
                   </Button>
                 </div>
@@ -847,16 +896,14 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                     <thead className="sticky top-0 bg-muted">
                       <tr>
                         <th className="px-3 py-2">
-                          <div className="flex flex-row items-center gap-2">
-                            <Checkbox
-                              disabled={hasAnyPending}
-                              checked={filteredForCert.length > 0 && filteredForCert.every((p) => selectedForCert.has(p.national_id))}
-                              onCheckedChange={(checked) => toggleSelectAllCert(Boolean(checked))}
-                              aria-label="Seleccionar todos"
-                            />
-                            Seleccionar
-                          </div>
+                          <Checkbox
+                            disabled={!canSelectRows}
+                            checked={canSelectRows && filteredForCert.length > 0 && filteredForCert.every((p) => selectedForCert.has(p.national_id))}
+                            onCheckedChange={(checked) => toggleSelectAllCert(Boolean(checked))}
+                            aria-label="Seleccionar todos"
+                          />
                         </th>
+
                         <th className="px-3 py-2 text-left font-semibold">DNI</th>
                         <th className="px-3 py-2 text-left font-semibold">Nombre</th>
                         <th className="px-3 py-2 text-left font-semibold">Email</th>
@@ -867,28 +914,30 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                     <tbody>
                       {filteredForCert.map((p) => {
                         const fullName = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
-
-                        const userDetailId = (p as any).user_detail_id as string | undefined;
-                        const doc = userDetailId ? documentsByUserDetailId.get(userDetailId) : undefined;
-                        const certStatusLabel = getCertificateLabel(doc?.status);
+                        const certStatusLabel = certStatusLabelFor(p);
 
                         return (
-                          <tr key={p.national_id} className={`border-t ${hasAnyPending ? '' : 'cursor-pointer hover:bg-muted/40'}`} onClick={() => toggleSelectCertByRowClick(p.national_id)}>
+                          <tr
+                            key={p.national_id}
+                            className={`border-t ${canSelectRows ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                            onClick={() => {
+                              if (!canSelectRows) return;
+                              toggleSelectCert(p.national_id, !selectedForCert.has(p.national_id));
+                            }}
+                          >
                             <td className="px-3 py-1" onClick={(e) => e.stopPropagation()}>
                               <Checkbox
-                                disabled={hasAnyPending}
+                                disabled={!canSelectRows}
                                 checked={selectedForCert.has(p.national_id)}
                                 onCheckedChange={(checked) => toggleSelectCert(p.national_id, Boolean(checked))}
                                 aria-label={`Seleccionar ${p.national_id}`}
                               />
                             </td>
-
                             <td className="px-3 py-1 font-mono">{p.national_id}</td>
                             <td className="px-3 py-1">{fullName || '—'}</td>
                             <td className="px-3 py-1">{p.email || '—'}</td>
-
                             <td className="px-3 py-1">
-                              <Badge variant="outline" className="text-[10px] uppercase">
+                              <Badge variant="outline" className={`text-[10px] uppercase ${certBadgeClass(certStatusLabel)}`}>
                                 {certStatusLabel}
                               </Badge>
                             </td>
@@ -897,6 +946,12 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                       })}
                     </tbody>
                   </table>
+
+                  {!canSelectRows && (
+                    <div className="border-t bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+                      Hay participantes en <strong>PENDIENTE</strong>. Primero genera certificados (aplica a todos). Luego podrás seleccionar para firmar o rechazar.
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

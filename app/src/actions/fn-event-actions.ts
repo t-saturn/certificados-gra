@@ -11,7 +11,7 @@ export const getCurrentUserId = async (): Promise<string> => {
   return session.user.id;
 };
 
-export type EventAction = 'create_certificates' | 'generate_certificates';
+export type EventAction = 'generate_certificates' | 'sign_certificates' | 'rejected_certificates';
 
 export interface EventActionResponse {
   event_id: string;
@@ -23,34 +23,45 @@ export interface EventActionResponse {
   };
 }
 
+export interface EventActionBody {
+  action: EventAction;
+  participants_id?: string[]; // user_detail_id[]
+}
+
 /**
  * POST /event/:id
- * body: { action: "create_certificates" | "generate_certificates" }
+ * body: { action: "generate_certificates" | "sign_certificates" | "rejected_certificates", participants_id?: string[] }
+ *
+ * - participants_id vacío/undefined => aplica a todos los participantes del evento
+ * - participants_id con ids => aplica solo a ese grupo
  */
-export const fn_event_action = async (eventId: string, action: EventAction): Promise<EventActionResponse> => {
+export const fn_event_action = async (eventId: string, action: EventAction, participantsId?: string[]): Promise<EventActionResponse> => {
   if (!eventId?.trim()) throw new Error('eventId es requerido');
 
   const url = `${BASE_URL}/event/${encodeURIComponent(eventId)}`;
+
+  const body: EventActionBody = { action };
+  if (participantsId && participantsId.length > 0) {
+    body.participants_id = participantsId;
+  }
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Si tu backend usa auth por cookie, no necesitas Authorization.
-      // Si usa bearer token, aquí deberías incluirlo.
     },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify(body),
     cache: 'no-store',
   });
 
-  const payload = (await res.json().catch(() => null)) as any;
+  const payload = (await res.json().catch(() => null)) as Record<string, unknown> | null;
 
   if (!res.ok) {
     const msg = payload?.message || payload?.error || `Error ${res.status} al ejecutar acción del evento`;
-    throw new Error(msg);
+    throw new Error(String(msg));
   }
 
-  // Tu wrapper suele devolver { data, status, message }
+  // wrapper: { data, status, message }
   const data = payload?.data ?? payload;
 
   return data as EventActionResponse;

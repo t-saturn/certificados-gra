@@ -13,6 +13,7 @@ export interface NewEventStep3Props {
   fileName: string | null;
   fileError: string | null;
   isParsingFile: boolean;
+  // eslint-disable-next-line no-unused-vars
   onSelectFile: (file: File) => void;
 }
 

@@ -21,7 +21,7 @@ func NewEventActionHandler(svc services.EventActionService) *EventActionHandler 
 }
 
 // POST /event/:id
-// body: { "action": "create_certificates" | "generate_certificates" }
+// body: { "action": "...", "participants_id": ["..."] }
 func (h *EventActionHandler) RunEventAction(c fiber.Ctx) (interface{}, string, error) {
 	idParam := strings.TrimSpace(c.Params("id", ""))
 	evID, err := uuid.Parse(idParam)
@@ -34,7 +34,12 @@ func (h *EventActionHandler) RunEventAction(c fiber.Ctx) (interface{}, string, e
 		return nil, "", fmt.Errorf("invalid body")
 	}
 
-	created, skipped, updated, err := h.svc.RunEventAction(context.Background(), evID, req.Action)
+	created, skipped, updated, err := h.svc.RunEventAction(
+		context.Background(),
+		evID,
+		req.Action,
+		req.ParticipantsID,
+	)
 	if err != nil {
 		return nil, "", err
 	}
