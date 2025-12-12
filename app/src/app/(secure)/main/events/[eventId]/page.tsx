@@ -9,7 +9,7 @@ type PageParams = {
 };
 
 export default async function Page({ params }: { params: Promise<PageParams> }): Promise<JSX.Element> {
-  // Next 13.5+: params es una Promise
+  // Next 13.5+: params es una Promise, por lo que debes esperar a que se resuelva
   const { eventId } = await params;
 
   // Si quisieras enviar el user_id:
