@@ -12,27 +12,41 @@ export interface EventDetailTemplate {
   document_type_name: string;
 }
 
-export interface EventDetailSchedule {
-  id: string;
+export interface EventSchedule {
+  id?: string;
   start_datetime: string;
   end_datetime: string;
 }
 
-export type RegistrationSource = 'ADMIN' | 'IMPORTED' | 'SELF' | 'SELF_REGISTERED' | string;
-export type RegistrationStatus = 'REGISTERED' | 'PENDING' | 'CANCELLED' | 'REJECTED' | string;
-export type AttendanceStatus = 'PENDING' | 'ATTENDED' | 'ABSENT' | string;
+export type DocumentStatus = 'PENDING' | 'CREATED' | 'GENERATED' | 'REJECTED' | string;
 
-export interface EventDetailParticipant {
+export interface EventDocument {
+  id: string;
+  user_detail_id: string;
+  serial_code: string;
+  verification_code: string;
+  status: DocumentStatus;
+  issue_date: string;
+
+  template_id: string;
+  document_type_id: string;
+  document_type_code: string;
+  document_type_name: string;
+}
+
+export interface EventParticipantDetail {
   id: string;
   user_detail_id: string;
   national_id: string;
   first_name: string;
   last_name: string;
-  email?: string | null;
   phone?: string | null;
-  registration_source: RegistrationSource;
-  registration_status: RegistrationStatus;
-  attendance_status: AttendanceStatus;
+  email?: string | null;
+
+  registration_source: string;
+  registration_status: string;
+  attendance_status: string;
+
   created_at: string;
   updated_at: string;
 }
@@ -54,9 +68,9 @@ export interface EventDetail {
   created_at: string;
   updated_at: string;
   template: EventDetailTemplate | null;
-  schedules: EventDetailSchedule[];
-  participants: EventDetailParticipant[];
-  documents: unknown | null;
+  schedules: EventSchedule[];
+  participants: EventParticipantDetail[];
+  documents: EventDocument[] | null;
 }
 
 interface EventDetailApiResponse {

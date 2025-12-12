@@ -2,10 +2,10 @@
 'use client';
 
 import type { FC } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { ArrowLeft, FileText, Users, Clock, Loader2, Trash2, Plus, Search, FileBadge, Pencil } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Clock, Loader2, Trash2, Plus, Search, FileBadge, Pencil, RefreshCcw } from 'lucide-react';
 
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import type { EventDetailResult } from '@/actions/fn-event-detail';
 import type { EventParticipant, EventSchedule, UpdateEventParticipantPatchItem, UpdateEventBody } from '@/actions/fn-events';
 import { fn_update_event, fn_update_event_participants } from '@/actions/fn-events';
+import { fn_event_action } from '@/actions/fn-event-actions';
 
 export interface EventDetailPageProps {
   event: EventDetailResult;
@@ -30,10 +31,7 @@ export interface EventDetailPageProps {
 
 const formatDateTime = (iso: string): string => {
   try {
-    return new Date(iso).toLocaleString('es-PE', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    });
+    return new Date(iso).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
   } catch {
     return iso;
   }
@@ -48,9 +46,9 @@ const toLocalInputValue = (iso: string | null | undefined): string => {
 
 // Calcula el offset local actual en formato ±HH:MM (ej: -05:00)
 const getLocalOffset = (): string => {
-  const offsetMinutes = new Date().getTimezoneOffset(); // ej: 300 para -05:00
+  const offsetMinutes = new Date().getTimezoneOffset();
   const sign = offsetMinutes > 0 ? '-' : '+';
-  const abs = Math.max(Math.abs(offsetMinutes), 0);
+  const abs = Math.abs(offsetMinutes);
   const hh = String(Math.floor(abs / 60)).padStart(2, '0');
   const mm = String(abs % 60).padStart(2, '0');
   return `${sign}${hh}:${mm}`;
@@ -88,6 +86,26 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
   const documentTypeName = event.template?.document_type_name ?? '—';
 
+  /* ----------------- Index de documentos ----------------- */
+  const documentsByUserDetailId = useMemo(() => {
+    const map = new Map<string, { status: string }>();
+    (event.documents ?? []).forEach((d: any) => {
+      if (d?.user_detail_id) map.set(d.user_detail_id, { status: d.status });
+    });
+    return map;
+  }, [event.documents]);
+
+  const getCertificateLabel = (rawStatus?: string): 'PENDIENTE' | 'CREADO' | 'COMPLETADO' | 'RECHAZADO' => {
+    if (!rawStatus) return 'PENDIENTE';
+    const s = String(rawStatus).toUpperCase();
+    if (s === 'CREATED') return 'CREADO';
+    if (s === 'GENERATED') return 'COMPLETADO';
+    if (s === 'REJECTED') return 'RECHAZADO';
+    return 'PENDIENTE';
+  };
+
+  /* ----------------- Estado: Guardar evento ----------------- */
+
   const [savingEvent, setSavingEvent] = useState(false);
 
   const [eventForm, setEventForm] = useState({
@@ -106,12 +124,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           start: toLocalInputValue(s.start_datetime),
           end: toLocalInputValue(s.end_datetime),
         }))
-      : [
-          {
-            start: '',
-            end: '',
-          },
-        ],
+      : [{ start: '', end: '' }],
   );
 
   const handleChangeEventField = (field: keyof typeof eventForm, value: string): void => {
@@ -145,44 +158,36 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       return;
     }
 
-    const invalidSchedule = eventSchedules.some((s) => !s.start || !s.end);
-    if (invalidSchedule) {
+    if (eventSchedules.some((s) => !s.start || !s.end)) {
       toast.error('Todas las fechas / horarios del evento deben estar completas');
       return;
     }
 
     const body: UpdateEventBody = {};
 
-    // ---- Campos simples ----
-    if (eventForm.title.trim() !== event.title) {
-      body.title = eventForm.title.trim();
-    }
+    // title
+    if (eventForm.title.trim() !== event.title) body.title = eventForm.title.trim();
 
+    // description
     const originalDesc = event.description ?? '';
-    if (eventForm.description.trim() !== originalDesc) {
-      body.description = eventForm.description.trim() || null;
-    }
+    if (eventForm.description.trim() !== originalDesc) body.description = eventForm.description.trim() || null;
 
+    // location
     const originalLoc = event.location ?? '';
-    if (eventForm.location.trim() !== originalLoc) {
-      body.location = eventForm.location.trim() || '';
-    }
+    if (eventForm.location.trim() !== originalLoc) body.location = eventForm.location.trim() || '';
 
+    // max_participants
     const originalMax = event.max_participants ?? null;
     const newMax = eventForm.max_participants ? Number(eventForm.max_participants) : null;
     const normalizedNewMax = Number.isNaN(newMax) ? null : newMax;
 
-    if (normalizedNewMax !== originalMax) {
-      body.max_participants = normalizedNewMax;
-    }
+    if (normalizedNewMax !== originalMax) body.max_participants = normalizedNewMax;
 
-    // ---- Fechas de inscripción (comparar como strings locales, NO Date) ----
+    // registration open/close (comparar por string local)
     const originalOpenLocal = toLocalInputValue(event.registration_open_at);
     const originalCloseLocal = toLocalInputValue(event.registration_close_at);
 
-    const registrationChanged = eventForm.registration_open_at !== originalOpenLocal || eventForm.registration_close_at !== originalCloseLocal;
-
-    if (registrationChanged) {
+    if (eventForm.registration_open_at !== originalOpenLocal || eventForm.registration_close_at !== originalCloseLocal) {
       const openStr = fromLocalInputToServer(eventForm.registration_open_at);
       const closeStr = fromLocalInputToServer(eventForm.registration_close_at);
 
@@ -195,7 +200,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       body.registration_close_at = closeStr;
     }
 
-    // ---- Schedules ----
+    // schedules (comparar por string local)
     const originalSchedulesLocal: EditableSchedule[] = (event.schedules ?? []).map((s) => ({
       start: toLocalInputValue(s.start_datetime),
       end: toLocalInputValue(s.end_datetime),
@@ -213,27 +218,14 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     })();
 
     if (schedulesChanged) {
-      try {
-        const schedulesIso = eventSchedules.map((s) => {
-          const startStr = fromLocalInputToServer(s.start);
-          const endStr = fromLocalInputToServer(s.end);
+      const schedulesIso = eventSchedules.map((s) => {
+        const startStr = fromLocalInputToServer(s.start);
+        const endStr = fromLocalInputToServer(s.end);
+        if (!startStr || !endStr) throw new Error('Formato inválido en fechas del evento');
+        return { start_datetime: startStr, end_datetime: endStr };
+      });
 
-          if (!startStr || !endStr) {
-            throw new Error('Hay fechas del evento con formato inválido');
-          }
-
-          return {
-            start_datetime: startStr,
-            end_datetime: endStr,
-          };
-        });
-
-        body.schedules = schedulesIso;
-      } catch (err) {
-        console.error(err);
-        toast.error('Hay fechas del evento con formato inválido');
-        return;
-      }
+      body.schedules = schedulesIso;
     }
 
     if (Object.keys(body).length === 0) {
@@ -248,19 +240,27 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       router.refresh();
     } catch (err: any) {
       console.error(err);
-      toast.error('No se pudo actualizar la información del evento', {
-        description: err?.message,
-      });
+      toast.error('No se pudo actualizar la información del evento', { description: err?.message });
     } finally {
       setSavingEvent(false);
     }
   };
 
+  /* ----------------- Participantes (CRUD) ----------------- */
+
   const [editableParticipants, setEditableParticipants] = useState<EditableParticipant[]>(originalParticipants);
   const [savingParticipants, setSavingParticipants] = useState(false);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<{ national_id: string; first_name: string; last_name: string; email: string; phone: string }>({
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
+
+  const [editForm, setEditForm] = useState<{
+    national_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  }>({
     national_id: '',
     first_name: '',
     last_name: '',
@@ -268,33 +268,30 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     phone: '',
   });
 
-  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
-
   const originalByDni = useMemo(() => {
     const map = new Map<string, EditableParticipant>();
-    originalParticipants.forEach((p) => {
-      map.set(p.national_id, p);
-    });
+    originalParticipants.forEach((p) => map.set(p.national_id, p));
     return map;
   }, [originalParticipants]);
 
+  const visibleParticipants = useMemo(() => editableParticipants.filter((p) => !p._deleted), [editableParticipants]);
+
   const openEditModal = (idx: number): void => {
     const p = editableParticipants[idx];
-    setEditForm({ national_id: p.national_id, first_name: p.first_name ?? '', last_name: p.last_name ?? '', email: p.email ?? '', phone: p.phone ?? '' });
+    setEditForm({
+      national_id: p.national_id,
+      first_name: p.first_name ?? '',
+      last_name: p.last_name ?? '',
+      email: p.email ?? '',
+      phone: p.phone ?? '',
+    });
     setEditingIndex(idx);
   };
 
-  const closeEditModal = (): void => {
-    setEditingIndex(null);
-  };
+  const closeEditModal = (): void => setEditingIndex(null);
 
-  const openDeleteModal = (idx: number): void => {
-    setDeleteIndex(idx);
-  };
-
-  const closeDeleteModal = (): void => {
-    setDeleteIndex(null);
-  };
+  const openDeleteModal = (idx: number): void => setDeleteIndex(idx);
+  const closeDeleteModal = (): void => setDeleteIndex(null);
 
   const handleSaveEditParticipant = (): void => {
     if (editingIndex === null) return;
@@ -331,7 +328,18 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   };
 
   const handleAddParticipantRow = (): void => {
-    setEditableParticipants((prev) => [...prev, { national_id: '', first_name: '', last_name: '', email: '', phone: '', registration_source: 'IMPORTED', _isNew: true }]);
+    setEditableParticipants((prev) => [
+      ...prev,
+      {
+        national_id: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        registration_source: 'IMPORTED',
+        _isNew: true,
+      },
+    ]);
   };
 
   const handleSaveParticipants = async (): Promise<void> => {
@@ -341,15 +349,12 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       const original = originalByDni.get(p.national_id);
 
       if (p._deleted) {
-        if (original) {
-          patches.push({ national_id: original.national_id, remove: true });
-        }
+        if (original) patches.push({ national_id: original.national_id, remove: true });
         return;
       }
 
       if (p._isNew) {
         if (!p.national_id.trim()) return;
-
         patches.push({
           national_id: p.national_id.trim(),
           first_name: p.first_name?.trim() || undefined,
@@ -366,7 +371,13 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
         if (!changed) return;
 
-        patches.push({ national_id: p.national_id, first_name: p.first_name, last_name: p.last_name, phone: p.phone ?? null, email: p.email ?? null });
+        patches.push({
+          national_id: p.national_id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          phone: p.phone ?? null,
+          email: p.email ?? null,
+        });
       }
     });
 
@@ -382,34 +393,66 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       router.refresh();
     } catch (error: any) {
       console.error(error);
-      toast.error('No se pudieron actualizar los participantes', {
-        description: error?.message,
-      });
+      toast.error('No se pudieron actualizar los participantes', { description: error?.message });
     } finally {
       setSavingParticipants(false);
     }
   };
 
+  const toggleSelectCertByRowClick = (dni: string): void => {
+    // si estamos en modo "Generar" (no requiere selección), no hacemos nada
+    if (hasAnyPending) return;
+
+    setSelectedForCert((prev) => {
+      const next = new Set(prev);
+      if (next.has(dni)) next.delete(dni);
+      else next.add(dni);
+      return next;
+    });
+  };
+
+  /* ----------------- Certificados ----------------- */
+
   const [certSearch, setCertSearch] = useState('');
   const [selectedForCert, setSelectedForCert] = useState<Set<string>>(new Set());
-
-  const visibleParticipants = editableParticipants.filter((p) => !p._deleted);
+  const [runningEventAction, setRunningEventAction] = useState(false);
 
   const filteredForCert = useMemo(() => {
-    if (!certSearch.trim()) return visibleParticipants;
+    const base = visibleParticipants;
+    if (!certSearch.trim()) return base;
     const term = certSearch.trim().toLowerCase();
-    return visibleParticipants.filter((p) => {
+    return base.filter((p) => {
       const fullName = `${p.first_name ?? ''} ${p.last_name ?? ''}`.toLowerCase();
       return p.national_id.toLowerCase().includes(term) || fullName.includes(term) || (p.email ?? '').toLowerCase().includes(term);
     });
   }, [certSearch, visibleParticipants]);
+
+  const certStatusForParticipant = (p: EditableParticipant): 'PENDIENTE' | 'CREADO' | 'COMPLETADO' | 'RECHAZADO' => {
+    const udid = (p as any).user_detail_id as string | undefined;
+    const doc = udid ? documentsByUserDetailId.get(udid) : undefined;
+    return getCertificateLabel(doc?.status);
+  };
+
+  const hasAnyPending = useMemo(() => {
+    if (filteredForCert.length === 0) return false;
+    return filteredForCert.some((p) => certStatusForParticipant(p) === 'PENDIENTE');
+  }, [filteredForCert, documentsByUserDetailId]);
+
+  // Regla: si al menos uno está PENDIENTE => mostrar "Generar certificados"
+  // si TODOS los visibles están en CREADO => mostrar "Emitir firma certificado"
+  const allVisibleCreated = useMemo(() => {
+    if (filteredForCert.length === 0) return false;
+    return filteredForCert.every((p) => certStatusForParticipant(p) === 'CREADO');
+  }, [filteredForCert, documentsByUserDetailId]);
 
   const toggleSelectAllCert = (checked: boolean): void => {
     if (checked) {
       const next = new Set<string>();
       filteredForCert.forEach((p) => next.add(p.national_id));
       setSelectedForCert(next);
-    } else setSelectedForCert(new Set());
+    } else {
+      setSelectedForCert(new Set());
+    }
   };
 
   const toggleSelectCert = (dni: string, checked: boolean): void => {
@@ -421,21 +464,70 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
     });
   };
 
-  const handleGenerateCertificates = (): void => {
-    if (selectedForCert.size === 0) {
-      toast.info('Selecciona al menos un participante para generar certificados');
+  const handlePrimaryCertificatesAction = async (): Promise<void> => {
+    if (filteredForCert.length === 0) {
+      toast.info('No hay participantes para procesar');
       return;
     }
-    toast.success(`Generar certificado para ${selectedForCert.size} participante(s) (TODO backend).`);
+
+    // Si hay al menos uno PENDIENTE => generar certificados (no requiere check)
+    const shouldCreate = hasAnyPending;
+
+    // Si NO hay pendientes y todos están CREADO => emitir firma (requiere check)
+    const shouldSign = !hasAnyPending && allVisibleCreated;
+
+    if (shouldSign && selectedForCert.size === 0) {
+      toast.info('Selecciona al menos un participante para emitir firma');
+      return;
+    }
+
+    const action = shouldCreate ? 'create_certificates' : 'generate_certificates';
+
+    try {
+      setRunningEventAction(true);
+
+      // Tu backend action actual NO recibe lista de participantes.
+      // - create_certificates: típicamente aplica a todos (o crea los faltantes)
+      // - generate_certificates: típicamente firma/genera para el evento (backend decide)
+      // Aquí seguimos la API actual.
+      const resp = await fn_event_action(event.id, action);
+
+      toast.success(shouldCreate ? 'Certificados generados' : 'Firma emitida / certificados finalizados', {
+        description: `created: ${resp.result.created} · skipped: ${resp.result.skipped} · updated: ${resp.result.updated}`,
+      });
+
+      // limpiar selección SIEMPRE al terminar una acción
+      setSelectedForCert(new Set());
+
+      router.refresh();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('No se pudo ejecutar la acción', { description: err?.message });
+    } finally {
+      setRunningEventAction(false);
+    }
   };
 
-  const handleDeleteCertificates = (): void => {
+  const handleRejectCertificates = (): void => {
     if (selectedForCert.size === 0) {
       toast.info('Selecciona al menos un participante');
       return;
     }
-    toast.info('TODO: eliminar certificados seleccionados (backend).');
+
+    // TODO: conectar endpoint real
+    toast.info(`TODO: rechazar certificados para ${selectedForCert.size} participante(s).`);
+
+    // limpiar selección cuando se ejecute la acción
+    setSelectedForCert(new Set());
   };
+
+  useEffect(() => {
+    if (hasAnyPending) {
+      setSelectedForCert(new Set());
+    }
+  }, [hasAnyPending]);
+
+  /* ----------------- Render ----------------- */
 
   return (
     <section className="flex flex-col gap-6 p-4">
@@ -465,7 +557,6 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
         </div>
       </header>
 
-      {/* Tabs */}
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="general" className="text-xs sm:text-sm">
@@ -479,9 +570,8 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB: Información principal (editable) */}
+        {/* ----------------- TAB: General ----------------- */}
         <TabsContent value="general" className="space-y-4">
-          {/* Datos principales */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
@@ -489,12 +579,14 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                   <FileText className="h-4 w-4" />
                   <span>Datos del evento</span>
                 </div>
+
                 <Button size="sm" className="gap-2" onClick={handleSaveEventInfo} disabled={savingEvent}>
                   {savingEvent && <Loader2 className="h-4 w-4 animate-spin" />}
                   Guardar cambios
                 </Button>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-4 text-sm">
               <div className="space-y-2">
                 <Label>Título *</Label>
@@ -531,7 +623,6 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </CardContent>
           </Card>
 
-          {/* Fechas / horarios del evento */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
@@ -546,35 +637,32 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                 </Button>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              {eventSchedules.length === 0 ? (
-                <p>No hay sesiones configuradas.</p>
-              ) : (
-                <div className="space-y-3">
-                  {eventSchedules.map((s, idx) => (
-                    <div key={idx} className="grid gap-3 md:grid-cols-[1fr,1fr,auto] items-end">
-                      <div className="space-y-2">
-                        <Label>Inicio *</Label>
-                        <Input type="datetime-local" value={s.start} onChange={(e) => handleChangeSchedule(idx, 'start', e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Fin *</Label>
-                        <Input type="datetime-local" value={s.end} onChange={(e) => handleChangeSchedule(idx, 'end', e.target.value)} />
-                      </div>
-                      <div className="flex justify-end">
-                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => handleRemoveScheduleRow(idx)} disabled={eventSchedules.length <= 1}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              <div className="space-y-3">
+                {eventSchedules.map((s, idx) => (
+                  <div key={idx} className="grid items-end gap-3 md:grid-cols-[1fr,1fr,auto]">
+                    <div className="space-y-2">
+                      <Label>Inicio *</Label>
+                      <Input type="datetime-local" value={s.start} onChange={(e) => handleChangeSchedule(idx, 'start', e.target.value)} />
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="space-y-2">
+                      <Label>Fin *</Label>
+                      <Input type="datetime-local" value={s.end} onChange={(e) => handleChangeSchedule(idx, 'end', e.target.value)} />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => handleRemoveScheduleRow(idx)} disabled={eventSchedules.length <= 1}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* TAB: Participantes (CRUD) */}
+        {/* ----------------- TAB: Participants ----------------- */}
         <TabsContent value="participants">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
@@ -649,13 +737,8 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </CardContent>
           </Card>
 
-          {/* Modal EDITAR participante */}
-          <Dialog
-            open={editingIndex !== null}
-            onOpenChange={(open) => {
-              if (!open) closeEditModal();
-            }}
-          >
+          {/* Modal EDIT */}
+          <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && closeEditModal()}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Editar participante</DialogTitle>
@@ -668,66 +751,29 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                     <Label>DNI</Label>
                     <Input
                       value={editForm.national_id}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          national_id: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, national_id: e.target.value }))}
                       disabled={editingIndex !== null && !editableParticipants[editingIndex]?._isNew}
                     />
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <Label>Nombre</Label>
-                    <Input
-                      value={editForm.first_name}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          first_name: e.target.value,
-                        }))
-                      }
-                    />
+                    <Input value={editForm.first_name} onChange={(e) => setEditForm((prev) => ({ ...prev, first_name: e.target.value }))} />
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <Label>Apellido</Label>
-                    <Input
-                      value={editForm.last_name}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          last_name: e.target.value,
-                        }))
-                      }
-                    />
+                    <Input value={editForm.last_name} onChange={(e) => setEditForm((prev) => ({ ...prev, last_name: e.target.value }))} />
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <Label>Email</Label>
-                    <Input
-                      value={editForm.email}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          email: e.target.value,
-                        }))
-                      }
-                    />
+                    <Input value={editForm.email} onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))} />
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <Label>Teléfono</Label>
-                    <Input
-                      value={editForm.phone}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          phone: e.target.value,
-                        }))
-                      }
-                    />
+                    <Input value={editForm.phone} onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))} />
                   </div>
                 </div>
               </div>
@@ -741,13 +787,8 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </DialogContent>
           </Dialog>
 
-          {/* Modal ELIMINAR participante */}
-          <Dialog
-            open={deleteIndex !== null}
-            onOpenChange={(open) => {
-              if (!open) closeDeleteModal();
-            }}
-          >
+          {/* Modal DELETE */}
+          <Dialog open={deleteIndex !== null} onOpenChange={(open) => !open && closeDeleteModal()}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Quitar participante</DialogTitle>
@@ -766,7 +807,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           </Dialog>
         </TabsContent>
 
-        {/* TAB: Certificados */}
+        {/* ----------------- TAB: Certificates ----------------- */}
         <TabsContent value="certificates">
           <Card>
             <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
@@ -785,13 +826,13 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleDeleteCertificates}>
+                  <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleRejectCertificates} disabled={selectedForCert.size === 0}>
                     <Trash2 className="h-3 w-3" />
-                    Eliminar
+                    Rechazar
                   </Button>
-                  <Button type="button" size="sm" className="gap-1" onClick={handleGenerateCertificates}>
-                    <FileBadge className="h-3 w-3" />
-                    Generar certificados
+                  <Button type="button" size="sm" className="gap-1" onClick={handlePrimaryCertificatesAction} disabled={runningEventAction || filteredForCert.length === 0}>
+                    {runningEventAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileBadge className="h-3 w-3" />}
+                    {hasAnyPending ? 'Generar certificados' : 'Emitir firma certificado'}
                   </Button>
                 </div>
               </div>
@@ -806,11 +847,15 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                     <thead className="sticky top-0 bg-muted">
                       <tr>
                         <th className="px-3 py-2">
-                          <Checkbox
-                            checked={filteredForCert.length > 0 && filteredForCert.every((p) => selectedForCert.has(p.national_id))}
-                            onCheckedChange={(checked) => toggleSelectAllCert(Boolean(checked))}
-                            aria-label="Seleccionar todos"
-                          />
+                          <div className="flex flex-row items-center gap-2">
+                            <Checkbox
+                              disabled={hasAnyPending}
+                              checked={filteredForCert.length > 0 && filteredForCert.every((p) => selectedForCert.has(p.national_id))}
+                              onCheckedChange={(checked) => toggleSelectAllCert(Boolean(checked))}
+                              aria-label="Seleccionar todos"
+                            />
+                            Seleccionar
+                          </div>
                         </th>
                         <th className="px-3 py-2 text-left font-semibold">DNI</th>
                         <th className="px-3 py-2 text-left font-semibold">Nombre</th>
@@ -818,27 +863,33 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                         <th className="px-3 py-2 text-left font-semibold">Estado certificado</th>
                       </tr>
                     </thead>
+
                     <tbody>
                       {filteredForCert.map((p) => {
                         const fullName = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
 
-                        const dummyStatus = 'PENDING'; // placeholder hasta tener backend
+                        const userDetailId = (p as any).user_detail_id as string | undefined;
+                        const doc = userDetailId ? documentsByUserDetailId.get(userDetailId) : undefined;
+                        const certStatusLabel = getCertificateLabel(doc?.status);
 
                         return (
-                          <tr key={p.national_id} className="border-t">
-                            <td className="px-3 py-1">
+                          <tr key={p.national_id} className={`border-t ${hasAnyPending ? '' : 'cursor-pointer hover:bg-muted/40'}`} onClick={() => toggleSelectCertByRowClick(p.national_id)}>
+                            <td className="px-3 py-1" onClick={(e) => e.stopPropagation()}>
                               <Checkbox
+                                disabled={hasAnyPending}
                                 checked={selectedForCert.has(p.national_id)}
                                 onCheckedChange={(checked) => toggleSelectCert(p.national_id, Boolean(checked))}
                                 aria-label={`Seleccionar ${p.national_id}`}
                               />
                             </td>
+
                             <td className="px-3 py-1 font-mono">{p.national_id}</td>
                             <td className="px-3 py-1">{fullName || '—'}</td>
                             <td className="px-3 py-1">{p.email || '—'}</td>
+
                             <td className="px-3 py-1">
                               <Badge variant="outline" className="text-[10px] uppercase">
-                                {dummyStatus}
+                                {certStatusLabel}
                               </Badge>
                             </td>
                           </tr>
