@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, KeyRound, Copy, Package } from 'lucide-react';
 
 import { fn_list_certificates, type CertificateListItem, type CertificateListResponse, type CertificateStatus } from '@/actions/fn-certificates';
+import { useRouter } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import DocumentsPagination from './documents-pagination';
-
 type Props = {
   initialData: CertificateListResponse;
 };
@@ -36,6 +36,7 @@ async function copyToClipboard(text: string) {
 }
 
 export default function DocumentsTable({ initialData }: Props) {
+  const router = useRouter();
   const [data, setData] = useState<CertificateListResponse>(initialData);
   const [search, setSearch] = useState<string>('');
   const [status, setStatus] = useState<CertificateStatus>('all');
@@ -119,7 +120,7 @@ export default function DocumentsTable({ initialData }: Props) {
               </tr>
             ) : (
               data.items.map((item) => (
-                <tr key={item.id} className="border-t">
+                <tr key={item.id} className="border-t cursor-pointer hover:bg-muted/40" onClick={() => router.push(`/documents/${item.id}`)}>
                   {/* Participante */}
                   <td className="px-4 py-3 align-top">
                     <div className="font-medium">
@@ -133,7 +134,10 @@ export default function DocumentsTable({ initialData }: Props) {
                       <button
                         type="button"
                         className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted"
-                        onClick={() => void copyToClipboard(item.serial_code)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void copyToClipboard(item.serial_code);
+                        }}
                         title="Copiar código del documento"
                       >
                         <Copy className="h-3.5 w-3.5" />
@@ -153,8 +157,10 @@ export default function DocumentsTable({ initialData }: Props) {
                       {item.event.code ? (
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted"
-                          onClick={() => void copyToClipboard(item.event.code!)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void copyToClipboard(item.event.code!);
+                          }}
                           title="Copiar código del evento"
                         >
                           <Copy className="h-3.5 w-3.5" />
