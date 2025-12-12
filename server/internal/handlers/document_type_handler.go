@@ -77,7 +77,7 @@ func (h *DocumentTypeHandler) ListTypes(c fiber.Ctx) (interface{}, string, error
 
 	// is_active
 	if iaStr := strings.TrimSpace(c.Query("is_active")); iaStr != "" {
-		if ia, err := strconv.ParseBool(iaStr); err == nil {
+		if ia, parseErr := strconv.ParseBool(iaStr); parseErr == nil {
 			params.IsActive = &ia
 		}
 	}

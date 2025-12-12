@@ -30,7 +30,7 @@ func (h *EventActionHandler) RunEventAction(c fiber.Ctx) (interface{}, string, e
 	}
 
 	var req dto.EventActionRequest
-	if err := c.Bind().Body(&req); err != nil {
+	if err = c.Bind().Body(&req); err != nil {
 		return nil, "", fmt.Errorf("invalid body")
 	}
 
