@@ -72,7 +72,6 @@ export const fetchFileById = async (fileId: string): Promise<FileContentResult> 
     cache: 'no-store',
   });
 
-
   if (!res.ok) {
     let text = '';
     try {

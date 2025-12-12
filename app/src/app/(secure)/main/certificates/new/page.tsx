@@ -73,14 +73,7 @@ export default function CreateCertificatesPage() {
             <div className="space-y-2">
               {events.map((event) => (
                 <label key={event} className="flex items-center gap-3 hover:bg-muted/50 p-4 border border-border rounded-lg cursor-pointer">
-                  <input
-                    type="radio"
-                    name="event"
-                    value={event}
-                    checked={formData.event === event}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, event: e.target.value }))}
-                    className="w-4 h-4"
-                  />
+                  <input type="radio" name="event" value={event} checked={formData.event === event} onChange={(e) => setFormData((prev) => ({ ...prev, event: e.target.value }))} className="w-4 h-4" />
                   <span className="font-medium text-foreground">{event}</span>
                 </label>
               ))}
@@ -171,11 +164,7 @@ export default function CreateCertificatesPage() {
         )}
 
         {step < 3 ? (
-          <Button
-            className="bg-primary hover:bg-primary/90 text-white"
-            disabled={(step === 1 && !formData.event) || (step === 2 && !formData.template)}
-            onClick={() => setStep(step + 1)}
-          >
+          <Button className="bg-primary hover:bg-primary/90 text-white" disabled={(step === 1 && !formData.event) || (step === 2 && !formData.template)} onClick={() => setStep(step + 1)}>
             Siguiente
           </Button>
         ) : (

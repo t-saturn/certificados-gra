@@ -26,15 +26,7 @@ const EventsPage: FC<EventsPageProps> = ({ events, pagination, filters, original
   const initialStatus = originalSearchParams.status ?? filters.status ?? 'ALL';
 
   const initialIsPublic: 'all' | 'true' | 'false' =
-    originalSearchParams.is_public === 'true'
-      ? 'true'
-      : originalSearchParams.is_public === 'false'
-      ? 'false'
-      : filters.is_public === true
-      ? 'true'
-      : filters.is_public === false
-      ? 'false'
-      : 'all';
+    originalSearchParams.is_public === 'true' ? 'true' : originalSearchParams.is_public === 'false' ? 'false' : filters.is_public === true ? 'true' : filters.is_public === false ? 'false' : 'all';
 
   const initialDateFrom = originalSearchParams.date_from ?? filters.date_from ?? '';
   const initialDateTo = originalSearchParams.date_to ?? filters.date_to ?? '';

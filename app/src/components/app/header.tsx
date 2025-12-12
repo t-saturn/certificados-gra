@@ -2,9 +2,7 @@ import Image from 'next/image';
 
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 
-const Container: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ children, className }) => (
-  <div className={`container mx-auto w-full px-6 ${className ?? ''}`}>{children}</div>
-);
+const Container: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ children, className }) => <div className={`container mx-auto w-full px-6 ${className ?? ''}`}>{children}</div>;
 
 const Logo: React.FC = () => (
   <div className="flex items-center gap-2 sm:gap-3" data-testid="logo">

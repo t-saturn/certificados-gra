@@ -58,9 +58,7 @@ export interface DocumentTypesResult {
   filters: DocumentTypesFilters;
 }
 
-export type FnGetDocumentTypes = (
-  params?: GetDocumentTypesParams,
-) => Promise<DocumentTypesResult>;
+export type FnGetDocumentTypes = (params?: GetDocumentTypesParams) => Promise<DocumentTypesResult>;
 
 export const fn_get_document_types: FnGetDocumentTypes = async (params = {}) => {
   const searchParams = new URLSearchParams();

@@ -19,8 +19,8 @@ export interface GetDocumentTemplatesParams {
   page_size?: number;
   search_query?: string;
   is_active?: boolean; // por defecto mandamos true si no viene
-  template_type_code?: string;      // CERTIFICATE, etc.
-  template_category_code?: string;  // CUR, etc.
+  template_type_code?: string; // CERTIFICATE, etc.
+  template_category_code?: string; // CUR, etc.
 }
 
 export interface DocumentTemplateItem {
@@ -73,7 +73,7 @@ export interface DocumentTemplatesResult {
   filters: DocumentTemplatesFilters;
 }
 
-export type FnGetDocumentTemplates = (  params?: GetDocumentTemplatesParams,) => Promise<DocumentTemplatesResult>;
+export type FnGetDocumentTemplates = (params?: GetDocumentTemplatesParams) => Promise<DocumentTemplatesResult>;
 
 /* ---------- SERVER ACTION: GET /document-templates ---------- */
 
@@ -158,14 +158,14 @@ export const fn_get_document_templates: FnGetDocumentTemplates = async (params =
 /* ---------- TIPOS: POST /document-template ---------- */
 
 export interface CreateDocumentTemplateBody {
-  doc_type_code: string;      // "CERTIFICATE"
-  doc_category_code: string;  // "CUR"
-  code: string;               // "CERT_CURSO_BASICO"
+  doc_type_code: string; // "CERTIFICATE"
+  doc_category_code: string; // "CUR"
+  code: string; // "CERT_CURSO_BASICO"
   name: string;
   description?: string;
   file_id: string;
   prev_file_id?: string;
-  is_active?: boolean;        // si no lo envías, que tu backend le ponga default true
+  is_active?: boolean; // si no lo envías, que tu backend le ponga default true
 }
 
 interface CreateDocumentTemplateApiData {
@@ -182,9 +182,7 @@ export interface CreateDocumentTemplateResult {
   message: string;
 }
 
-export type FnCreateDocumentTemplate = (
-  body: CreateDocumentTemplateBody,
-) => Promise<CreateDocumentTemplateResult>;
+export type FnCreateDocumentTemplate = (body: CreateDocumentTemplateBody) => Promise<CreateDocumentTemplateResult>;
 
 /* ---------- SERVER ACTION: POST /document-template ---------- */
 
@@ -267,10 +265,7 @@ export interface UpdateDocumentTemplateResult {
   message: string;
 }
 
-export type FnUpdateDocumentTemplate = (
-  id: string,
-  body: UpdateDocumentTemplateBody,
-) => Promise<UpdateDocumentTemplateResult>;
+export type FnUpdateDocumentTemplate = (id: string, body: UpdateDocumentTemplateBody) => Promise<UpdateDocumentTemplateResult>;
 
 export const fn_update_document_template: FnUpdateDocumentTemplate = async (id, body) => {
   if (!id) {
@@ -376,9 +371,7 @@ export const fn_disable_document_template: FnDisableDocumentTemplate = async (id
       body: text,
     });
 
-    throw new Error(
-      text || `Error al deshabilitar la plantilla de documento (status ${res.status})`,
-    );
+    throw new Error(text || `Error al deshabilitar la plantilla de documento (status ${res.status})`);
   }
 
   let json: ToggleDocumentTemplateApiResponse;
@@ -432,9 +425,7 @@ export const fn_enable_document_template: FnEnableDocumentTemplate = async (id) 
       body: text,
     });
 
-    throw new Error(
-      text || `Error al habilitar la plantilla de documento (status ${res.status})`,
-    );
+    throw new Error(text || `Error al habilitar la plantilla de documento (status ${res.status})`);
   }
 
   let json: ToggleDocumentTemplateApiResponse;

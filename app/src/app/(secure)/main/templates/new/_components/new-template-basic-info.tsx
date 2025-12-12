@@ -74,28 +74,12 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
               </PopoverContent>
             </Popover>
           </div>
-          <Input
-            type="text"
-            name="code"
-            placeholder="Ej: CERT_CURSO_BASICO"
-            value={templateData.code}
-            onChange={(e) => handleCodeChange(e.target.value)}
-            required
-            className="bg-muted border-border"
-          />
+          <Input type="text" name="code" placeholder="Ej: CERT_CURSO_BASICO" value={templateData.code} onChange={(e) => handleCodeChange(e.target.value)} required className="bg-muted border-border" />
         </div>
 
         <div>
           <label className="block mb-2 font-medium text-foreground text-sm">Nombre de la Plantilla</label>
-          <Input
-            type="text"
-            name="name"
-            placeholder="Ej: Certificado Taller Go 2025"
-            value={templateData.name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            required
-            className="bg-muted border-border"
-          />
+          <Input type="text" name="name" placeholder="Ej: Certificado Taller Go 2025" value={templateData.name} onChange={(e) => handleNameChange(e.target.value)} required className="bg-muted border-border" />
         </div>
       </div>
 
@@ -171,14 +155,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
             }}
           >
             <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                aria-expanded={openCategoryPopover}
-                className="justify-between w-full"
-                disabled={loadingCategories || !templateData.document_type_id}
-              >
+              <Button type="button" variant="outline" role="combobox" aria-expanded={openCategoryPopover} className="justify-between w-full" disabled={loadingCategories || !templateData.document_type_id}>
                 {selectedCategory ? `${selectedCategory.name}` : 'Selecciona una categoría...'}
                 <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>

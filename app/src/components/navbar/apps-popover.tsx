@@ -136,12 +136,7 @@ export function AppsPopover() {
 
                     <div className="relative space-y-3">
                       {/* Icon */}
-                      <div
-                        className={cn(
-                          'flex justify-center items-center bg-linear-to-br shadow-lg rounded-xl w-12 h-12 group-hover:scale-110 transition-transform duration-300',
-                          module.gradient,
-                        )}
-                      >
+                      <div className={cn('flex justify-center items-center bg-linear-to-br shadow-lg rounded-xl w-12 h-12 group-hover:scale-110 transition-transform duration-300', module.gradient)}>
                         <module.icon className="w-6 h-6 text-white" />
                       </div>
 

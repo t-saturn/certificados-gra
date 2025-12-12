@@ -362,8 +362,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       }
 
       if (original) {
-        const changed =
-          p.first_name !== original.first_name || p.last_name !== original.last_name || (p.phone ?? '') !== (original.phone ?? '') || (p.email ?? '') !== (original.email ?? '');
+        const changed = p.first_name !== original.first_name || p.last_name !== original.last_name || (p.phone ?? '') !== (original.phone ?? '') || (p.email ?? '') !== (original.email ?? '');
 
         if (!changed) return;
 
@@ -504,12 +503,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
               <div className="space-y-2">
                 <Label>Descripción</Label>
-                <Textarea
-                  rows={3}
-                  value={eventForm.description}
-                  onChange={(e) => handleChangeEventField('description', e.target.value)}
-                  placeholder="Describe brevemente el objetivo del evento…"
-                />
+                <Textarea rows={3} value={eventForm.description} onChange={(e) => handleChangeEventField('description', e.target.value)} placeholder="Describe brevemente el objetivo del evento…" />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -520,13 +514,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
                 <div className="space-y-2">
                   <Label>Máx. participantes</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={eventForm.max_participants}
-                    onChange={(e) => handleChangeEventField('max_participants', e.target.value)}
-                    placeholder="Ej: 100"
-                  />
+                  <Input type="number" min={1} value={eventForm.max_participants} onChange={(e) => handleChangeEventField('max_participants', e.target.value)} placeholder="Ej: 100" />
                 </div>
               </div>
 
@@ -574,14 +562,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                         <Input type="datetime-local" value={s.end} onChange={(e) => handleChangeSchedule(idx, 'end', e.target.value)} />
                       </div>
                       <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 text-destructive"
-                          onClick={() => handleRemoveScheduleRow(idx)}
-                          disabled={eventSchedules.length <= 1}
-                        >
+                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => handleRemoveScheduleRow(idx)} disabled={eventSchedules.length <= 1}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -770,9 +751,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Quitar participante</DialogTitle>
-                <DialogDescription className="text-xs">
-                  ¿Estás seguro de que quieres quitar a este participante del evento? Esta acción se aplicará cuando guardes los cambios.
-                </DialogDescription>
+                <DialogDescription className="text-xs">¿Estás seguro de que quieres quitar a este participante del evento? Esta acción se aplicará cuando guardes los cambios.</DialogDescription>
               </DialogHeader>
 
               <DialogFooter>
@@ -802,12 +781,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2 rounded-md border bg-background px-2">
                   <Search className="h-3 w-3 text-muted-foreground" />
-                  <Input
-                    className="h-8 border-none px-0 text-xs focus-visible:ring-0"
-                    placeholder="Buscar por nombre, DNI o email…"
-                    value={certSearch}
-                    onChange={(e) => setCertSearch(e.target.value)}
-                  />
+                  <Input className="h-8 border-none px-0 text-xs focus-visible:ring-0" placeholder="Buscar por nombre, DNI o email…" value={certSearch} onChange={(e) => setCertSearch(e.target.value)} />
                 </div>
 
                 <div className="flex gap-2">
