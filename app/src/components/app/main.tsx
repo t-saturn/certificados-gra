@@ -10,8 +10,7 @@ export const Main = () => {
       <section className="flex flex-col flex-1 justify-center items-center py-20 text-center container">
         <h2 className="mb-4 font-bold text-primary text-3xl md:text-4xl">Sistema de Certificados</h2>
         <p className="mb-8 max-w-2xl text-muted-foreground text-base">
-          Consulta, descarga y verifica certificados oficiales emitidos por el Gobierno Regional de Ayacucho. Una plataforma segura, moderna y transparente al servicio de la
-          ciudadanía.
+          Consulta, descarga y verifica certificados oficiales emitidos por el Gobierno Regional de Ayacucho. Una plataforma segura, moderna y transparente al servicio de la ciudadanía.
         </p>
         <div className="flex sm:flex-row flex-col gap-4">
           <Button asChild size="lg" className="bg-primary hover:bg-primary/80 text-primary-foreground">

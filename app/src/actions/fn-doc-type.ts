@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 'use server';
 
 const BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8002';
@@ -58,39 +59,27 @@ export interface DocumentTypesResult {
   filters: DocumentTypesFilters;
 }
 
-export type FnGetDocumentTypes = (
-  params?: GetDocumentTypesParams,
-) => Promise<DocumentTypesResult>;
+// eslint-disable-next-line no-unused-vars
+export type FnGetDocumentTypes = (params?: GetDocumentTypesParams) => Promise<DocumentTypesResult>;
 
 export const fn_get_document_types: FnGetDocumentTypes = async (params = {}) => {
   const searchParams = new URLSearchParams();
 
-  if (params.page !== undefined) {
-    searchParams.set('page', String(params.page));
-  }
+  if (params.page !== undefined) searchParams.set('page', String(params.page));
 
-  if (params.page_size !== undefined) {
-    searchParams.set('page_size', String(params.page_size));
-  }
+  if (params.page_size !== undefined) searchParams.set('page_size', String(params.page_size));
 
-  if (params.search_query) {
-    searchParams.set('search_query', params.search_query);
-  }
+  if (params.search_query) searchParams.set('search_query', params.search_query);
 
-  if (params.is_active === undefined) {
-    searchParams.set('is_active', 'true');
-  } else {
-    searchParams.set('is_active', String(params.is_active));
-  }
+  if (params.is_active === undefined) searchParams.set('is_active', 'true');
+  else searchParams.set('is_active', String(params.is_active));
 
   const queryString = searchParams.toString();
   const url = `${BASE_URL}/document-types${queryString ? `?${queryString}` : ''}`;
 
   const res = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
   });
 

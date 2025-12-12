@@ -35,9 +35,7 @@ export const TemplatesList: FC<TemplatesListProps> = ({ templates, previewMap, d
 
                   <span
                     className={`rounded-full border px-2 py-1 text-[10px] font-medium uppercase tracking-wide
-                          ${
-                            template.document_type_code === 'CERTIFICATE' ? 'border-primary/20 bg-primary/10 text-primary' : 'border-accent/20 bg-accent/10 text-accent-foreground'
-                          }`}
+                          ${template.document_type_code === 'CERTIFICATE' ? 'border-primary/20 bg-primary/10 text-primary' : 'border-accent/20 bg-accent/10 text-accent-foreground'}`}
                   >
                     {template.document_type_name}
                   </span>
@@ -120,13 +118,7 @@ export const TemplatesList: FC<TemplatesListProps> = ({ templates, previewMap, d
                   <Edit2 className="w-4 h-4" />
                   Editar
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 gap-2 text-destructive hover:text-destructive/80"
-                  onClick={() => onDisable(template.id)}
-                  disabled={disablingId === template.id}
-                >
+                <Button variant="ghost" size="sm" className="flex-1 gap-2 text-destructive hover:text-destructive/80" onClick={() => onDisable(template.id)} disabled={disablingId === template.id}>
                   {disablingId === template.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   Eliminar
                 </Button>

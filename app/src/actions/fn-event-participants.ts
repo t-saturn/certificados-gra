@@ -115,7 +115,7 @@ export const fn_get_event_participants: FnGetEventParticipants = async (eventId,
   }
 
   return {
-    participants: json.data.participants,    
+    participants: json.data.participants,
     filters: json.data.filters,
   };
 };

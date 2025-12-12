@@ -31,13 +31,7 @@ export const NewEventStepper: FC<NewEventStepperProps> = ({ step }) => {
 
                 <div
                   className={`relative z-10 flex justify-center items-center rounded-full w-9 h-9 text-sm font-semibold border-2 
-                  ${
-                    active
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : completed
-                      ? 'bg-primary/10 text-primary border-primary/10'
-                      : 'bg-muted text-muted-foreground border-transparent'
-                  }`}
+                  ${active ? 'bg-primary text-primary-foreground border-primary' : completed ? 'bg-primary/10 text-primary border-primary/10' : 'bg-muted text-muted-foreground border-transparent'}`}
                 >
                   {s.id}
                 </div>

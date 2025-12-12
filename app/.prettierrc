@@ -1,7 +1,7 @@
 {
   "semi": true,
   "tabWidth": 2,
-  "printWidth": 180,
+  "printWidth": 210,
   "singleQuote": true,
   "trailingComma": "all",
   "bracketSpacing": true,
@@ -14,7 +14,6 @@
   "singleAttributePerLine": false,
   "jsxSingleQuote": false,
   "quoteProps": "as-needed",
-  "jsxBracketSameLine": false,
   "requirePragma": false,
   "insertPragma": false,
   "vueIndentScriptAndStyle": false,

@@ -244,9 +244,7 @@ const TemplatesPage: FC = () => {
 
       setTemplates((prev) =>
         prev.map((t) =>
-          t.id === editingTemplate.id
-            ? { ...t, code: editCode, name: editName, description: editDescription, file_id: newFileId ?? t.file_id, prev_file_id: newPrevFileId ?? t.prev_file_id }
-            : t,
+          t.id === editingTemplate.id ? { ...t, code: editCode, name: editName, description: editDescription, file_id: newFileId ?? t.file_id, prev_file_id: newPrevFileId ?? t.prev_file_id } : t,
         ),
       );
 

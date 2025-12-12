@@ -1,17 +1,23 @@
 meta {
-  name: get by id
+  name: generate-certificates
   type: http
-  seq: 4
+  seq: 5
 }
 
-get {
+post {
   url: {{base_url}}/event/:id
-  body: none
+  body: json
   auth: inherit
 }
 
 params:path {
   id: 76cb49e0-cbfa-41e2-a640-bedf38af3bf3
+}
+
+body:json {
+  {
+    "action": "create_certificates"
+  }
 }
 
 settings {

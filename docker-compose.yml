@@ -38,7 +38,7 @@ services:
       dockerfile: app/Dockerfile
       args:
         # Build-time ARG del Dockerfile de app
-        APP_NEXT_PUBLIC_APP_CLIENT_ID: ${APP_NEXT_PUBLIC_APP_CLIENT_ID}
+        NEXT_PUBLIC_APP_CLIENT_ID: ${APP_NEXT_PUBLIC_APP_CLIENT_ID}
     container_name: certgra_app
     restart: unless-stopped
     depends_on:

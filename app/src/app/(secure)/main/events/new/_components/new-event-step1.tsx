@@ -109,13 +109,7 @@ export const NewEventStep1: FC<NewEventStep1Props> = ({
 
           <div className="flex flex-col gap-2">
             <Label>Máx. participantes</Label>
-            <Input
-              type="number"
-              min={1}
-              value={maxParticipants}
-              onChange={(e) => onChangeMaxParticipants(e.target.value === '' ? '' : Number(e.target.value))}
-              placeholder="Ej: 100"
-            />
+            <Input type="number" min={1} value={maxParticipants} onChange={(e) => onChangeMaxParticipants(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Ej: 100" />
           </div>
         </div>
 
@@ -147,13 +141,7 @@ export const NewEventStep1: FC<NewEventStep1Props> = ({
               <Input type="datetime-local" value={sch.end_datetime} onChange={(e) => onUpdateSchedule(idx, 'end_datetime', e.target.value)} />
             </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex items-center gap-2 col-span-2 w-fit text-destructive"
-              onClick={() => onRemoveSchedule(idx)}
-              disabled={schedules.length <= 1}
-            >
+            <Button type="button" variant="ghost" className="flex items-center gap-2 col-span-2 w-fit text-destructive" onClick={() => onRemoveSchedule(idx)} disabled={schedules.length <= 1}>
               <Trash2 className="w-4 h-4" />
               Eliminar fecha
             </Button>

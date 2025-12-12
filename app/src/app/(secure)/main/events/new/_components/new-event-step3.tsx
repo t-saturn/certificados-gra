@@ -13,6 +13,7 @@ export interface NewEventStep3Props {
   fileName: string | null;
   fileError: string | null;
   isParsingFile: boolean;
+  // eslint-disable-next-line no-unused-vars
   onSelectFile: (file: File) => void;
 }
 
@@ -159,8 +160,8 @@ export const NewEventStep3: FC<NewEventStep3Props> = ({ participants, hasPartici
     <div className="space-y-4">
       <h2 className="font-semibold text-lg">Participantes (opcional)</h2>
       <p className="text-xs text-muted-foreground">
-        Puedes cargar un archivo de <strong>hoja de cálculo (.xlsx/.xls)</strong>, <strong>CSV</strong>, <strong>JSON</strong> o <strong>YAML</strong> con la lista de
-        participantes. Si no cargas ningún archivo, el evento se guardará sin participantes.
+        Puedes cargar un archivo de <strong>hoja de cálculo (.xlsx/.xls)</strong>, <strong>CSV</strong>, <strong>JSON</strong> o <strong>YAML</strong> con la lista de participantes. Si no cargas ningún archivo,
+        el evento se guardará sin participantes.
       </p>
 
       {/* Área Drag & Drop + input */}
@@ -214,9 +215,7 @@ export const NewEventStep3: FC<NewEventStep3Props> = ({ participants, hasPartici
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as ExampleTab)}
-              className={`px-3 py-1 rounded-md transition-colors ${
-                activeTab === tab.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`px-3 py-1 rounded-md transition-colors ${activeTab === tab.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {tab.label}
             </button>

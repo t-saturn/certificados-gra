@@ -55,9 +55,7 @@ export interface DocumentCategoriesResult {
   filters: DocumentCategoriesFilters;
 }
 
-export type FnGetDocumentCategories = (
-  params?: GetDocumentCategoriesParams,
-) => Promise<DocumentCategoriesResult>;
+export type FnGetDocumentCategories = (params?: GetDocumentCategoriesParams) => Promise<DocumentCategoriesResult>;
 
 /* ---------- SERVER ACTION ---------- */
 

@@ -40,7 +40,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
         <SidebarHeader className="flex items-center bg-card border-b rounded-t-lg">
           {!isCollapsed ? (
             <div className="flex items-center gap-4 p-6 font-semibold">
-              <Image src="/img/logo.png" alt="logo" width={40} height={20} />
+              <Image src="/img/logo.webp" alt="logo" width={40} height={20} />
               <div className="flex flex-col">
                 <span className="font-bold text-xl">Certificaciones</span>
                 <span className="font-light text-muted-foreground text-sm">Sistema de Certificaciones</span>
@@ -48,7 +48,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
             </div>
           ) : (
             <div className="p-2">
-              <Image src="/img/logo.png" alt="logo" width={20} height={20} />
+              <Image src="/img/logo.webp" alt="logo" width={20} height={20} />
             </div>
           )}
         </SidebarHeader>
@@ -97,9 +97,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
                                     <Link
                                       href={subitem.url}
                                       key={j}
-                                      className={`px-2 py-1 text-xs flex items-center gap-2 rounded-lg ${
-                                        isSubItemActive ? 'bg-primary text-[#eff1f5]' : 'hover:bg-primary hover:text-[#eff1f5]'
-                                      }`}
+                                      className={`px-2 py-1 text-xs flex items-center gap-2 rounded-lg ${isSubItemActive ? 'bg-primary text-[#eff1f5]' : 'hover:bg-primary hover:text-[#eff1f5]'}`}
                                       onClick={() => {
                                         if (isMobile) {
                                           setOpenMobile(false);
@@ -118,9 +116,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
                       ) : (
                         <Link href={item.url}>
                           <SidebarMenuButton
-                            className={`hover:bg-primary hover:text-[#eff1f5] ${
-                              isActive ? 'bg-primary text-[#eff1f5]' : 'data-[active=true]:bg-primary data-[active=true]:text-[#eff1f5]'
-                            } hover:cursor-pointer`}
+                            className={`hover:bg-primary hover:text-[#eff1f5] ${isActive ? 'bg-primary text-[#eff1f5]' : 'data-[active=true]:bg-primary data-[active=true]:text-[#eff1f5]'} hover:cursor-pointer`}
                             onMouseEnter={(e) => handleMouseEnter(item.label, e)}
                             onMouseLeave={handleMouseLeave}
                             onClick={() => {
@@ -162,11 +158,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
             ?.items?.map((subitem: SidebarSubItem, index: number) => {
               const isSubItemActive = subitem.url === pathname;
               return (
-                <Link
-                  href={subitem.url}
-                  key={index}
-                  className={`flex items-center gap-2 m-2 px-3 py-2 text-sm rounded-lg ${isSubItemActive ? 'bg-primary text-white' : 'hover:bg-primary hover:text-white'}`}
-                >
+                <Link href={subitem.url} key={index} className={`flex items-center gap-2 m-2 px-3 py-2 text-sm rounded-lg ${isSubItemActive ? 'bg-primary text-white' : 'hover:bg-primary hover:text-white'}`}>
                   {subitem.icon && <subitem.icon className="w-4 h-4" />}
                   <span>{subitem.label}</span>
                 </Link>
