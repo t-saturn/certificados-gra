@@ -14,4 +14,5 @@ func RegisterCertificateRoutes(app *fiber.App) {
 	certHandler := handlers.NewCertificateHandler(certService)
 
 	app.Get("/certificates", httpwrap.Wrap(certHandler.ListCertificates))
+	app.Get("/certificates/:id", httpwrap.Wrap(certHandler.GetCertificateByID))
 }
