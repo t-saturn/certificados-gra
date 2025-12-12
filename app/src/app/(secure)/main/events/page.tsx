@@ -10,7 +10,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<EventsSearchParams
   const resolvedSearchParams = await searchParams;
 
   const page = Number(resolvedSearchParams.page ?? '1') || 1;
-  const page_size = Number(resolvedSearchParams.page_size ?? '10') || 10;
+  const page_size = Number(resolvedSearchParams.page_size ?? '9') || 9;
 
   const search_query = resolvedSearchParams.search_query || undefined;
   const status = resolvedSearchParams.status && resolvedSearchParams.status !== 'ALL' ? resolvedSearchParams.status : undefined;

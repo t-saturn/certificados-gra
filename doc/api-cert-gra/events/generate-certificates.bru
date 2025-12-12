@@ -6,14 +6,21 @@ meta {
 
 post {
   url: {{base_url}}/event/:id
-  body: none
+  body: json
   auth: inherit
 }
 
 params:path {
-  id: 
+  id: 76cb49e0-cbfa-41e2-a640-bedf38af3bf3
+}
+
+body:json {
+  {
+    "action": "create_certificates"
+  }
 }
 
 settings {
   encodeUrl: true
+  timeout: 0
 }

@@ -5,11 +5,19 @@ meta {
 }
 
 get {
-  url: {{base_url}}/certificates
+  url: {{base_url}}/certificates?search_query&signature_status&page&page_size
   body: none
   auth: inherit
 }
 
+params:query {
+  search_query: 
+  signature_status: 
+  page: 
+  page_size: 
+}
+
 settings {
   encodeUrl: true
+  timeout: 0
 }
