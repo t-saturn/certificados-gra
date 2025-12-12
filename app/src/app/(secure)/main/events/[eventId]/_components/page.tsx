@@ -2,6 +2,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
+import type { DragEvent } from 'react';
+import { useRef } from 'react';
+
+import * as XLSX from 'xlsx';
+import yaml from 'js-yaml';
+
 import type { FC } from 'react';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -314,6 +320,164 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       phone: p.phone ?? '',
     });
     setEditingIndex(idx);
+  };
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
+
+  type ImportParticipantRow = {
+    national_id: string;
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    email?: string;
+  };
+
+  const normalizeImportedRow = (row: any): ImportParticipantRow | null => {
+    if (!row) return null;
+
+    const national_id = String(row.national_id ?? row.NATIONAL_ID ?? row.dni ?? row.DNI ?? '').trim();
+    const first_name = String(row.first_name ?? row.FIRST_NAME ?? row.nombre ?? row.NOMBRE ?? '').trim();
+    const last_name = String(row.last_name ?? row.LAST_NAME ?? row.apellido ?? row.APELLIDO ?? '').trim();
+    const phone = row.phone ?? row.PHONE ?? row.telefono ?? row.TELEFONO;
+    const email = row.email ?? row.EMAIL;
+
+    if (!national_id) return null;
+
+    return {
+      national_id,
+      first_name,
+      last_name,
+      phone: phone ? String(phone).trim() : '',
+      email: email ? String(email).trim() : '',
+    };
+  };
+
+  const mergeImportedParticipants = (rows: ImportParticipantRow[]): void => {
+    setEditableParticipants((prev) => {
+      const existingDni = new Set(prev.filter((p) => !p._deleted).map((p) => p.national_id));
+      const next = [...prev];
+
+      rows.forEach((r) => {
+        if (!r.national_id) return;
+
+        // si ya existe, lo saltamos (no sobreescribimos)
+        if (existingDni.has(r.national_id)) return;
+
+        next.push({
+          national_id: r.national_id,
+          first_name: r.first_name ?? '',
+          last_name: r.last_name ?? '',
+          phone: r.phone ?? '',
+          email: r.email ?? '',
+          registration_source: 'IMPORTED',
+          _isNew: true,
+        });
+        existingDni.add(r.national_id);
+      });
+
+      return next;
+    });
+  };
+
+  const parseFileToRows = async (file: File): Promise<ImportParticipantRow[]> => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    // XLSX/XLS
+    if (ext === 'xlsx' || ext === 'xls') {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      return json.map(normalizeImportedRow).filter(Boolean) as ImportParticipantRow[];
+    }
+
+    // CSV
+    if (ext === 'csv') {
+      const text = await file.text();
+      const wb = XLSX.read(text, { type: 'string' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      return json.map(normalizeImportedRow).filter(Boolean) as ImportParticipantRow[];
+    }
+
+    // JSON
+    if (ext === 'json') {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.participants) ? parsed.participants : [];
+      return arr.map(normalizeImportedRow).filter(Boolean) as ImportParticipantRow[];
+    }
+
+    // YAML
+    if (ext === 'yml' || ext === 'yaml') {
+      const text = await file.text();
+      const parsed: any = yaml.load(text);
+      const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.participants) ? parsed.participants : [];
+      return arr.map(normalizeImportedRow).filter(Boolean) as ImportParticipantRow[];
+    }
+
+    throw new Error('Formato no soportado. Usa .xlsx/.xls/.csv/.json/.yml/.yaml');
+  };
+
+  const handleSelectImportFile = async (file: File): Promise<void> => {
+    setImportError(null);
+    setImportFileName(file.name);
+
+    try {
+      setIsParsingFile(true);
+
+      const rows = await parseFileToRows(file);
+
+      if (!rows.length) {
+        setImportError('No se detectaron filas válidas. Verifica los encabezados (national_id, first_name, last_name, phone, email).');
+        return;
+      }
+
+      mergeImportedParticipants(rows);
+      toast.success(`Importados ${rows.length} participante(s)`);
+    } catch (e: any) {
+      console.error('[handleSelectImportFile]', e);
+      setImportError(e?.message ?? 'No se pudo procesar el archivo');
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    void handleSelectImportFile(file);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleClickDropzone = (): void => {
+    inputRef.current?.click();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    void handleSelectImportFile(file);
+    e.target.value = ''; // permite re-subir el mismo archivo
   };
 
   const closeEditModal = (): void => setEditingIndex(null);
@@ -695,29 +859,72 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
         <TabsContent value="participants">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <div>
-                  <p className="text-sm font-semibold">Participantes</p>
-                  <p className="text-xs text-muted-foreground">Total filas (incl. nuevas): {visibleParticipants.length}</p>
+            {/* HEADER: título + botones */}
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <div>
+                    <p className="text-sm font-semibold">Participantes</p>
+                    <p className="text-xs text-muted-foreground">Total filas (incl. nuevas): {visibleParticipants.length}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleAddParticipantRow}>
-                  <Plus className="h-3 w-3" />
-                  Agregar participante
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleAddParticipantRow}>
+                    <Plus className="h-3 w-3" />
+                    Agregar participante
+                  </Button>
 
-                <Button type="button" size="sm" className="gap-2" onClick={handleSaveParticipants} disabled={savingParticipants}>
-                  {savingParticipants && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Guardar cambios
-                </Button>
+                  <Button type="button" size="sm" className="gap-2" onClick={handleSaveParticipants} disabled={savingParticipants}>
+                    {savingParticipants && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Guardar cambios
+                  </Button>
+                </div>
               </div>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* IMPORT: Dropzone */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Importar participantes</Label>
+
+                  {importFileName && (
+                    <p className="text-xs text-muted-foreground">
+                      Archivo: <span className="font-medium">{importFileName}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div
+                  onClick={handleClickDropzone}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-xs cursor-pointer transition-colors
+          ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/40 hover:bg-muted'}`}
+                >
+                  <p className="mb-1 font-medium">Arrastra y suelta el archivo aquí</p>
+                  <p className="text-muted-foreground">o haz clic para buscar en tu equipo</p>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Formatos: <span className="font-mono">.xlsx, .xls, .csv, .json, .yml, .yaml</span>
+                  </p>
+                </div>
+
+                <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.json,.yml,.yaml" onChange={handleInputChange} className="hidden" />
+
+                {isParsingFile && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Procesando archivo…</span>
+                  </div>
+                )}
+
+                {importError && <p className="text-xs text-destructive">{importError}</p>}
+              </div>
+
+              {/* TABLA */}
               {visibleParticipants.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">
                   No hay participantes registrados. Puedes agregar nuevos con el botón &quot;Agregar participante&quot;.
@@ -767,6 +974,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </CardContent>
           </Card>
 
+          {/* Modales quedan igual */}
           {/* Modal EDITAR participante */}
           <Dialog
             open={editingIndex !== null}
