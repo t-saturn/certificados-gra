@@ -8,9 +8,8 @@ const BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:8002';
 
 export const getCurrentUserId = async (): Promise<string> => {
   const session = await auth();
-  if (!session?.user?.id) {
-    throw new Error('Sesión inválida: no se encontró el usuario autenticado');
-  }
+  if (!session?.user?.id) throw new Error('Sesión inválida: no se encontró el usuario autenticado');
+
   return session.user.id;
 };
 
@@ -29,7 +28,7 @@ export interface EventTemplateSummary {
 export interface EventSchedule {
   id?: string;
   start_datetime: string; // ISO string
-  end_datetime: string;   // ISO string
+  end_datetime: string; // ISO string
 }
 
 export interface EventParticipant {
@@ -125,7 +124,7 @@ export interface GetEventsParams {
   status?: string; // "SCHEDULED", etc.
   user_id?: string;
   date_from?: string; // "YYYY-MM-DD"
-  date_to?: string;   // "YYYY-MM-DD"
+  date_to?: string; // "YYYY-MM-DD"
 }
 
 export interface EventListItem {
@@ -276,7 +275,7 @@ export interface CreateEventParticipantBody {
   last_name: string;
   phone?: string;
   email?: string;
-  registration_source: string; // "SELF" | "ADMIN" | etc.
+  registration_source: string;
 }
 
 export interface CreateEventBody {
@@ -320,9 +319,7 @@ export const fn_create_event: FnCreateEvent = async (body) => {
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     cache: 'no-store',
   });
@@ -350,7 +347,174 @@ export const fn_create_event: FnCreateEvent = async (body) => {
     throw new Error(json.message || 'Error en el servicio de eventos');
   }
 
-  return {
-    message: json.data?.message ?? 'Event created successfully',
-  };
+  return { message: json.data?.message ?? 'Event created successfully' };
+};
+
+/* PATCH /event/:id  (actualizar datos del evento) */
+
+export interface UpdateEventScheduleBody {
+  start_datetime: string;
+  end_datetime: string;
+}
+
+export interface UpdateEventBody {
+  is_public?: boolean;
+
+  certificate_series?: string;
+  organizational_units_path?: string;
+
+  title?: string;
+  description?: string | null;
+
+  template_id?: string; // enviar "" para limpiar el template en el backend
+
+  location?: string;
+  max_participants?: number | null;
+
+  registration_open_at?: string | null;
+  registration_close_at?: string | null;
+
+  status?: string; // "SCHEDULED", etc.
+
+  // Si se envía este campo, se reemplazan TODAS las sesiones
+  // (si viene [], se borran todas)
+  schedules?: UpdateEventScheduleBody[];
+}
+
+interface UpdateEventApiResponse {
+  data: {
+    message: string; // "Event updated successfully"
+  } | null;
+  status: 'success' | 'failed';
+  message: string;
+}
+
+export interface UpdateEventResult {
+  message: string;
+}
+
+export type FnUpdateEvent = (id: string, body: UpdateEventBody) => Promise<UpdateEventResult>;
+
+export const fn_update_event: FnUpdateEvent = async (id, body) => {
+  if (!id) {
+    throw new Error('El id del evento es obligatorio para actualizar');
+  }
+
+  const url = `${BASE_URL}/event/${encodeURIComponent(id)}`;
+
+  console.log('[fn_update_event] URL =>', url);
+  console.log('[fn_update_event] Body =>', body);
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.error('Error al consumir PATCH /event/:id =>', {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
+    throw new Error(text || `Error al actualizar el evento (status ${res.status})`);
+  }
+
+  let json: UpdateEventApiResponse;
+  try {
+    json = (await res.json()) as UpdateEventApiResponse;
+  } catch (err) {
+    console.error('Error parseando JSON de PATCH /event/:id =>', err);
+    throw new Error('Respuesta inválida del servicio de eventos');
+  }
+
+  if (json.status !== 'success') {
+    console.error('Servicio PATCH /event/:id respondió failed =>', json);
+    throw new Error(json.message || 'Error en el servicio de eventos');
+  }
+
+  return { message: json.data?.message ?? 'Event updated successfully' };
+};
+
+/* PATCH /event/:id/participants  (actualizar solo participantes) */
+
+export interface UpdateEventParticipantPatchItem {
+  // Si se envía id, se usa para ubicar el participante; si no, se intenta por national_id
+  id?: string;
+
+  national_id: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string | null;
+  email?: string | null;
+
+  registration_source?: string;
+  registration_status?: string;
+  attendance_status?: string;
+
+  // Si remove = true => se elimina este participante del evento
+  remove?: boolean;
+}
+
+export interface UpdateEventParticipantsBody {
+  participants: UpdateEventParticipantPatchItem[];
+}
+
+interface UpdateEventParticipantsApiResponse {
+  data: {
+    message: string; // "Event participants updated successfully"
+  } | null;
+  status: 'success' | 'failed';
+  message: string;
+}
+
+export interface UpdateEventParticipantsResult {
+  message: string;
+}
+
+export type FnUpdateEventParticipants = (id: string, body: UpdateEventParticipantsBody) => Promise<UpdateEventParticipantsResult>;
+
+export const fn_update_event_participants: FnUpdateEventParticipants = async (id, body) => {
+  if (!id) {
+    throw new Error('El id del evento es obligatorio para actualizar participantes');
+  }
+
+  const url = `${BASE_URL}/event/${encodeURIComponent(id)}/participants`;
+
+  console.log('[fn_update_event_participants] URL =>', url);
+  console.log('[fn_update_event_participants] Body =>', body);
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.error('Error al consumir PATCH /event/:id/participants =>', {
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
+    throw new Error(text || `Error al actualizar los participantes (status ${res.status})`);
+  }
+
+  let json: UpdateEventParticipantsApiResponse;
+  try {
+    json = (await res.json()) as UpdateEventParticipantsApiResponse;
+  } catch (err) {
+    console.error('Error parseando JSON de PATCH /event/:id/participants =>', err);
+    throw new Error('Respuesta inválida del servicio de eventos');
+  }
+
+  if (json.status !== 'success') {
+    console.error('Servicio PATCH /event/:id/participants respondió failed =>', json);
+    throw new Error(json.message || 'Error en el servicio de eventos');
+  }
+
+  return { message: json.data?.message ?? 'Event participants updated successfully' };
 };

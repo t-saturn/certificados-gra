@@ -20,7 +20,7 @@ type EventParticipantCreateRequest struct {
 	Phone      *string `json:"phone,omitempty"`
 	Email      *string `json:"email,omitempty"`
 
-	RegistrationSource *string `json:"registration_source,omitempty"` // SELF, IMPORTED, ADMIN
+	RegistrationSource *string `json:"registration_source,omitempty"`
 }
 
 type EventCreateRequest struct {
@@ -186,4 +186,55 @@ type EventDetailResponse struct {
 	Schedules    []EventDetailScheduleItem    `json:"schedules"`
 	Participants []EventDetailParticipantItem `json:"participants"`
 	Documents    []EventDetailDocumentItem    `json:"documents"`
+}
+
+// --- UPDATE (PATCH EVENT) ---
+
+type EventUpdateRequest struct {
+	IsPublic *bool `json:"is_public,omitempty"`
+
+	CertificateSeries       *string `json:"certificate_series,omitempty"`
+	OrganizationalUnitsPath *string `json:"organizational_units_path,omitempty"`
+
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	TemplateID *string `json:"template_id,omitempty"` // UUID string o "" para limpiar
+
+	Location        *string `json:"location,omitempty"`
+	MaxParticipants *int    `json:"max_participants,omitempty"`
+
+	RegistrationOpenAt  *time.Time `json:"registration_open_at,omitempty"`
+	RegistrationCloseAt *time.Time `json:"registration_close_at,omitempty"`
+
+	Status *string `json:"status,omitempty"`
+
+	// Si se envía este campo, se reemplazan TODAS las sesiones del evento
+	// por las nuevas. Si no se envía, las sesiones no se tocan.
+	Schedules *[]EventScheduleCreateRequest `json:"schedules,omitempty"`
+}
+
+// --- UPDATE (PATCH PARTICIPANTS) ---
+
+type EventParticipantPatchItem struct {
+	// Si viene ID => modificamos/eliminamos ese participante
+	// Si no viene ID => creamos uno nuevo para ese national_id
+	ID *uuid.UUID `json:"id,omitempty"`
+
+	NationalID string  `json:"national_id"`
+	FirstName  *string `json:"first_name,omitempty"`
+	LastName   *string `json:"last_name,omitempty"`
+	Phone      *string `json:"phone,omitempty"`
+	Email      *string `json:"email,omitempty"`
+
+	RegistrationSource *string `json:"registration_source,omitempty"`
+	RegistrationStatus *string `json:"registration_status,omitempty"`
+	AttendanceStatus   *string `json:"attendance_status,omitempty"`
+
+	// Si Remove = true => se elimina el participante del evento
+	Remove *bool `json:"remove,omitempty"`
+}
+
+type EventParticipantsUpdateRequest struct {
+	Participants []EventParticipantPatchItem `json:"participants"`
 }

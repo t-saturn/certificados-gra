@@ -19,6 +19,8 @@ type EventService interface {
 	CreateEvent(ctx context.Context, userID uuid.UUID, in dto.EventCreateRequest) error
 	ListEvents(ctx context.Context, params dto.EventListQuery) (*dto.EventListResponse, error)
 	GetEventByID(ctx context.Context, id uuid.UUID) (*dto.EventDetailResponse, error)
+	UpdateEvent(ctx context.Context, id uuid.UUID, in dto.EventUpdateRequest) error
+	UpdateEventParticipants(ctx context.Context, id uuid.UUID, in dto.EventParticipantsUpdateRequest) error
 }
 
 type eventServiceImpl struct {
@@ -567,4 +569,327 @@ func (s *eventServiceImpl) GetEventByID(ctx context.Context, id uuid.UUID) (*dto
 	}
 
 	return &resp, nil
+}
+
+func (s *eventServiceImpl) UpdateEvent(ctx context.Context, id uuid.UUID, in dto.EventUpdateRequest) error {
+	if s.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var ev models.Event
+		if err := tx.First(&ev, "id = ?", id).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("event not found")
+			}
+			return fmt.Errorf("error fetching event: %w", err)
+		}
+
+		// --- Campos simples (patch con punteros) ---
+
+		if in.IsPublic != nil {
+			ev.IsPublic = *in.IsPublic
+		}
+
+		if in.CertificateSeries != nil {
+			cs := strings.TrimSpace(*in.CertificateSeries)
+			ev.CertificateSeries = cs
+		}
+
+		if in.OrganizationalUnitsPath != nil {
+			org := strings.TrimSpace(*in.OrganizationalUnitsPath)
+			ev.OrganizationalUnitsPath = org
+		}
+
+		if in.Title != nil {
+			title := strings.TrimSpace(*in.Title)
+			ev.Title = title
+		}
+
+		if in.Description != nil {
+			// Aquí permitimos descripción vacía
+			desc := strings.TrimSpace(*in.Description)
+			// si quieres mantener nil cuando venga "", puedes hacer condicional
+			ev.Description = &desc
+			if desc == "" {
+				// opcional: ev.Description = nil
+			}
+		}
+
+		if in.Location != nil {
+			loc := strings.TrimSpace(*in.Location)
+			ev.Location = loc
+		}
+
+		if in.MaxParticipants != nil {
+			ev.MaxParticipants = in.MaxParticipants
+		}
+
+		if in.RegistrationOpenAt != nil {
+			ev.RegistrationOpenAt = in.RegistrationOpenAt
+		}
+
+		if in.RegistrationCloseAt != nil {
+			ev.RegistrationCloseAt = in.RegistrationCloseAt
+		}
+
+		if in.Status != nil {
+			status := strings.TrimSpace(*in.Status)
+			if status != "" {
+				ev.Status = status
+			}
+		}
+
+		// TemplateID: string UUID o "" para limpiar
+		if in.TemplateID != nil {
+			tidStr := strings.TrimSpace(*in.TemplateID)
+			if tidStr == "" {
+				ev.TemplateID = nil
+			} else {
+				tid, err := uuid.Parse(tidStr)
+				if err != nil {
+					return fmt.Errorf("invalid template_id")
+				}
+				ev.TemplateID = &tid
+			}
+		}
+
+		now := time.Now().UTC()
+		ev.UpdatedAt = now
+
+		if err := tx.Save(&ev).Error; err != nil {
+			return fmt.Errorf("error updating event: %w", err)
+		}
+
+		// --- Schedules: si el campo viene en el request, reemplazamos todo ---
+
+		if in.Schedules != nil {
+			newSchedules := *in.Schedules
+
+			// Validar
+			for i, sch := range newSchedules {
+				if sch.StartDatetime.IsZero() || sch.EndDatetime.IsZero() {
+					return fmt.Errorf("schedule %d has invalid datetime", i)
+				}
+				if !sch.EndDatetime.After(sch.StartDatetime) {
+					return fmt.Errorf("schedule %d end_datetime must be after start_datetime", i)
+				}
+			}
+
+			// Borrar los schedules anteriores
+			if err := tx.Where("event_id = ?", ev.ID).Delete(&models.EventSchedule{}).Error; err != nil {
+				return fmt.Errorf("error deleting old schedules: %w", err)
+			}
+
+			// Crear nuevos (si la lista está vacía, simplemente se quedan sin sesiones)
+			for _, schReq := range newSchedules {
+				sch := models.EventSchedule{
+					ID:            uuid.New(),
+					EventID:       ev.ID,
+					StartDatetime: schReq.StartDatetime,
+					EndDatetime:   schReq.EndDatetime,
+					CreatedAt:     now,
+				}
+				if err := tx.Create(&sch).Error; err != nil {
+					return fmt.Errorf("error creating event schedule: %w", err)
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
+func (s *eventServiceImpl) UpdateEventParticipants(ctx context.Context, eventID uuid.UUID, in dto.EventParticipantsUpdateRequest) error {
+	if s.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	if len(in.Participants) == 0 {
+		// nada que hacer, pero no es error
+		return nil
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verificar que el evento exista
+		var ev models.Event
+		if err := tx.First(&ev, "id = ?", eventID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("event not found")
+			}
+			return fmt.Errorf("error fetching event: %w", err)
+		}
+
+		now := time.Now().UTC()
+
+		for idx, pReq := range in.Participants {
+			remove := (pReq.Remove != nil && *pReq.Remove)
+
+			// --- Eliminar participante ---
+			if remove {
+				if pReq.ID == nil {
+					// No hay ID => ignoramos (o podrías usar national_id + event_id)
+					continue
+				}
+				if err := tx.Where("id = ? AND event_id = ?", *pReq.ID, eventID).
+					Delete(&models.EventParticipant{}).Error; err != nil {
+					return fmt.Errorf("error deleting participant %d: %w", idx, err)
+				}
+				continue
+			}
+
+			// --- Agregar o actualizar participante ---
+
+			nationalID := strings.TrimSpace(pReq.NationalID)
+			if nationalID == "" {
+				return fmt.Errorf("participant %d has empty national_id", idx)
+			}
+
+			// Buscar/crear UserDetail por DNI
+			var userDetail models.UserDetail
+			err := tx.Where("national_id = ?", nationalID).First(&userDetail).Error
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					// Crear nuevo UserDetail
+					if pReq.FirstName == nil || strings.TrimSpace(*pReq.FirstName) == "" {
+						return fmt.Errorf("participant %d missing first_name for new user_detail", idx)
+					}
+					if pReq.LastName == nil || strings.TrimSpace(*pReq.LastName) == "" {
+						return fmt.Errorf("participant %d missing last_name for new user_detail", idx)
+					}
+
+					firstName := strings.TrimSpace(*pReq.FirstName)
+					lastName := strings.TrimSpace(*pReq.LastName)
+
+					var phone *string
+					if pReq.Phone != nil && strings.TrimSpace(*pReq.Phone) != "" {
+						ph := strings.TrimSpace(*pReq.Phone)
+						phone = &ph
+					}
+					var email *string
+					if pReq.Email != nil && strings.TrimSpace(*pReq.Email) != "" {
+						em := strings.TrimSpace(*pReq.Email)
+						email = &em
+					}
+
+					userDetail = models.UserDetail{
+						ID:         uuid.New(),
+						NationalID: nationalID,
+						FirstName:  firstName,
+						LastName:   lastName,
+						Phone:      phone,
+						Email:      email,
+						CreatedAt:  now,
+						UpdatedAt:  now,
+					}
+
+					if createErr := tx.Create(&userDetail).Error; createErr != nil {
+						return fmt.Errorf("error creating user_detail for participant %d: %w", idx, createErr)
+					}
+				} else {
+					return fmt.Errorf("error fetching user_detail for participant %d: %w", idx, err)
+				}
+			} else {
+				// Opcional: actualizar datos básicos de UserDetail si vienen
+				updated := false
+				if pReq.FirstName != nil && strings.TrimSpace(*pReq.FirstName) != "" {
+					userDetail.FirstName = strings.TrimSpace(*pReq.FirstName)
+					updated = true
+				}
+				if pReq.LastName != nil && strings.TrimSpace(*pReq.LastName) != "" {
+					userDetail.LastName = strings.TrimSpace(*pReq.LastName)
+					updated = true
+				}
+				if pReq.Phone != nil {
+					if strings.TrimSpace(*pReq.Phone) == "" {
+						userDetail.Phone = nil
+					} else {
+						ph := strings.TrimSpace(*pReq.Phone)
+						userDetail.Phone = &ph
+					}
+					updated = true
+				}
+				if pReq.Email != nil {
+					if strings.TrimSpace(*pReq.Email) == "" {
+						userDetail.Email = nil
+					} else {
+						em := strings.TrimSpace(*pReq.Email)
+						userDetail.Email = &em
+					}
+					updated = true
+				}
+				if updated {
+					userDetail.UpdatedAt = now
+					if err := tx.Save(&userDetail).Error; err != nil {
+						return fmt.Errorf("error updating user_detail for participant %d: %w", idx, err)
+					}
+				}
+			}
+
+			// Buscar participante existente
+			var participant models.EventParticipant
+			var participantErr error
+
+			if pReq.ID != nil {
+				participantErr = tx.Where("id = ? AND event_id = ?", *pReq.ID, eventID).
+					First(&participant).Error
+			} else {
+				participantErr = tx.Where("event_id = ? AND user_detail_id = ?", eventID, userDetail.ID).
+					First(&participant).Error
+			}
+
+			if participantErr != nil {
+				if participantErr == gorm.ErrRecordNotFound {
+					// Crear nuevo participant
+					participant = models.EventParticipant{
+						ID:           uuid.New(),
+						EventID:      eventID,
+						UserDetailID: userDetail.ID,
+						CreatedAt:    now,
+						UpdatedAt:    now,
+					}
+				} else {
+					return fmt.Errorf("error fetching event participant %d: %w", idx, participantErr)
+				}
+			}
+
+			// Actualizar campos opcionales
+			if pReq.RegistrationSource != nil {
+				trimmed := strings.TrimSpace(*pReq.RegistrationSource)
+				if trimmed == "" {
+					participant.RegistrationSource = nil
+				} else {
+					participant.RegistrationSource = &trimmed
+				}
+			}
+			if pReq.RegistrationStatus != nil {
+				status := strings.TrimSpace(*pReq.RegistrationStatus)
+				if status != "" {
+					participant.RegistrationStatus = status
+				}
+			}
+			if pReq.AttendanceStatus != nil {
+				as := strings.TrimSpace(*pReq.AttendanceStatus)
+				if as != "" {
+					participant.AttendanceStatus = as
+				}
+			}
+
+			participant.UserDetailID = userDetail.ID
+			participant.UpdatedAt = now
+
+			if participant.ID == uuid.Nil {
+				participant.ID = uuid.New()
+				if err := tx.Create(&participant).Error; err != nil {
+					return fmt.Errorf("error creating event participant %d: %w", idx, err)
+				}
+			} else {
+				if err := tx.Save(&participant).Error; err != nil {
+					return fmt.Errorf("error updating event participant %d: %w", idx, err)
+				}
+			}
+		}
+
+		return nil
+	})
 }

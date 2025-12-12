@@ -29,7 +29,7 @@ type seedDocumentType struct {
 }
 
 func SeedDocumentTypes(db *gorm.DB) error {
-	logger.Log.Info("Iniciando seeder de tipos de documento + categorías...")
+	logger.Log.Info().Msg("Iniciando seeder de tipos de documento + categorías...")
 
 	path := filepath.Join("internal", "database", "seeds", "data", "document_type.yml")
 
@@ -117,6 +117,6 @@ func SeedDocumentTypes(db *gorm.DB) error {
 		}
 	}
 
-	logger.Log.Infof("Seeder de tipos de documento + categorías completado. Total tipos: %d", len(seedDocs))
+	logger.Log.Info().Msgf("Seeder de tipos de documento + categorías completado. Total tipos: %d", len(seedDocs))
 	return nil
 }
