@@ -1,2 +1,16 @@
+# Forzar EOL LF solo en archivos de texto
 * text eol=lf
+
+# Excluir archivos binarios (no tocar)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.svg binary
+*.pdf binary
+*.zip binary
+*.ico binary
+
+# Filtro para secretos
 secrets.env filter=block

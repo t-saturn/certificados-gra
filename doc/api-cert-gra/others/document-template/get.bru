@@ -1,0 +1,25 @@
+meta {
+  name: get
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/document-templates?page=1&page_size=20&is_active=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  page_size: 20
+  is_active: true
+  ~search_query: curso
+  ~template_type_code: CERTIFICATE
+  ~template_category_code: cur
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

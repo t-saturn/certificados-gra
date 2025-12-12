@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, CheckCircle, Search, ArrowRight, Mail } from 'lucide-react';
+import { FileText, CheckCircle, Search, ArrowRight, Mail, Key } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,8 +20,8 @@ export const Main = () => {
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="#servicios">
-              <FileText className="mr-2 w-4 h-4" /> Ver Servicios
+            <Link href="/main">
+              <Key className="mr-2 w-4 h-4" /> Iniciar Sesión
             </Link>
           </Button>
         </div>
@@ -63,8 +63,9 @@ export const Main = () => {
           <div className="flex sm:flex-row flex-col gap-3">
             <input
               type="text"
+              name="codigo"
               placeholder="Ejemplo: GRA-2025-00123"
-              className="bg-input-background px-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring w-full text-foreground placeholder:text-muted-foreground"
+              className="bg-input-background dark:bg-background/80 px-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring w-full text-foreground placeholder:text-muted-foreground"
             />
             <Button className="bg-primary hover:bg-primary/80 text-primary-foreground">
               <ArrowRight className="mr-2 w-4 h-4" /> Verificar

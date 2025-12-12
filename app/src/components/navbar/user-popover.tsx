@@ -6,26 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Settings, LogOut, User, Shield, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { to_cb64 } from '@/helpers';
 import { useProfile } from '@/context/profile';
-
-const AUTH_ORIGIN = process.env.NEXT_PUBLIC_AUTH_ORIGIN!;
-const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN!;
+import { keycloakSignOut } from '@/lib/keycloak-logout';
 
 export function UserPopover() {
   const { profile } = useProfile();
 
-  const signoutUrl = new URL('/api/auth/signout', AUTH_ORIGIN);
-  signoutUrl.searchParams.set('cb64', to_cb64(`${APP_ORIGIN}/`));
-
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(' ')
-      .map((word) => word.charAt(0))
+      .map((w) => w.charAt(0))
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
 
   const userStats = {
     lastLogin: 'Hace 2 horas',
@@ -48,8 +41,11 @@ export function UserPopover() {
           </div>
         </Button>
       </PopoverTrigger>
+
       <PopoverContent className="bg-popover shadow-2xl shadow-black/10 backdrop-blur-xl mr-2 border-border/50 w-80" align="end">
         <div className="space-y-6">
+          {/* ...todo tu contenido igual... */}
+
           <div className="flex flex-col items-center space-y-4 text-center">
             <div className="relative">
               <Avatar className="ring-4 ring-primary/20 ring-offset-4 ring-offset-background w-20 h-20">
@@ -57,6 +53,7 @@ export function UserPopover() {
                 <AvatarFallback className="bg-linear-to-br from-primary to-chart-1 font-bold text-primary-foreground text-xl">{getInitials(profile.name)}</AvatarFallback>
               </Avatar>
               <div className="-right-1 -bottom-1 absolute flex justify-center items-center bg-green-500 border-2 border-background rounded-full w-6 h-6">
+                {/* eslint-disable-next-line react/self-closing-comp */}
                 <div className="bg-white rounded-full w-2 h-2"></div>
               </div>
             </div>
@@ -103,13 +100,13 @@ export function UserPopover() {
           </div>
 
           <div className="mt-2 pt-2 border-border/50 border-t">
-            <a
-              href={signoutUrl.toString()}
+            <button
+              onClick={() => keycloakSignOut()}
               className="flex items-center gap-2 hover:bg-red-600 px-3 py-2 rounded-lg w-full font-medium text-red-600 hover:text-white text-sm transition-colors duration-200"
             >
               <LogOut className="w-4 h-4" />
               Cerrar sesión
-            </a>
+            </button>
           </div>
         </div>
       </PopoverContent>
