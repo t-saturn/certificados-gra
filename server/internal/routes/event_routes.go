@@ -22,4 +22,11 @@ func RegisterEventRoutes(app *fiber.App) {
 
 	// Obtener detalle de un evento
 	app.Get("/event/:id", httpwrap.Wrap(eventHandler.GetEvent))
+
+	// Actualizar datos del evento (titulo, descripción, ubicación, inscripciones, sesiones, etc.)
+	app.Patch("/event/:id", httpwrap.Wrap(eventHandler.UpdateEvent))
+
+	// Actualizar sólo participantes (agregar, quitar, modificar)
+	app.Patch("/event/:id/participants", httpwrap.Wrap(eventHandler.UpdateEventParticipants))
+
 }

@@ -229,3 +229,121 @@ func (h *EventHandler) GetEvent(c fiber.Ctx) (interface{}, string, error) {
 
 	return detail, "ok", nil
 }
+
+// PATCH /event/:id
+func (h *EventHandler) UpdateEvent(c fiber.Ctx) (interface{}, string, error) {
+	idStr := strings.TrimSpace(c.Params("id"))
+	if idStr == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid event id")
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid event id")
+	}
+
+	var in dto.EventUpdateRequest
+	if err := c.Bind().Body(&in); err != nil {
+		return nil, "error", err
+	}
+
+	// Normalización básica de strings
+	if in.CertificateSeries != nil {
+		trimmed := strings.TrimSpace(*in.CertificateSeries)
+		in.CertificateSeries = &trimmed
+	}
+	if in.OrganizationalUnitsPath != nil {
+		trimmed := strings.TrimSpace(*in.OrganizationalUnitsPath)
+		in.OrganizationalUnitsPath = &trimmed
+	}
+	if in.Title != nil {
+		trimmed := strings.TrimSpace(*in.Title)
+		in.Title = &trimmed
+	}
+	if in.Description != nil {
+		trimmed := strings.TrimSpace(*in.Description)
+		in.Description = &trimmed
+	}
+	if in.Location != nil {
+		trimmed := strings.TrimSpace(*in.Location)
+		in.Location = &trimmed
+	}
+	if in.TemplateID != nil {
+		trimmed := strings.TrimSpace(*in.TemplateID)
+		in.TemplateID = &trimmed
+	}
+	if in.Status != nil {
+		trimmed := strings.TrimSpace(*in.Status)
+		in.Status = &trimmed
+	}
+
+	// Schedules: no toco aquí; la validación se hace en el service
+
+	ctx := context.Background()
+	if err := h.service.UpdateEvent(ctx, id, in); err != nil {
+		return nil, "error", err
+	}
+
+	return fiber.Map{
+		"message": "Event updated successfully",
+	}, "ok", nil
+}
+
+// PATCH /event/:id/participants
+func (h *EventHandler) UpdateEventParticipants(c fiber.Ctx) (interface{}, string, error) {
+	idStr := strings.TrimSpace(c.Params("id"))
+	if idStr == "" {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid event id")
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, "error", fiber.NewError(fiber.StatusBadRequest, "invalid event id")
+	}
+
+	var in dto.EventParticipantsUpdateRequest
+	if err := c.Bind().Body(&in); err != nil {
+		return nil, "error", err
+	}
+
+	// Trim de strings en participantes
+	for i := range in.Participants {
+		in.Participants[i].NationalID = strings.TrimSpace(in.Participants[i].NationalID)
+
+		if in.Participants[i].FirstName != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].FirstName)
+			in.Participants[i].FirstName = &trimmed
+		}
+		if in.Participants[i].LastName != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].LastName)
+			in.Participants[i].LastName = &trimmed
+		}
+		if in.Participants[i].Phone != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].Phone)
+			in.Participants[i].Phone = &trimmed
+		}
+		if in.Participants[i].Email != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].Email)
+			in.Participants[i].Email = &trimmed
+		}
+		if in.Participants[i].RegistrationSource != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].RegistrationSource)
+			in.Participants[i].RegistrationSource = &trimmed
+		}
+		if in.Participants[i].RegistrationStatus != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].RegistrationStatus)
+			in.Participants[i].RegistrationStatus = &trimmed
+		}
+		if in.Participants[i].AttendanceStatus != nil {
+			trimmed := strings.TrimSpace(*in.Participants[i].AttendanceStatus)
+			in.Participants[i].AttendanceStatus = &trimmed
+		}
+	}
+
+	ctx := context.Background()
+	if err := h.service.UpdateEventParticipants(ctx, id, in); err != nil {
+		return nil, "error", err
+	}
+
+	return fiber.Map{"message": "Event participants updated successfully"}, "ok", nil
+}
