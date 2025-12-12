@@ -5,7 +5,7 @@ import type { FC } from 'react';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { ArrowLeft, CalendarDays, FileText, Users, Clock, Loader2, Trash2, Plus, Search, FileBadge, Pencil } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Clock, Loader2, Trash2, Plus, Search, FileBadge, Pencil } from 'lucide-react';
 
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,16 +14,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 import type { EventDetailResult } from '@/actions/fn-event-detail';
-import type { EventParticipant, EventSchedule, UpdateEventParticipantPatchItem } from '@/actions/fn-events';
-import { fn_update_event_participants } from '@/actions/fn-events';
+import type { EventParticipant, EventSchedule, UpdateEventParticipantPatchItem, UpdateEventBody } from '@/actions/fn-events';
+import { fn_update_event, fn_update_event_participants } from '@/actions/fn-events';
 
 export interface EventDetailPageProps {
   event: EventDetailResult;
 }
+
+/* ----------------- Helpers ----------------- */
 
 const formatDateTime = (iso: string): string => {
   try {
@@ -36,11 +39,44 @@ const formatDateTime = (iso: string): string => {
   }
 };
 
+// Extrae "YYYY-MM-DDTHH:mm" del ISO del backend SIN usar new Date()
+const toLocalInputValue = (iso: string | null | undefined): string => {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+  return m ? m[1] : '';
+};
+
+// Calcula el offset local actual en formato ±HH:MM (ej: -05:00)
+const getLocalOffset = (): string => {
+  const offsetMinutes = new Date().getTimezoneOffset(); // ej: 300 para -05:00
+  const sign = offsetMinutes > 0 ? '-' : '+';
+  const abs = Math.max(Math.abs(offsetMinutes), 0);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `${sign}${hh}:${mm}`;
+};
+
+// Convierte el valor del input datetime-local a string para el backend
+// Ej: "2025-10-10T08:00" => "2025-10-10T08:00:00-05:00"
+const fromLocalInputToServer = (value: string): string | null => {
+  if (!value) return null;
+  const offset = getLocalOffset();
+  return `${value}:00${offset}`;
+};
+
+/* ----------------- Tipos UI ----------------- */
+
 type EditableParticipant = EventParticipant & {
   full_name?: string;
   user_detail_id?: string;
   _isNew?: boolean;
   _deleted?: boolean;
+};
+
+type EditableSchedule = {
+  id?: string;
+  start: string; // datetime-local
+  end: string; // datetime-local
 };
 
 const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
@@ -52,17 +88,179 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
   const documentTypeName = event.template?.document_type_name ?? '—';
 
+  const [savingEvent, setSavingEvent] = useState(false);
+
+  const [eventForm, setEventForm] = useState({
+    title: event.title,
+    description: event.description ?? '',
+    location: event.location ?? '',
+    max_participants: event.max_participants ? String(event.max_participants) : '',
+    registration_open_at: toLocalInputValue(event.registration_open_at),
+    registration_close_at: toLocalInputValue(event.registration_close_at),
+  });
+
+  const [eventSchedules, setEventSchedules] = useState<EditableSchedule[]>(
+    schedules.length
+      ? schedules.map((s) => ({
+          id: s.id,
+          start: toLocalInputValue(s.start_datetime),
+          end: toLocalInputValue(s.end_datetime),
+        }))
+      : [
+          {
+            start: '',
+            end: '',
+          },
+        ],
+  );
+
+  const handleChangeEventField = (field: keyof typeof eventForm, value: string): void => {
+    setEventForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleChangeSchedule = (idx: number, field: 'start' | 'end', value: string): void => {
+    setEventSchedules((prev) => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: value };
+      return copy;
+    });
+  };
+
+  const handleAddScheduleRow = (): void => {
+    setEventSchedules((prev) => [...prev, { start: '', end: '' }]);
+  };
+
+  const handleRemoveScheduleRow = (idx: number): void => {
+    setEventSchedules((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveEventInfo = async (): Promise<void> => {
+    if (!eventForm.title.trim()) {
+      toast.error('El título del evento es obligatorio');
+      return;
+    }
+
+    if (!eventForm.registration_open_at || !eventForm.registration_close_at) {
+      toast.error('Las fechas de apertura y cierre de inscripción son obligatorias');
+      return;
+    }
+
+    const invalidSchedule = eventSchedules.some((s) => !s.start || !s.end);
+    if (invalidSchedule) {
+      toast.error('Todas las fechas / horarios del evento deben estar completas');
+      return;
+    }
+
+    const body: UpdateEventBody = {};
+
+    // ---- Campos simples ----
+    if (eventForm.title.trim() !== event.title) {
+      body.title = eventForm.title.trim();
+    }
+
+    const originalDesc = event.description ?? '';
+    if (eventForm.description.trim() !== originalDesc) {
+      body.description = eventForm.description.trim() || null;
+    }
+
+    const originalLoc = event.location ?? '';
+    if (eventForm.location.trim() !== originalLoc) {
+      body.location = eventForm.location.trim() || '';
+    }
+
+    const originalMax = event.max_participants ?? null;
+    const newMax = eventForm.max_participants ? Number(eventForm.max_participants) : null;
+    const normalizedNewMax = Number.isNaN(newMax) ? null : newMax;
+
+    if (normalizedNewMax !== originalMax) {
+      body.max_participants = normalizedNewMax;
+    }
+
+    // ---- Fechas de inscripción (comparar como strings locales, NO Date) ----
+    const originalOpenLocal = toLocalInputValue(event.registration_open_at);
+    const originalCloseLocal = toLocalInputValue(event.registration_close_at);
+
+    const registrationChanged = eventForm.registration_open_at !== originalOpenLocal || eventForm.registration_close_at !== originalCloseLocal;
+
+    if (registrationChanged) {
+      const openStr = fromLocalInputToServer(eventForm.registration_open_at);
+      const closeStr = fromLocalInputToServer(eventForm.registration_close_at);
+
+      if (!openStr || !closeStr) {
+        toast.error('Hay fechas de inscripción con formato inválido');
+        return;
+      }
+
+      body.registration_open_at = openStr;
+      body.registration_close_at = closeStr;
+    }
+
+    // ---- Schedules ----
+    const originalSchedulesLocal: EditableSchedule[] = (event.schedules ?? []).map((s) => ({
+      start: toLocalInputValue(s.start_datetime),
+      end: toLocalInputValue(s.end_datetime),
+    }));
+
+    const schedulesChanged = (() => {
+      if (originalSchedulesLocal.length !== eventSchedules.length) return true;
+      for (let i = 0; i < eventSchedules.length; i++) {
+        const curr = eventSchedules[i];
+        const orig = originalSchedulesLocal[i];
+        if (!orig) return true;
+        if (curr.start !== orig.start || curr.end !== orig.end) return true;
+      }
+      return false;
+    })();
+
+    if (schedulesChanged) {
+      try {
+        const schedulesIso = eventSchedules.map((s) => {
+          const startStr = fromLocalInputToServer(s.start);
+          const endStr = fromLocalInputToServer(s.end);
+
+          if (!startStr || !endStr) {
+            throw new Error('Hay fechas del evento con formato inválido');
+          }
+
+          return {
+            start_datetime: startStr,
+            end_datetime: endStr,
+          };
+        });
+
+        body.schedules = schedulesIso;
+      } catch (err) {
+        console.error(err);
+        toast.error('Hay fechas del evento con formato inválido');
+        return;
+      }
+    }
+
+    if (Object.keys(body).length === 0) {
+      toast.info('No hay cambios en la información del evento');
+      return;
+    }
+
+    try {
+      setSavingEvent(true);
+      const result = await fn_update_event(event.id, body);
+      toast.success(result.message || 'Evento actualizado correctamente');
+      router.refresh();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('No se pudo actualizar la información del evento', {
+        description: err?.message,
+      });
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
   const [editableParticipants, setEditableParticipants] = useState<EditableParticipant[]>(originalParticipants);
   const [savingParticipants, setSavingParticipants] = useState(false);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<{
-    national_id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-  }>({
+  const [editForm, setEditForm] = useState<{ national_id: string; first_name: string; last_name: string; email: string; phone: string }>({
     national_id: '',
     first_name: '',
     last_name: '',
@@ -82,13 +280,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
   const openEditModal = (idx: number): void => {
     const p = editableParticipants[idx];
-    setEditForm({
-      national_id: p.national_id,
-      first_name: p.first_name ?? '',
-      last_name: p.last_name ?? '',
-      email: p.email ?? '',
-      phone: p.phone ?? '',
-    });
+    setEditForm({ national_id: p.national_id, first_name: p.first_name ?? '', last_name: p.last_name ?? '', email: p.email ?? '', phone: p.phone ?? '' });
     setEditingIndex(idx);
   };
 
@@ -131,10 +323,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
     setEditableParticipants((prev) => {
       const copy = [...prev];
-      copy[deleteIndex] = {
-        ...copy[deleteIndex],
-        _deleted: true,
-      };
+      copy[deleteIndex] = { ...copy[deleteIndex], _deleted: true };
       return copy;
     });
 
@@ -142,18 +331,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
   };
 
   const handleAddParticipantRow = (): void => {
-    setEditableParticipants((prev) => [
-      ...prev,
-      {
-        national_id: '',
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        registration_source: 'IMPORTED',
-        _isNew: true,
-      },
-    ]);
+    setEditableParticipants((prev) => [...prev, { national_id: '', first_name: '', last_name: '', email: '', phone: '', registration_source: 'IMPORTED', _isNew: true }]);
   };
 
   const handleSaveParticipants = async (): Promise<void> => {
@@ -164,10 +342,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
       if (p._deleted) {
         if (original) {
-          patches.push({
-            national_id: original.national_id,
-            remove: true,
-          });
+          patches.push({ national_id: original.national_id, remove: true });
         }
         return;
       }
@@ -186,20 +361,13 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
         return;
       }
 
-      // 3) existentes
       if (original) {
         const changed =
           p.first_name !== original.first_name || p.last_name !== original.last_name || (p.phone ?? '') !== (original.phone ?? '') || (p.email ?? '') !== (original.email ?? '');
 
         if (!changed) return;
 
-        patches.push({
-          national_id: p.national_id,
-          first_name: p.first_name,
-          last_name: p.last_name,
-          phone: p.phone ?? null,
-          email: p.email ?? null,
-        });
+        patches.push({ national_id: p.national_id, first_name: p.first_name, last_name: p.last_name, phone: p.phone ?? null, email: p.email ?? null });
       }
     });
 
@@ -242,9 +410,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
       const next = new Set<string>();
       filteredForCert.forEach((p) => next.add(p.national_id));
       setSelectedForCert(next);
-    } else {
-      setSelectedForCert(new Set());
-    }
+    } else setSelectedForCert(new Set());
   };
 
   const toggleSelectCert = (dni: string, checked: boolean): void => {
@@ -274,7 +440,6 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
 
   return (
     <section className="flex flex-col gap-6 p-4">
-      {/* Header */}
       <header className="flex items-center gap-4">
         <button type="button" onClick={() => router.back()} className="rounded-lg p-2 transition-colors hover:bg-muted">
           <ArrowLeft className="h-5 w-5" />
@@ -315,74 +480,117 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB: Información principal */}
+        {/* TAB: Información principal (editable) */}
         <TabsContent value="general" className="space-y-4">
+          {/* Datos principales */}
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <FileText className="h-4 w-4" />
-                <span>Descripción</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <FileText className="h-4 w-4" />
+                  <span>Datos del evento</span>
+                </div>
+                <Button size="sm" className="gap-2" onClick={handleSaveEventInfo} disabled={savingEvent}>
+                  {savingEvent && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Guardar cambios
+                </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{event.description || 'Sin descripción.'}</p>
+            <CardContent className="space-y-4 text-sm">
+              <div className="space-y-2">
+                <Label>Título *</Label>
+                <Input value={eventForm.title} onChange={(e) => handleChangeEventField('title', e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Descripción</Label>
+                <Textarea
+                  rows={3}
+                  value={eventForm.description}
+                  onChange={(e) => handleChangeEventField('description', e.target.value)}
+                  placeholder="Describe brevemente el objetivo del evento…"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Ubicación</Label>
+                  <Input value={eventForm.location} onChange={(e) => handleChangeEventField('location', e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Máx. participantes</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={eventForm.max_participants}
+                    onChange={(e) => handleChangeEventField('max_participants', e.target.value)}
+                    placeholder="Ej: 100"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Apertura de inscripción *</Label>
+                  <Input type="datetime-local" value={eventForm.registration_open_at} onChange={(e) => handleChangeEventField('registration_open_at', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cierre de inscripción *</Label>
+                  <Input type="datetime-local" value={eventForm.registration_close_at} onChange={(e) => handleChangeEventField('registration_close_at', e.target.value)} />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Detalles básicos */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <CalendarDays className="h-4 w-4" />
-                  <span>Detalles del evento</span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex justify-between gap-2">
-                  <span>Tipo de documento</span>
-                  <span className="font-medium text-foreground">{documentTypeName}</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>Ubicación</span>
-                  <span className="font-medium text-foreground">{event.location || '—'}</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>Creado por</span>
-                  <span className="font-mono text-[11px]">{event.created_by}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Fechas (schedules) */}
-            <Card>
-              <CardHeader className="pb-3">
+          {/* Fechas / horarios del evento */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Clock className="h-4 w-4" />
-                  <span>Fechas / Horarios</span>
+                  <span>Fechas / Horarios del evento</span>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                {schedules.length === 0 ? (
-                  <p>No hay fechas registradas.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {schedules.map((s, idx) => (
-                      <li key={`${s.start_datetime}-${idx}`} className="flex flex-col rounded-md border border-border bg-muted/40 px-3 py-2">
-                        <span className="text-[11px] uppercase text-muted-foreground">Sesión {idx + 1}</span>
-                        <span>
-                          <strong>Inicio:</strong> {formatDateTime(s.start_datetime)}
-                        </span>
-                        <span>
-                          <strong>Fin:</strong> {formatDateTime(s.end_datetime)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+
+                <Button type="button" variant="outline" size="sm" className="gap-1" onClick={handleAddScheduleRow}>
+                  <Plus className="h-3 w-3" />
+                  Agregar sesión
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              {eventSchedules.length === 0 ? (
+                <p>No hay sesiones configuradas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {eventSchedules.map((s, idx) => (
+                    <div key={idx} className="grid gap-3 md:grid-cols-[1fr,1fr,auto] items-end">
+                      <div className="space-y-2">
+                        <Label>Inicio *</Label>
+                        <Input type="datetime-local" value={s.start} onChange={(e) => handleChangeSchedule(idx, 'start', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fin *</Label>
+                        <Input type="datetime-local" value={s.end} onChange={(e) => handleChangeSchedule(idx, 'end', e.target.value)} />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-destructive"
+                          onClick={() => handleRemoveScheduleRow(idx)}
+                          disabled={eventSchedules.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* TAB: Participantes (CRUD) */}
@@ -552,6 +760,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
             </DialogContent>
           </Dialog>
 
+          {/* Modal ELIMINAR participante */}
           <Dialog
             open={deleteIndex !== null}
             onOpenChange={(open) => {
@@ -578,6 +787,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
           </Dialog>
         </TabsContent>
 
+        {/* TAB: Certificados */}
         <TabsContent value="certificates">
           <Card>
             <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
@@ -638,7 +848,7 @@ const EventDetailPage: FC<EventDetailPageProps> = ({ event }) => {
                       {filteredForCert.map((p) => {
                         const fullName = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
 
-                        const dummyStatus = 'PENDING'; // placeholder
+                        const dummyStatus = 'PENDING'; // placeholder hasta tener backend
 
                         return (
                           <tr key={p.national_id} className="border-t">
