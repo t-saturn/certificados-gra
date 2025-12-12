@@ -21,10 +21,11 @@ func NewCertificateHandler(svc services.CertificateService) *CertificateHandler 
 	return &CertificateHandler{svc: svc}
 }
 
-// GET /certificates?search_query=&signature_status=&event_id=&page=&page_size=&user_id=
+// GET /certificates?search_query=&event_query=&status=&event_id=&page=&page_size=&user_id=&national_id=
 func (h *CertificateHandler) ListCertificates(c fiber.Ctx) (interface{}, string, error) {
 	searchQuery := strings.TrimSpace(c.Query("search_query", ""))
-	signatureStatus := strings.TrimSpace(c.Query("signature_status", "all"))
+	eventQuery := strings.TrimSpace(c.Query("event_query", ""))
+	status := strings.TrimSpace(c.Query("status", "all"))
 
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	if page <= 0 {
@@ -57,13 +58,22 @@ func (h *CertificateHandler) ListCertificates(c fiber.Ctx) (interface{}, string,
 		userIDPtr = &id
 	}
 
+	// national_id opcional
+	nationalIDParam := strings.TrimSpace(c.Query("national_id", ""))
+	var nationalIDPtr *string
+	if nationalIDParam != "" {
+		nationalIDPtr = &nationalIDParam
+	}
+
 	in := dto.ListCertificatesQuery{
-		SearchQuery:     searchQuery,
-		SignatureStatus: signatureStatus,
-		EventID:         eventIDPtr,
-		Page:            page,
-		PageSize:        pageSize,
-		UserID:          userIDPtr,
+		SearchQuery: searchQuery,
+		EventQuery:  eventQuery,
+		Status:      status, // ✅ usarlo
+		EventID:     eventIDPtr,
+		Page:        page,
+		PageSize:    pageSize,
+		UserID:      userIDPtr,
+		NationalID:  nationalIDPtr,
 	}
 
 	resp, err := h.svc.ListCertificates(context.Background(), in)
