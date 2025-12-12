@@ -24,9 +24,9 @@ export const baseMenus: SidebarMenuGroup[] = [
         roles: ['org', 'admin'],
       },
       {
-        label: 'Certificados',
+        label: 'Documents',
         icon: Signature,
-        url: '/main/certificates',
+        url: '/main/documents',
         roles: ['default', 'org', 'admin'],
       },
       {

@@ -27,24 +27,30 @@ func NewCertificateService(db *gorm.DB) CertificateService {
 	return &certificateServiceImpl{db: db}
 }
 
-func normalizeSignatureStatus(s string) string {
-	s = strings.TrimSpace(strings.ToLower(s))
-	if s == "" || s == "all" {
+// --- SOLO 3 estados ---
+func normalizeDocStatus(s string) string {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	if s == "" || strings.EqualFold(s, "all") {
 		return ""
 	}
-	return strings.ToUpper(s)
+	switch s {
+	case "CREATED", "GENERATED", "REJECTED":
+		return s
+	default:
+		return "" // o error, si quieres ser estricto
+	}
 }
 
-func mapStateLabel(signatureStatus string) string {
-	switch strings.ToUpper(strings.TrimSpace(signatureStatus)) {
-	case "SIGNED":
+func mapStateLabelFromStatus(status string) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "GENERATED":
 		return "LISTO"
-	case "PENDING", "PARTIALLY_SIGNED":
-		return "PENDIENTE"
-	case "ERROR":
-		return "ERROR"
+	case "REJECTED":
+		return "RECHAZADO"
+	case "CREATED":
+		fallthrough
 	default:
-		return signatureStatus
+		return "PENDIENTE"
 	}
 }
 
@@ -60,7 +66,10 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 	offset := (page - 1) * pageSize
 
 	search := strings.TrimSpace(in.SearchQuery)
-	signatureStatus := normalizeSignatureStatus(in.SignatureStatus)
+	eventQuery := strings.TrimSpace(in.EventQuery)
+
+	// NUEVO: status solo 3 valores
+	statusValue := normalizeDocStatus(in.Status) // <-- requiere que agregues Status en DTO query (ver nota abajo)
 
 	// --------- Filtro opcional por usuario (user_id) => national_id ----------
 	var userNationalID string
@@ -81,17 +90,32 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 	// --------- BASE QUERY ----------
 	base := s.db.WithContext(ctx).Model(&models.Document{})
 
+	// IMPORTANT: limitar a solo estos estados cuando no venga status
+	// para que no aparezcan otros estados históricos en BD
+	base = base.Where("status IN ?", []string{"CREATED", "GENERATED", "REJECTED"})
+
+	// filtro por status específico
+	if statusValue != "" {
+		base = base.Where("status = ?", statusValue)
+	}
+
 	// filtro por event_id
 	if in.EventID != nil {
 		base = base.Where("event_id = ?", *in.EventID)
 	}
 
-	// filtro por signature status
-	if signatureStatus != "" {
-		base = base.Where("digital_signature_status = ?", signatureStatus)
+	// filtro por national_id (DNI) directo
+	if in.NationalID != nil && strings.TrimSpace(*in.NationalID) != "" {
+		dni := strings.TrimSpace(*in.NationalID)
+		subUserDetailsByDNI := s.db.WithContext(ctx).
+			Table("user_details").
+			Select("id").
+			Where("national_id = ?", dni)
+
+		base = base.Where("user_detail_id IN (?)", subUserDetailsByDNI)
 	}
 
-	// filtro por user_id -> user_details.national_id
+	// filtro por user_id (vía national_id del user autenticado)
 	if userNationalID != "" {
 		subUserDetails := s.db.WithContext(ctx).
 			Table("user_details").
@@ -101,47 +125,27 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 		base = base.Where("user_detail_id IN (?)", subUserDetails)
 	}
 
-	// búsqueda (serial, verification, participante, evento, plantilla, tipo doc)
+	// búsqueda por PARTICIPANTE (nombre/apellido/dni)
 	if search != "" {
 		like := "%" + search + "%"
 
-		// subquery user_details por nombre/apellido/dni
 		subUserDetails := s.db.WithContext(ctx).
 			Table("user_details").
 			Select("id").
 			Where("national_id ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?", like, like, like)
 
-		// subquery events por title/code
+		base = base.Where("user_detail_id IN (?)", subUserDetails)
+	}
+
+	// filtro por EVENTO (title/code) vía event_query
+	if eventQuery != "" {
+		like := "%" + eventQuery + "%"
 		subEvents := s.db.WithContext(ctx).
 			Table("events").
 			Select("id").
 			Where("title ILIKE ? OR code ILIKE ?", like, like)
 
-		// subquery templates por name/code
-		subTemplates := s.db.WithContext(ctx).
-			Table("document_templates").
-			Select("id").
-			Where("name ILIKE ? OR code ILIKE ?", like, like)
-
-		// subquery document_types por name/code (a través de templates)
-		subDocTypes := s.db.WithContext(ctx).
-			Table("document_types").
-			Select("id").
-			Where("name ILIKE ? OR code ILIKE ?", like, like)
-
-		// templates que pertenecen a esos document_types (para filtrar por tipo)
-		subTemplatesByDocType := s.db.WithContext(ctx).
-			Table("document_templates").
-			Select("id").
-			Where("document_type_id IN (?)", subDocTypes)
-
-		base = base.Where(`
-			(serial_code ILIKE ? OR verification_code ILIKE ?
-			OR user_detail_id IN (?)
-			OR event_id IN (?)
-			OR template_id IN (?)
-			OR template_id IN (?))
-		`, like, like, subUserDetails, subEvents, subTemplates, subTemplatesByDocType)
+		base = base.Where("event_id IN (?)", subEvents)
 	}
 
 	// --------- TOTAL ----------
@@ -183,21 +187,21 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 				HasNextPage: hasNext,
 			},
 			Filters: dto.CertificateListFilters{
-				SearchQuery:     search,
-				SignatureStatus: in.SignatureStatus,
-				EventID:         in.EventID,
-				UserID:          in.UserID,
+				SearchQuery: search,
+				EventQuery:  eventQuery,
+				Status:      in.Status, // <-- requiere agregar Status en filters DTO
+				EventID:     in.EventID,
+				UserID:      in.UserID,
+				NationalID:  in.NationalID,
 			},
 		}, nil
 	}
 
-	// --------- Cargar completos con relaciones ----------
+	// --------- Cargar docs con relaciones ----------
 	var docs []models.Document
 	if err := s.db.WithContext(ctx).
 		Preload("UserDetail").
 		Preload("Event").
-		Preload("Template").
-		Preload("Template.DocumentType").
 		Preload("PDFs").
 		Where("id IN ?", docIDs).
 		Order("created_at DESC").
@@ -219,32 +223,34 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 			evTitle = &d.Event.Title
 		}
 
-		var tplID *uuid.UUID
-		var tplCode, tplName *string
-		var dtID *uuid.UUID
-		var dtCode, dtName *string
-
-		if d.Template != nil {
-			tplID = &d.Template.ID
-			tplCode = &d.Template.Code
-			tplName = &d.Template.Name
-
-			// DocumentType viene por Template.DocumentType
-			dtID = &d.Template.DocumentType.ID
-			dtCode = &d.Template.DocumentType.Code
-			dtName = &d.Template.DocumentType.Name
-		}
-
-		fileIDs := make([]uuid.UUID, 0, len(d.PDFs))
-		for _, pdf := range d.PDFs {
-			fileIDs = append(fileIDs, pdf.FileID)
-		}
-
 		issueISO := d.IssueDate.Format(time.RFC3339)
 		var signedISO *string
 		if d.SignedAt != nil {
-			s := d.SignedAt.Format(time.RFC3339)
-			signedISO = &s
+			si := d.SignedAt.Format(time.RFC3339)
+			signedISO = &si
+		}
+
+		pdfs := make([]dto.CertificatePDFItem, 0, len(d.PDFs))
+		var previewFileID *uuid.UUID
+		for _, p := range d.PDFs {
+			pdfs = append(pdfs, dto.CertificatePDFItem{
+				ID:       p.ID,
+				Stage:    p.Stage,
+				Version:  p.Version,
+				FileID:   p.FileID,
+				FileName: p.FileName,
+				FileHash: p.FileHash,
+			})
+
+			// preview: si hay "final" usarlo, si no el primero
+			if previewFileID == nil {
+				tmp := p.FileID
+				previewFileID = &tmp
+			}
+			if strings.EqualFold(p.Stage, "final") {
+				tmp := p.FileID
+				previewFileID = &tmp
+			}
 		}
 
 		items = append(items, dto.CertificateListItem{
@@ -252,10 +258,10 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 			SerialCode:       d.SerialCode,
 			VerificationCode: d.VerificationCode,
 			Status:           d.Status,
-			SignatureStatus:  d.DigitalSignatureStatus,
-			StateLabel:       mapStateLabel(d.DigitalSignatureStatus),
-			IssueDate:        issueISO,
-			SignedAt:         signedISO,
+			// SignatureStatus:  "", // si aún existe el campo en DTO lo puedes dejar vacío
+			StateLabel: mapStateLabelFromStatus(d.Status),
+			IssueDate:  issueISO,
+			SignedAt:   signedISO,
 			Event: dto.CertificateEventSummary{
 				ID:    evID,
 				Code:  evCode,
@@ -268,13 +274,8 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 				LastName:   d.UserDetail.LastName,
 				FullName:   fullName,
 			},
-			TemplateID:       tplID,
-			TemplateCode:     tplCode,
-			TemplateName:     tplName,
-			DocumentTypeID:   dtID,
-			DocumentTypeCode: dtCode,
-			DocumentTypeName: dtName,
-			FileIDs:          fileIDs,
+			PDFs:          pdfs,
+			PreviewFileID: previewFileID,
 		})
 	}
 
@@ -289,10 +290,12 @@ func (s *certificateServiceImpl) ListCertificates(ctx context.Context, in dto.Li
 			HasNextPage: hasNext,
 		},
 		Filters: dto.CertificateListFilters{
-			SearchQuery:     search,
-			SignatureStatus: in.SignatureStatus,
-			EventID:         in.EventID,
-			UserID:          in.UserID,
+			SearchQuery: search,
+			EventQuery:  eventQuery,
+			Status:      in.Status,
+			EventID:     in.EventID,
+			UserID:      in.UserID,
+			NationalID:  in.NationalID,
 		},
 	}, nil
 }

@@ -49,7 +49,7 @@ export const Footer: React.FC = () => {
             <div className="md:col-span-2">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="flex justify-center items-center w-10 h-10">
-                  <Image src="/img/logo.png" alt="Logo Gobierno Regional de Ayacucho" width={24} height={24} className="rounded-full" priority />
+                  <Image src="/img/logo.webp" alt="Logo Gobierno Regional de Ayacucho" width={24} height={24} className="rounded-full" priority />
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">{ORG_NAME}</h3>
