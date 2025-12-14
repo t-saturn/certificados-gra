@@ -35,37 +35,31 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 		return fmt.Errorf("database connection is nil")
 	}
 
-	// 1) Normalizar código (por seguridad)
 	code := strings.TrimSpace(in.Code)
 	if code == "" {
 		return fmt.Errorf("template code is required")
 	}
 
-	// 2) Verificar unicidad del código
+	// unicidad de code
 	var existing models.DocumentTemplate
-	if err := s.db.WithContext(ctx).
-		Where("code = ?", code).
-		First(&existing).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("code = ?", code).First(&existing).Error; err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return fmt.Errorf("error checking existing document template code: %w", err)
 		}
 	} else {
-		// Si no hubo error, significa que encontró una plantilla con ese code
 		return fmt.Errorf("document template with code '%s' already exists", code)
 	}
 
-	// 3) Buscar document type por code
+	// doc type
 	var docType models.DocumentType
-	if err := s.db.WithContext(ctx).
-		Where("code = ?", in.DocTypeCode).
-		First(&docType).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("code = ?", in.DocTypeCode).First(&docType).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return fmt.Errorf("document type with code '%s' not found", in.DocTypeCode)
 		}
 		return fmt.Errorf("error fetching document type: %w", err)
 	}
 
-	// 4) Resolver categoría opcional por doc_category_code
+	// categoría opcional
 	var categoryID *uint
 	if in.DocCategoryCode != nil && strings.TrimSpace(*in.DocCategoryCode) != "" {
 		catCode := strings.TrimSpace(*in.DocCategoryCode)
@@ -81,43 +75,90 @@ func (s *documentTemplateServiceImpl) CreateTemplate(ctx context.Context, userID
 		categoryID = &category.ID
 	}
 
-	// 5) Validar UUIDs de FileID y PrevFileID
+	// UUIDs
 	fileID, err := uuid.Parse(in.FileID)
 	if err != nil {
 		return fmt.Errorf("invalid file_id")
 	}
-
 	prevFileID, err := uuid.Parse(in.PrevFileID)
 	if err != nil {
 		return fmt.Errorf("invalid prev_file_id")
 	}
 
-	// 6) Setear campos base
 	now := time.Now().UTC()
 	isActive := true
 	if in.IsActive != nil {
 		isActive = *in.IsActive
 	}
 
-	template := models.DocumentTemplate{
-		DocumentTypeID: docType.ID,
-		CategoryID:     categoryID,
-		Code:           code,
-		Name:           in.Name,
-		Description:    in.Description,
-		FileID:         fileID,
-		PrevFileID:     prevFileID,
-		IsActive:       isActive,
-		CreatedBy:      &userID,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
+	// Transacción: template + fields
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		template := models.DocumentTemplate{
+			DocumentTypeID: docType.ID,
+			CategoryID:     categoryID,
+			Code:           code,
+			Name:           in.Name,
+			FileID:         fileID,
+			PrevFileID:     prevFileID,
+			IsActive:       isActive,
+			CreatedBy:      &userID,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
 
-	if err := s.db.WithContext(ctx).Create(&template).Error; err != nil {
-		return fmt.Errorf("error creating document template: %w", err)
-	}
+		if err := tx.Create(&template).Error; err != nil {
+			return fmt.Errorf("error creating document template: %w", err)
+		}
 
-	return nil
+		// Crear fields si vinieron en request
+		if len(in.Fields) > 0 {
+			fields := make([]models.DocumentTemplateField, 0, len(in.Fields))
+
+			seen := map[string]struct{}{} // evitar duplicados en el mismo request
+
+			for _, f := range in.Fields {
+				key := strings.TrimSpace(f.Key)
+				if key == "" {
+					return fmt.Errorf("field key is required")
+				}
+				if _, ok := seen[key]; ok {
+					return fmt.Errorf("duplicated field key in request: '%s'", key)
+				}
+				seen[key] = struct{}{}
+
+				label := strings.TrimSpace(f.Label)
+				if label == "" {
+					return fmt.Errorf("field label is required for key '%s'", key)
+				}
+
+				ft := "text"
+				if f.FieldType != nil && strings.TrimSpace(*f.FieldType) != "" {
+					ft = strings.TrimSpace(*f.FieldType)
+				}
+
+				req := false
+				if f.Required != nil {
+					req = *f.Required
+				}
+
+				fields = append(fields, models.DocumentTemplateField{
+					TemplateID: template.ID,
+					Key:        key,
+					Label:      label,
+					FieldType:  ft,
+					Required:   req,
+					CreatedAt:  now,
+					UpdatedAt:  now,
+				})
+			}
+
+			if err := tx.Create(&fields).Error; err != nil {
+				return fmt.Errorf("error creating document template fields: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func (s *documentTemplateServiceImpl) ListTemplates(ctx context.Context, params dto.DocumentTemplateListQuery) (*dto.DocumentTemplateListResponse, error) {
@@ -205,7 +246,6 @@ func (s *documentTemplateServiceImpl) ListTemplates(ctx context.Context, params 
 			ID:               t.ID,
 			Code:             t.Code,
 			Name:             t.Name,
-			Description:      t.Description,
 			FileID:           t.FileID.String(),
 			PrevFileID:       t.PrevFileID.String(),
 			IsActive:         t.IsActive,
@@ -270,9 +310,6 @@ func (s *documentTemplateServiceImpl) UpdateTemplate(ctx context.Context, id uui
 	}
 	if in.Name != nil {
 		template.Name = *in.Name
-	}
-	if in.Description != nil {
-		template.Description = in.Description
 	}
 	if in.FileID != nil {
 		if *in.FileID == "" {
