@@ -151,7 +151,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
           onMouseLeave={() => setHoveredItem(null)}
         >
           <div className="px-3 py-2 font-medium text-muted-foreground text-sm">{hoveredItem}</div>
-          <div className="border-t"></div>
+          <div className="border-t" />
           {sidebarMenus
             .flatMap((group) => group.menu)
             .find((item) => item.label === hoveredItem)
