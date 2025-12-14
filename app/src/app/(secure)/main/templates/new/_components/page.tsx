@@ -15,31 +15,42 @@ import { fn_get_document_types } from '@/actions/fn-doc-type';
 import { fn_get_document_categories } from '@/actions/fn-doc-category';
 import { fn_create_document_template, type FnCreateDocumentTemplate } from '@/actions/fn-doc-template';
 
-import { type TemplateFormState, type DocTypeOption, type CategoryOption, type PreviewKind } from './new-template-types';
+import { type TemplateFormState, type DocTypeOption, type CategoryOption, type PreviewKind, type TemplateFieldForm } from './new-template-types';
+
 import { NewTemplateHeader } from './new-template-header';
 import { NewTemplateBasicInfo } from './new-template-basic-info';
 import { NewTemplateFilesSection } from './new-template-files-section';
+import { NewTemplateFieldsSection } from './new-template-fields-section';
 
 const NewTemplatePage: React.FC = () => {
   const router = useRouter();
 
+  /* ---------- catálogos ---------- */
   const [docTypeOptions, setDocTypeOptions] = useState<DocTypeOption[]>([]);
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const [loadingDocTypes, setLoadingDocTypes] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
-  const [templateData, setTemplateData] = useState<TemplateFormState>({ code: '', name: '', document_type_id: '', category_id: '', description: '' });
+  /* ---------- datos base ---------- */
+  const [templateData, setTemplateData] = useState<TemplateFormState>({
+    code: '',
+    name: '',
+    document_type_id: '',
+    category_id: '',
+  });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  /* ---------- variables ---------- */
+  const [fields, setFields] = useState<TemplateFieldForm[]>([]);
 
+  /* ---------- archivos ---------- */
   const [fileId, setFileId] = useState<string | null>(null);
   const [prevFileId, setPrevFileId] = useState<string | null>(null);
   const [templateFileName, setTemplateFileName] = useState<string | null>(null);
   const [previewFileName, setPreviewFileName] = useState<string | null>(null);
-
   const [uploadingTemplate, setUploadingTemplate] = useState(false);
   const [uploadingPreview, setUploadingPreview] = useState(false);
 
+  /* ---------- previews ---------- */
   const [mainPreviewSrc, setMainPreviewSrc] = useState<string | null>(null);
   const [mainPreviewKind, setMainPreviewKind] = useState<PreviewKind>(null);
   const [mainPreviewLoading, setMainPreviewLoading] = useState(false);
@@ -50,61 +61,56 @@ const NewTemplatePage: React.FC = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isLoadingCatalogs = loadingDocTypes || loadingCategories;
 
-  const loadDocumentTypes = async (searchQuery: string, autoSelectFirst = false): Promise<void> => {
+  /* ---------- loaders ---------- */
+
+  const loadDocumentTypes = async (searchQuery = '', autoSelectFirst = false): Promise<void> => {
     setLoadingDocTypes(true);
     try {
-      const params: any = { page: 1, page_size: 50, is_active: true };
-      if (searchQuery.trim()) {
-        params.search_query = searchQuery.trim();
-      }
+      const res = await fn_get_document_types({
+        page: 1,
+        page_size: 50,
+        is_active: true,
+        search_query: searchQuery || undefined,
+      });
 
-      const dtResult = await fn_get_document_types(params);
-
-      const mapped: DocTypeOption[] = dtResult.items.map((dt) => ({ id: dt.id, code: dt.code, name: dt.name }));
-
+      const mapped = res.items.map((dt) => ({ id: dt.id, code: dt.code, name: dt.name }));
       setDocTypeOptions(mapped);
 
       if (autoSelectFirst && mapped.length > 0 && !templateData.document_type_id) {
-        setTemplateData((prev) => ({ ...prev, document_type_id: mapped[0].id }));
+        setTemplateData((p) => ({ ...p, document_type_id: mapped[0].id }));
       }
-    } catch (error: any) {
-      console.error('Error al cargar tipos de documento:', error);
-      toast.error(error?.message || 'Error al cargar los tipos de documento');
-      setDocTypeOptions([]);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al cargar tipos de documento');
     } finally {
       setLoadingDocTypes(false);
     }
   };
 
-  const loadCategories = async (searchQuery: string, autoSelectFirst = false): Promise<void> => {
-    const selectedDocType = docTypeOptions.find((dt) => dt.id === templateData.document_type_id);
-
-    if (!selectedDocType) {
-      setCategoryOptions([]);
-      if (autoSelectFirst) setTemplateData((prev) => ({ ...prev, category_id: '' }));
-
-      return;
-    }
+  const loadCategories = async (searchQuery = '', autoSelectFirst = false): Promise<void> => {
+    const dt = docTypeOptions.find((d) => d.id === templateData.document_type_id);
+    if (!dt) return;
 
     setLoadingCategories(true);
     try {
-      const params: any = { page: 1, page_size: 50, is_active: true, doc_type_code: selectedDocType.code };
-      if (searchQuery.trim()) params.search_query = searchQuery.trim();
+      const res = await fn_get_document_categories({
+        page: 1,
+        page_size: 50,
+        is_active: true,
+        doc_type_code: dt.code,
+        search_query: searchQuery || undefined,
+      });
 
-      const catResult = await fn_get_document_categories(params);
-
-      const mapped: CategoryOption[] = catResult.items.map((cat) => ({ id: cat.id, code: cat.code, name: cat.name }));
-
+      const mapped = res.items.map((c) => ({ id: c.id, code: c.code, name: c.name }));
       setCategoryOptions(mapped);
 
-      if (autoSelectFirst && !templateData.category_id && mapped.length > 0) setTemplateData((prev) => ({ ...prev, category_id: mapped[0].id.toString() }));
-    } catch (error: any) {
-      console.error('Error al cargar categorías:', error);
-      toast.error(error?.message || 'Error al cargar las categorías');
-      setCategoryOptions([]);
-      setTemplateData((prev) => ({ ...prev, category_id: '' }));
+      if (autoSelectFirst && mapped.length > 0 && !templateData.category_id) {
+        setTemplateData((p) => ({ ...p, category_id: String(mapped[0].id) }));
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al cargar categorías');
     } finally {
       setLoadingCategories(false);
     }
@@ -117,22 +123,11 @@ const NewTemplatePage: React.FC = () => {
 
   useEffect(() => {
     if (templateData.document_type_id) void loadCategories('', true);
-    else {
-      setCategoryOptions([]);
-      setTemplateData((prev) => ({ ...prev, category_id: '' }));
-    }
+    else setCategoryOptions([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateData.document_type_id]);
 
-  /* -------- handlers de formulario -------- */
-
-  const handleTemplateDataChange = (changes: Partial<TemplateFormState>): void => {
-    setTemplateData((prev) => ({ ...prev, ...changes }));
-  };
-
-  const handleDescriptionChange = (value: string): void => {
-    handleTemplateDataChange({ description: value });
-  };
+  /* ---------- handlers ---------- */
 
   const handleTemplateFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
@@ -144,11 +139,10 @@ const NewTemplatePage: React.FC = () => {
     try {
       const result: UploadResult = await fn_upload_template_file(file);
       setFileId(result.id);
-      toast.success('Archivo PDF de plantilla subido correctamente');
-    } catch (error: any) {
-      console.error('Error al subir archivo de plantilla:', error);
+      toast.success('Plantilla subida');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al subir plantilla');
       setFileId(null);
-      toast.error(error?.message || 'No se pudo subir el archivo PDF de plantilla');
     } finally {
       setUploadingTemplate(false);
     }
@@ -159,27 +153,24 @@ const NewTemplatePage: React.FC = () => {
     if (!file) return;
 
     setUploadingPreview(true);
-    setPreviewError(null);
     setPreviewFileName(file.name);
 
     try {
       const result: UploadResult = await fn_upload_preview_image(file);
       setPrevFileId(result.id);
-      toast.success('Archivo PDF asociado subido correctamente');
-    } catch (error: any) {
-      console.error('Error al subir PDF asociado:', error);
+      toast.success('PDF asociado subido');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al subir PDF asociado');
       setPrevFileId(null);
-      setPreviewSrc(null);
-      setPreviewKind(null);
-      setPreviewError(error?.message || 'No se pudo subir el archivo PDF asociado');
     } finally {
       setUploadingPreview(false);
     }
   };
 
-  // preview plantilla principal
+  /* ---------- previews (FIX union type) ---------- */
+
   useEffect(() => {
-    const loadMainPreview = async (): Promise<void> => {
+    const load = async (): Promise<void> => {
       if (!fileId) {
         setMainPreviewSrc(null);
         setMainPreviewKind(null);
@@ -192,31 +183,30 @@ const NewTemplatePage: React.FC = () => {
       setMainPreviewError(null);
 
       try {
-        const preview: FilePreviewResult = await fn_get_file_preview(fileId);
+        const p: FilePreviewResult = await fn_get_file_preview(fileId);
 
-        if (preview.kind === 'image' || preview.kind === 'pdf') {
-          setMainPreviewKind(preview.kind);
-          setMainPreviewSrc(preview.url);
+        if (p.kind === 'image' || p.kind === 'pdf') {
+          setMainPreviewKind(p.kind);
+          setMainPreviewSrc(p.url);
         } else {
           setMainPreviewKind('text');
           setMainPreviewSrc(null);
           setMainPreviewError('Tipo de archivo no soportado para previsualización.');
         }
-      } catch (error: any) {
-        console.error('Error al obtener vista previa de la plantilla:', error);
+      } catch {
         setMainPreviewSrc(null);
         setMainPreviewKind(null);
-        setMainPreviewError(error?.message || 'Error al obtener vista previa de la plantilla');
+        setMainPreviewError('Error al cargar preview');
       } finally {
         setMainPreviewLoading(false);
       }
     };
 
-    void loadMainPreview();
+    void load();
   }, [fileId]);
 
   useEffect(() => {
-    const loadPreview = async (): Promise<void> => {
+    const load = async (): Promise<void> => {
       if (!prevFileId) {
         setPreviewSrc(null);
         setPreviewKind(null);
@@ -229,127 +219,110 @@ const NewTemplatePage: React.FC = () => {
       setPreviewError(null);
 
       try {
-        const preview: FilePreviewResult = await fn_get_file_preview(prevFileId);
+        const p: FilePreviewResult = await fn_get_file_preview(prevFileId);
 
-        if (preview.kind === 'image' || preview.kind === 'pdf') {
-          setPreviewKind(preview.kind);
-          setPreviewSrc(preview.url);
+        if (p.kind === 'image' || p.kind === 'pdf') {
+          setPreviewKind(p.kind);
+          setPreviewSrc(p.url);
         } else {
           setPreviewKind('text');
           setPreviewSrc(null);
           setPreviewError('Tipo de archivo no soportado para previsualización.');
         }
-      } catch (error: any) {
-        console.error('Error al obtener vista previa:', error);
+      } catch {
         setPreviewSrc(null);
         setPreviewKind(null);
-        setPreviewError(error?.message || 'Error al obtener vista previa');
+        setPreviewError('Error al cargar preview');
       } finally {
         setPreviewLoading(false);
       }
     };
 
-    void loadPreview();
+    void load();
   }, [prevFileId]);
+
+  /* ---------- submit ---------- */
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
-    if (!templateData.code.trim()) {
-      toast.error('El código de la plantilla es obligatorio');
+    if (!templateData.code.trim() || !templateData.name.trim()) {
+      toast.error('Código y nombre son obligatorios');
+      return;
+    }
+    if (!templateData.document_type_id || !templateData.category_id) {
+      toast.error('Selecciona tipo y categoría');
+      return;
+    }
+    if (!fileId || !prevFileId) {
+      toast.error('Debes subir ambos PDFs');
       return;
     }
 
-    if (!templateData.name.trim()) {
-      toast.error('El nombre de la plantilla es obligatorio');
-      return;
+    // validar fields
+    const keys = new Set<string>();
+    for (const f of fields) {
+      if (!f.key.trim() || !f.label.trim()) {
+        toast.error('Todas las variables deben tener key y etiqueta');
+        return;
+      }
+      const k = f.key.trim();
+      if (keys.has(k)) {
+        toast.error(`Key duplicada: ${k}`);
+        return;
+      }
+      keys.add(k);
     }
 
-    if (!templateData.document_type_id) {
-      toast.error('Debes elegir un tipo de documento');
-      return;
-    }
+    const dt = docTypeOptions.find((d) => d.id === templateData.document_type_id);
+    const cat = categoryOptions.find((c) => c.id === Number(templateData.category_id));
 
-    if (!templateData.category_id) {
-      toast.error('Debes elegir una categoría');
-      return;
-    }
-
-    if (!fileId) {
-      toast.error('Debes subir el archivo PDF de la plantilla');
-      return;
-    }
-
-    if (!prevFileId) {
-      toast.error('Debes subir el PDF asociado');
-      return;
-    }
-
-    const selectedDocType = docTypeOptions.find((dt) => dt.id === templateData.document_type_id);
-    const selectedCategory = categoryOptions.find((c) => c.id === Number(templateData.category_id));
-
-    if (!selectedDocType) {
-      toast.error('Tipo de documento seleccionado no es válido');
-      return;
-    }
-
-    if (!selectedCategory) {
-      toast.error('Categoría seleccionada no es válida');
+    if (!dt || !cat) {
+      toast.error('Tipo o categoría inválidos');
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       const body: Parameters<FnCreateDocumentTemplate>[0] = {
-        doc_type_code: selectedDocType.code,
-        doc_category_code: selectedCategory.code,
-        code: templateData.code,
-        name: templateData.name,
-        description: templateData.description,
+        doc_type_code: dt.code,
+        doc_category_code: cat.code,
+        code: templateData.code.trim(),
+        name: templateData.name.trim(),
         file_id: fileId,
         prev_file_id: prevFileId,
         is_active: true,
+        fields,
       };
 
-      const result = await fn_create_document_template(body);
+      const res = await fn_create_document_template(body);
 
-      toast.success(result.message || 'Plantilla creada con éxito');
-
+      toast.success(res.message || 'Plantilla creada');
       router.push('/main/templates');
-    } catch (error: any) {
-      console.error('Error al crear la plantilla:', error);
-      toast.error(error?.message || 'Ocurrió un error al crear la plantilla');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al crear plantilla');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const selectedDocType = docTypeOptions.find((dt) => dt.id === templateData.document_type_id);
-  const selectedCategory = categoryOptions.find((c) => c.id === Number(templateData.category_id));
 
   return (
     <div className="space-y-6 p-6">
       <NewTemplateHeader onBack={() => router.back()} isLoadingCatalogs={isLoadingCatalogs} />
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="space-y-6 p-6 border-border">
+        <Card className="space-y-6 p-6">
           <NewTemplateBasicInfo
             templateData={templateData}
             docTypeOptions={docTypeOptions}
             categoryOptions={categoryOptions}
             loadingDocTypes={loadingDocTypes}
             loadingCategories={loadingCategories}
-            selectedDocType={selectedDocType}
-            selectedCategory={selectedCategory}
-            onTemplateDataChange={handleTemplateDataChange}
-            onRequestLoadDocTypes={(search) => {
-              void loadDocumentTypes(search, false);
-            }}
-            onRequestLoadCategories={(search) => {
-              void loadCategories(search, false);
-            }}
-            onDescriptionChange={handleDescriptionChange}
+            selectedDocType={docTypeOptions.find((d) => d.id === templateData.document_type_id)}
+            selectedCategory={categoryOptions.find((c) => c.id === Number(templateData.category_id))}
+            onTemplateDataChange={(c) => setTemplateData((p) => ({ ...p, ...c }))}
+            onRequestLoadDocTypes={(s) => void loadDocumentTypes(s, false)}
+            onRequestLoadCategories={(s) => void loadCategories(s, false)}
           />
 
           <NewTemplateFilesSection
@@ -371,14 +344,16 @@ const NewTemplatePage: React.FC = () => {
             onTemplateFileChange={handleTemplateFileChange}
             onPreviewFileChange={handlePreviewFileChange}
           />
+
+          <NewTemplateFieldsSection fields={fields} onChange={setFields} disabled={isSubmitting} />
         </Card>
 
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90 text-white" disabled={isSubmitting || isLoadingCatalogs}>
-            {isSubmitting ? 'Creando...' : 'Crear Plantilla'}
+          <Button type="submit" disabled={isSubmitting || isLoadingCatalogs}>
+            {isSubmitting ? 'Creando…' : 'Crear Plantilla'}
           </Button>
         </div>
       </form>
