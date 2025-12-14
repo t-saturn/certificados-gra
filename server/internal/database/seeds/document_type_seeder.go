@@ -96,7 +96,6 @@ func SeedDocumentTypes(db *gorm.DB) error {
 				DocumentTypeID: docType.ID,
 				Code:           sc.Code,
 				Name:           sc.Name,
-				Description:    sc.Description,
 				IsActive:       catIsActive,
 				CreatedAt:      now,
 				UpdatedAt:      now,
@@ -106,10 +105,9 @@ func SeedDocumentTypes(db *gorm.DB) error {
 			if err := db.
 				Where("document_type_id = ? AND name = ?", cat.DocumentTypeID, cat.Name).
 				Assign(models.DocumentCategory{
-					Code:        cat.Code,
-					Description: cat.Description,
-					IsActive:    cat.IsActive,
-					UpdatedAt:   now,
+					Code:      cat.Code,
+					IsActive:  cat.IsActive,
+					UpdatedAt: now,
 				}).
 				FirstOrCreate(&cat).Error; err != nil {
 				return fmt.Errorf("error al hacer seed de document_category '%s' para type '%s': %w", sc.Name, sd.Code, err)
