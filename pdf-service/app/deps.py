@@ -10,6 +10,7 @@ from app.core.config import Settings, get_settings
 from app.repositories.files_repository import HttpFilesRepository
 from app.services.file_service import FileService
 from app.services.health_service import HealthService
+from app.repositories.files_repository import HttpFilesRepository
 
 
 # --- shared app startup time (used by health) ---
@@ -36,7 +37,7 @@ def get_files_repository(
     settings: Settings = Depends(get_settings),
     client: httpx.AsyncClient = Depends(get_http_client),
 ) -> HttpFilesRepository:
-    return HttpFilesRepository(base_url=settings.FILE_SERVER, client=client)
+    return HttpFilesRepository(public_base_url=settings.FILE_SERVER, client=client)
 
 
 # --- services ---
