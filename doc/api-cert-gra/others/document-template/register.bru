@@ -20,12 +20,17 @@ body:json {
     "doc_category_code": "CUR",
     "code": "CERT_CURSO_BASICO",
     "name": "Certificado de Curso Básico",
-    "description": "Plantilla para certificados de cursos básicos realizados en el GRA.",
     "file_id": "3b728448-5d83-4803-b8c7-131a19a3d2cb",
     "prev_file_id": "9f4a0b9a-2c11-4d2b-9a67-0c5cfe9a1234",
-    "is_active": true
+    "is_active": true,
+    "fields": [
+      { "key": "NOMBRE_PARTICIPANTE", "label": "Nombre del participante", "field_type": "text", "required": true },
+      { "key": "nombre_programa", "label": "Nombre del programa", "field_type": "text", "required": true },
+      { "key": "fecha", "label": "Fecha", "field_type": "date", "required": true },
+      { "key": "firma_1_nombre", "label": "Firma 1 - Nombre", "field_type": "text", "required": false },
+      { "key": "firma_1_cargo", "label": "Firma 1 - Cargo", "field_type": "text", "required": false }
+    ]
   }
-  
 }
 
 settings {
