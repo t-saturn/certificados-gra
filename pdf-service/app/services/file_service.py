@@ -79,15 +79,7 @@ class FileService:
         except ValueError:
             raise HTTPException(status_code=500, detail="Invalid FILE_PROJECT_ID in env")
 
-        resp = await self.repo.upload_file(
-            headers=headers,
-            project_id=project_uuid,
-            user_id=user_id,
-            is_public=is_public,
-            filename=filename,
-            content_type=content_type,
-            content=content,
-        )
+        resp = await self.repo.upload_file(headers=headers, project_id=project_uuid, user_id=user_id, is_public=is_public, filename=filename, content_type=content_type, content=content)
 
         if resp.status_code >= 400:
             raise HTTPException(status_code=502, detail="Upstream error")

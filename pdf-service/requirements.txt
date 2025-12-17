@@ -13,3 +13,5 @@ structlog>=24.4.0
 rich>=13.7.0
 
 python-multipart>=0.0.9
+segno>=1.6.1
+pillow>=10.4.0

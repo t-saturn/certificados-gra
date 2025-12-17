@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from typing import Generator
+from pathlib import Path
+from typing import AsyncGenerator
 
 import httpx
 from fastapi import Depends
@@ -10,26 +11,20 @@ from app.core.config import Settings, get_settings
 from app.repositories.files_repository import HttpFilesRepository
 from app.services.file_service import FileService
 from app.services.health_service import HealthService
-from app.repositories.files_repository import HttpFilesRepository
-
+from app.services.qr_service import QrService
 
 # --- shared app startup time (used by health) ---
 _started_at = time.monotonic()
 
 
 # --- http client lifecycle ---
-def get_http_client() -> Generator[httpx.AsyncClient, None, None]:
-    client = httpx.AsyncClient()
-    try:
+async def get_http_client() -> AsyncGenerator[httpx.AsyncClient, None]:
+    """
+    FastAPI dependency with proper async lifecycle.
+    Ensures the AsyncClient is closed after request (or test).
+    """
+    async with httpx.AsyncClient() as client:
         yield client
-    finally:
-        # important: avoid resource warnings in tests
-        try:
-            import anyio
-            anyio.from_thread.run(client.aclose)  # safe even if not running in loop
-        except Exception:
-            # fallback: best effort
-            pass
 
 
 # --- repositories ---
@@ -50,3 +45,8 @@ def get_file_service(
     repo: HttpFilesRepository = Depends(get_files_repository),
 ) -> FileService:
     return FileService(settings=settings, repo=repo)
+
+
+def get_qr_service() -> QrService:
+    logo_path = Path(__file__).resolve().parent / "assets" / "logo.png"
+    return QrService(logo_path=logo_path)
