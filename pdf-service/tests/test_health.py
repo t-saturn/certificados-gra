@@ -6,11 +6,12 @@ from app.main import create_app
 
 @pytest.fixture(autouse=True)
 def set_env(monkeypatch):
-    monkeypatch.setenv("SERVER_FILE", "C:/tmp/server")
-    monkeypatch.setenv("ACCESS_KEY_FILE", "C:/tmp/access")
-    monkeypatch.setenv("SECRET_KEY_FILE", "C:/tmp/secret")
-    monkeypatch.setenv("PROJECT_ID_FILE", "C:/tmp/project")
+    monkeypatch.setenv("FILE_SERVER", "https://files-demo.regionayacucho.gob.pe/public")
+    monkeypatch.setenv("FILE_ACCESS_KEY", "access_key_value")
+    monkeypatch.setenv("FILE_SECRET_KEY", "secret_key_value")
+    monkeypatch.setenv("FILE_PROJECT_ID", "project_id_value")
     monkeypatch.setenv("SERVER_PORT", "8001")
+    monkeypatch.setenv("ENV", "dev")
 
 
 @pytest.mark.asyncio
@@ -29,9 +30,24 @@ async def test_health_info():
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         resp = await ac.get("/health?info=true")
+
     assert resp.status_code == 200
     body = resp.json()
+
     assert body["status"] == "ok"
     assert "uptime_seconds" in body
     assert body["config"]["SERVER_PORT"] == 8001
-    assert "checks" in body
+
+    # presence flags
+    assert body["config"]["FILE_SERVER_set"] is True
+    assert body["config"]["FILE_ACCESS_KEY_set"] is True
+    assert body["config"]["FILE_SECRET_KEY_set"] is True
+    assert body["config"]["FILE_PROJECT_ID_set"] is True
+
+    # secrets are not exposed in config
+    assert "FILE_ACCESS_KEY" not in body["config"]
+    assert "FILE_SECRET_KEY" not in body["config"]
+
+    # optional: fingerprints exist
+    assert "FILE_ACCESS_KEY_fp" in body["config"]
+    assert len(body["config"]["FILE_ACCESS_KEY_fp"]) == 12
