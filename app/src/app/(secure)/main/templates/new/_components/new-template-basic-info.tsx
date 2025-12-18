@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -19,7 +19,6 @@ export interface NewTemplateBasicInfoProps {
   onTemplateDataChange: (changes: Partial<TemplateFormState>) => void;
   onRequestLoadDocTypes: (search: string) => void;
   onRequestLoadCategories: (search: string) => void;
-  onDescriptionChange: (value: string) => void;
 }
 
 export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
@@ -33,20 +32,11 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
   onTemplateDataChange,
   onRequestLoadDocTypes,
   onRequestLoadCategories,
-  onDescriptionChange,
 }) => {
   const [openTypePopover, setOpenTypePopover] = useState(false);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [typeSearch, setTypeSearch] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
-
-  const handleCodeChange = (value: string): void => {
-    onTemplateDataChange({ code: value });
-  };
-
-  const handleNameChange = (value: string): void => {
-    onTemplateDataChange({ name: value });
-  };
 
   return (
     <div className="space-y-4">
@@ -74,12 +64,29 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
               </PopoverContent>
             </Popover>
           </div>
-          <Input type="text" name="code" placeholder="Ej: CERT_CURSO_BASICO" value={templateData.code} onChange={(e) => handleCodeChange(e.target.value)} required className="bg-muted border-border" />
+
+          <Input
+            type="text"
+            name="code"
+            placeholder="Ej: CERT_CURSO_BASICO"
+            value={templateData.code}
+            onChange={(e) => onTemplateDataChange({ code: e.target.value })}
+            required
+            className="bg-muted border-border"
+          />
         </div>
 
         <div>
           <label className="block mb-2 font-medium text-foreground text-sm">Nombre de la Plantilla</label>
-          <Input type="text" name="name" placeholder="Ej: Certificado Taller Go 2025" value={templateData.name} onChange={(e) => handleNameChange(e.target.value)} required className="bg-muted border-border" />
+          <Input
+            type="text"
+            name="name"
+            placeholder="Ej: Certificado Taller Go 2025"
+            value={templateData.name}
+            onChange={(e) => onTemplateDataChange({ name: e.target.value })}
+            required
+            className="bg-muted border-border"
+          />
         </div>
       </div>
 
@@ -87,13 +94,12 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
         {/* Tipo de documento */}
         <div className="space-y-2">
           <label className="block font-medium text-foreground text-sm">Tipo de Documento</label>
+
           <Popover
             open={openTypePopover}
             onOpenChange={(open) => {
               setOpenTypePopover(open);
-              if (open) {
-                onRequestLoadDocTypes(typeSearch);
-              }
+              if (open) onRequestLoadDocTypes(typeSearch);
             }}
           >
             <PopoverTrigger asChild>
@@ -102,6 +108,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-[300px] p-0">
               <Command>
                 <CommandInput
@@ -112,6 +119,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                     onRequestLoadDocTypes(value);
                   }}
                 />
+
                 <CommandList>
                   <CommandEmpty>No se encontraron tipos</CommandEmpty>
                   <CommandGroup>
@@ -120,10 +128,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                         key={dt.id}
                         value={dt.code}
                         onSelect={() => {
-                          onTemplateDataChange({
-                            document_type_id: dt.id,
-                            category_id: '',
-                          });
+                          onTemplateDataChange({ document_type_id: dt.id, category_id: '' });
                           setOpenTypePopover(false);
                         }}
                       >
@@ -141,6 +146,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
         {/* Categoría */}
         <div className="space-y-2">
           <label className="block font-medium text-foreground text-sm">Categoría</label>
+
           <Popover
             open={openCategoryPopover}
             onOpenChange={(open) => {
@@ -149,9 +155,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                 return;
               }
               setOpenCategoryPopover(open);
-              if (open) {
-                onRequestLoadCategories(categorySearch);
-              }
+              if (open) onRequestLoadCategories(categorySearch);
             }}
           >
             <PopoverTrigger asChild>
@@ -160,6 +164,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-[300px] p-0">
               <Command>
                 <CommandInput
@@ -170,6 +175,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                     onRequestLoadCategories(value);
                   }}
                 />
+
                 <CommandList>
                   <CommandEmpty>No se encontraron categorías</CommandEmpty>
                   <CommandGroup>
@@ -178,9 +184,7 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
                         key={cat.id}
                         value={cat.code}
                         onSelect={() => {
-                          onTemplateDataChange({
-                            category_id: cat.id.toString(),
-                          });
+                          onTemplateDataChange({ category_id: cat.id.toString() });
                           setOpenCategoryPopover(false);
                         }}
                       >
@@ -195,21 +199,6 @@ export const NewTemplateBasicInfo: FC<NewTemplateBasicInfoProps> = ({
           </Popover>
         </div>
       </div>
-
-      <div>
-        <label className="block mb-2 font-medium text-foreground text-sm">Descripción</label>
-        <textarea
-          name="description"
-          placeholder="Describe el propósito de esta plantilla..."
-          value={templateData.description}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-          className="bg-muted px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary w-full text-foreground"
-          rows={3}
-        />
-      </div>
     </div>
   );
 };
-
-// hook local que necesita el componente
-import { useState } from 'react';

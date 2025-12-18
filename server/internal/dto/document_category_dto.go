@@ -1,11 +1,10 @@
 package dto
 
 type DocumentCategoryCreateRequest struct {
-	DocTypeCode string  `json:"doc_type_code" validate:"required,max=50"`
-	Code        string  `json:"code" validate:"required,max=50"`
-	Name        string  `json:"name" validate:"required,max=100"`
-	Description *string `json:"description,omitempty" validate:"omitempty,max=1000"`
-	IsActive    *bool   `json:"is_active,omitempty"`
+	DocTypeCode string `json:"doc_type_code" validate:"required,max=50"`
+	Code        string `json:"code" validate:"required,max=50"`
+	Name        string `json:"name" validate:"required,max=100"`
+	IsActive    *bool  `json:"is_active,omitempty"`
 }
 
 type DocumentCategoryUpdateRequest struct {
@@ -25,13 +24,12 @@ type DocumentCategoryListQuery struct {
 }
 
 type DocumentCategoryListItem struct {
-	ID          uint    `json:"id"`
-	Code        string  `json:"code"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	IsActive    bool    `json:"is_active"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID        uint   `json:"id"`
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	IsActive  bool   `json:"is_active"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type DocumentCategoryPagination struct {

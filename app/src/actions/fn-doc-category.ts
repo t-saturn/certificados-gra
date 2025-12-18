@@ -8,7 +8,7 @@ export interface GetDocumentCategoriesParams {
   page?: number;
   page_size?: number;
   search_query?: string;
-  is_active?: boolean; // <- si viene undefined, mandamos true por defecto
+  is_active?: boolean; // si viene undefined, mandamos true por defecto
   doc_type_code?: string;
   doc_type_name?: string;
 }
@@ -17,7 +17,6 @@ export interface DocumentCategoryItem {
   id: number;
   code: string;
   name: string;
-  description?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -55,6 +54,7 @@ export interface DocumentCategoriesResult {
   filters: DocumentCategoriesFilters;
 }
 
+// eslint-disable-next-line no-unused-vars
 export type FnGetDocumentCategories = (params?: GetDocumentCategoriesParams) => Promise<DocumentCategoriesResult>;
 
 /* ---------- SERVER ACTION ---------- */
@@ -63,41 +63,21 @@ export const fn_get_document_categories: FnGetDocumentCategories = async (params
   const searchParams = new URLSearchParams();
 
   // Todos opcionales
-  if (params.page !== undefined) {
-    searchParams.set('page', String(params.page));
-  }
-
-  if (params.page_size !== undefined) {
-    searchParams.set('page_size', String(params.page_size));
-  }
-
-  if (params.search_query) {
-    searchParams.set('search_query', params.search_query);
-  }
-
-  if (params.doc_type_code) {
-    searchParams.set('doc_type_code', params.doc_type_code);
-  }
-
-  if (params.doc_type_name) {
-    searchParams.set('doc_type_name', params.doc_type_name);
-  }
+  if (params.page !== undefined) searchParams.set('page', String(params.page));
+  if (params.page_size !== undefined) searchParams.set('page_size', String(params.page_size));
+  if (params.search_query) searchParams.set('search_query', params.search_query);
+  if (params.doc_type_code) searchParams.set('doc_type_code', params.doc_type_code);
+  if (params.doc_type_name) searchParams.set('doc_type_name', params.doc_type_name);
 
   // is_active: por defecto true si no viene nada
-  if (params.is_active === undefined) {
-    searchParams.set('is_active', 'true');
-  } else {
-    searchParams.set('is_active', String(params.is_active));
-  }
+  searchParams.set('is_active', String(params.is_active ?? true));
 
   const queryString = searchParams.toString();
   const url = `${BASE_URL}/document-categories${queryString ? `?${queryString}` : ''}`;
 
   const res = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
   });
 

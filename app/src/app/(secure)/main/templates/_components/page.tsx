@@ -8,7 +8,6 @@ import Image from 'next/image';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
@@ -57,7 +56,6 @@ const TemplatesPage: FC = () => {
   const [editingTemplate, setEditingTemplate] = useState<DocumentTemplateItem | null>(null);
   const [editCode, setEditCode] = useState('');
   const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
   const [editMainPdfFile, setEditMainPdfFile] = useState<File | null>(null);
   const [editAssocPdfFile, setEditAssocPdfFile] = useState<File | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -112,7 +110,6 @@ const TemplatesPage: FC = () => {
         setPage(result.pagination.page);
         setError(null);
       } catch (err: any) {
-        console.error(err);
         const message = err?.message ?? 'Ocurrió un error al obtener las plantillas.';
         setError(message);
         toast.error('No se pudieron cargar las plantillas', {
@@ -149,7 +146,6 @@ const TemplatesPage: FC = () => {
           }));
         }
       } catch (err: any) {
-        console.error('Error al obtener vista previa del archivo:', err);
         setPreviewMap((prev) => ({ ...prev, [templateId]: { src: null, kind: null, loading: false, error: err?.message ?? 'Error al obtener vista previa' } }));
       }
     })();
@@ -194,7 +190,6 @@ const TemplatesPage: FC = () => {
     setEditingTemplate(template);
     setEditCode(template.code);
     setEditName(template.name);
-    setEditDescription(template.description ?? '');
     setEditMainPdfFile(null);
     setEditAssocPdfFile(null);
     setNewAssocPreviewUrl(null);
@@ -208,7 +203,6 @@ const TemplatesPage: FC = () => {
     setEditingTemplate(null);
     setEditCode('');
     setEditName('');
-    setEditDescription('');
     setEditMainPdfFile(null);
     setEditAssocPdfFile(null);
     setNewAssocPreviewUrl(null);
@@ -237,21 +231,15 @@ const TemplatesPage: FC = () => {
       await fn_update_document_template(editingTemplate.id, {
         code: editCode || undefined,
         name: editName || undefined,
-        description: editDescription || undefined,
         ...(newFileId && newFileId !== editingTemplate.file_id ? { file_id: newFileId } : {}),
         ...(newPrevFileId && newPrevFileId !== editingTemplate.prev_file_id ? { prev_file_id: newPrevFileId } : {}),
       });
 
-      setTemplates((prev) =>
-        prev.map((t) =>
-          t.id === editingTemplate.id ? { ...t, code: editCode, name: editName, description: editDescription, file_id: newFileId ?? t.file_id, prev_file_id: newPrevFileId ?? t.prev_file_id } : t,
-        ),
-      );
+      setTemplates((prev) => prev.map((t) => (t.id === editingTemplate.id ? { ...t, code: editCode, name: editName, file_id: newFileId ?? t.file_id, prev_file_id: newPrevFileId ?? t.prev_file_id } : t)));
 
       toast.success('Plantilla actualizada con éxito');
       handleCloseEdit();
     } catch (err: any) {
-      console.error(err);
       toast.error('No se pudo actualizar la plantilla', { description: err?.message ?? 'Error inesperado al guardar cambios.' });
     } finally {
       setIsSavingEdit(false);
@@ -267,7 +255,6 @@ const TemplatesPage: FC = () => {
 
       toast.success('Plantilla deshabilitada correctamente', { description: 'Se ha desactivado la plantilla (baja lógica).' });
     } catch (err: any) {
-      console.error(err);
       toast.error('No se pudo deshabilitar la plantilla', { description: err?.message ?? 'Error inesperado al deshabilitar.' });
     } finally {
       setDisablingId(null);
@@ -370,11 +357,6 @@ const TemplatesPage: FC = () => {
             <div className="space-y-1">
               <Label htmlFor="name">Nombre</Label>
               <Input id="name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="description">Descripción</Label>
-              <Textarea id="description" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
             </div>
 
             <div className="space-y-1">

@@ -129,11 +129,10 @@ func (s *documentTypeServiceImpl) ListTypes(ctx context.Context, params dto.Docu
 		catItems := make([]dto.DocumentTypeCategoryItem, 0, len(t.Categories))
 		for _, c := range t.Categories {
 			catItems = append(catItems, dto.DocumentTypeCategoryItem{
-				ID:          c.ID,
-				Code:        c.Code,
-				Name:        c.Name,
-				Description: c.Description,
-				IsActive:    c.IsActive,
+				ID:       c.ID,
+				Code:     c.Code,
+				Name:     c.Name,
+				IsActive: c.IsActive,
 			})
 		}
 

@@ -58,9 +58,10 @@ func MigrateUp() error {
 		&models.UserDetail{},
 		&models.Notification{},
 
-		&models.DocumentType{},     // primero type
-		&models.DocumentCategory{}, // luego category
-		&models.DocumentTemplate{}, // luego template
+		&models.DocumentType{},
+		&models.DocumentCategory{},
+		&models.DocumentTemplate{},
+		&models.DocumentTemplateField{},
 
 		&models.Event{},
 		&models.EventSchedule{},
@@ -113,6 +114,8 @@ func MigrateDown() error {
 		&models.EventParticipant{},
 		&models.EventSchedule{},
 		&models.Event{},
+		&models.DocumentTemplateField{},
+
 		&models.DocumentTemplate{},
 		&models.DocumentCategory{},
 		&models.DocumentType{},

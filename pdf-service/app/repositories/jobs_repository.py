@@ -1,0 +1,13 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Any
+
+class JobsRepository(ABC):
+    @abstractmethod
+    async def create_job(self, job_id: str, total: int) -> None: ...
+    @abstractmethod
+    async def push_job(self, payload: dict[str, Any]) -> None: ...
+    @abstractmethod
+    async def get_meta(self, job_id: str) -> dict[str, Any]: ...
+    @abstractmethod
+    async def get_results(self, job_id: str, start: int = 0, end: int = -1) -> list[str]: ...

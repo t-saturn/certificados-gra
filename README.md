@@ -9,14 +9,6 @@
   <img src="https://raw.githubusercontent.com/catppuccin/catppuccin/main/assets/palette/macchiato.png" width="400" />
 </p>
 
-<!--
-<p align="center">
-  <img src="https://img.shields.io/badge/stars-★%2010-363a4f?style=for-the-badge&labelColor=363a4f&color=b7bdf8" alt="Stars">
-  <img src="https://img.shields.io/badge/release-v2.0.0-363a4f?style=for-the-badge&labelColor=363a4f&color=a6da95" alt="Latest Release">
-  <img src="https://img.shields.io/badge/issues-3%20open-363a4f?style=for-the-badge&labelColor=363a4f&color=f5a97f" alt="Open Issues">
-</p>
--->
-
 <div style="text-align: center;" align="center">
   <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">

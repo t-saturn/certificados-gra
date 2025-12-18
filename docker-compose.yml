@@ -12,6 +12,15 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: certgra_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # si luego agregas password:
+    # command: ["redis-server", "--requirepass", "${PDF_REDIS_PASSWORD}"]
+
   server:
     build:
       context: .
@@ -22,7 +31,6 @@ services:
       - db
     environment:
       - SERVER_PORT=${SERVER_PORT}
-      # Mapeamos las variables "con sufijo" del .env a las que usa Go (sin sufijo)
       - DB_HOST=${SERVER_DB_HOST}
       - DB_PORT=${SERVER_DB_PORT}
       - DB_USER=${SERVER_DB_USER}
@@ -37,35 +45,89 @@ services:
       context: .
       dockerfile: app/Dockerfile
       args:
-        # Build-time ARG del Dockerfile de app
         NEXT_PUBLIC_APP_CLIENT_ID: ${APP_NEXT_PUBLIC_APP_CLIENT_ID}
     container_name: certgra_app
     restart: unless-stopped
     depends_on:
       - server
     environment:
-      # Runtime env del frontend (Next/Bun), usando valores con sufijo del .env
       - AUTH_SECRET=${APP_AUTH_SECRET}
       - AUTH_TRUST_HOST=${APP_AUTH_TRUST_HOST}
-
       - NEXTAUTH_URL=${APP_NEXTAUTH_URL}
       - NEXTAUTH_SECRET=${APP_NEXTAUTH_SECRET}
       - NEXT_PUBLIC_APP_CLIENT_ID=${APP_NEXT_PUBLIC_APP_CLIENT_ID}
-
       - API_BASE_URL=${APP_API_BASE_URL}
       - API_SGD_BASE_URL=${APP_API_SGD_BASE_URL}
       - API_CUM_URL=${APP_API_CUM_URL}
-
       - KEYCLOAK_CLIENT_SECRET=${APP_KEYCLOAK_CLIENT_SECRET}
       - KEYCLOAK_CLIENT_ID=${APP_KEYCLOAK_CLIENT_ID}
       - KEYCLOAK_ISSUER=${APP_KEYCLOAK_ISSUER}
-
       - FILE_SERVER=${APP_FILE_SERVER}
       - FILE_ACCESS_KEY=${APP_FILE_ACCESS_KEY}
       - FILE_SECRET_KEY=${APP_FILE_SECRET_KEY}
       - FILE_PROJECT_ID=${APP_FILE_PROJECT_ID}
     ports:
       - "30002:30002"
+
+  pdf_api:
+    build:
+      context: .
+      dockerfile: pdf-service/Dockerfile
+    container_name: certgra_pdf_api
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - SERVER_PORT=${PDF_SERVER_PORT}
+
+      - LOG_DIR=${PDF_LOG_DIR}
+      - LOG_LEVEL=${PDF_LOG_LEVEL}
+      - LOG_JSON=${PDF_LOG_JSON}
+      - ENV=${PDF_ENV}
+
+      - REDIS_HOST=${PDF_REDIS_HOST}
+      - REDIS_PORT=${PDF_REDIS_PORT}
+      - REDIS_DB=${PDF_REDIS_DB}
+      - REDIS_QUEUE_PDF_JOBS=${PDF_REDIS_QUEUE_PDF_JOBS}
+      - REDIS_JOB_TTL_SECONDS=${PDF_REDIS_JOB_TTL_SECONDS}
+      # - REDIS_PASSWORD=${PDF_REDIS_PASSWORD}
+
+      - FILE_SERVER=${PDF_FILE_SERVER}
+      - FILE_ACCESS_KEY=${PDF_FILE_ACCESS_KEY}
+      - FILE_SECRET_KEY=${PDF_FILE_SECRET_KEY}
+      - FILE_PROJECT_ID=${PDF_FILE_PROJECT_ID}
+    ports:
+      - "5050:5050"
+    command: ["uv", "run", "python", "run.py"]
+
+  pdf_worker:
+    build:
+      context: .
+      dockerfile: pdf-service/Dockerfile
+    container_name: certgra_pdf_worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - SERVER_PORT=${PDF_SERVER_PORT}
+
+      - LOG_DIR=${PDF_LOG_DIR}
+      - LOG_LEVEL=${PDF_LOG_LEVEL}
+      - LOG_JSON=${PDF_LOG_JSON}
+      - ENV=${PDF_ENV}
+
+      - REDIS_HOST=${PDF_REDIS_HOST}
+      - REDIS_PORT=${PDF_REDIS_PORT}
+      - REDIS_DB=${PDF_REDIS_DB}
+      - REDIS_QUEUE_PDF_JOBS=${PDF_REDIS_QUEUE_PDF_JOBS}
+      - REDIS_JOB_TTL_SECONDS=${PDF_REDIS_JOB_TTL_SECONDS}
+      # - REDIS_PASSWORD=${PDF_REDIS_PASSWORD}
+
+      - FILE_SERVER=${PDF_FILE_SERVER}
+      - FILE_ACCESS_KEY=${PDF_FILE_ACCESS_KEY}
+      - FILE_SECRET_KEY=${PDF_FILE_SECRET_KEY}
+      - FILE_PROJECT_ID=${PDF_FILE_PROJECT_ID}
+    command: ["uv", "run", "python", "worker.py"]
 
 volumes:
   db_data:

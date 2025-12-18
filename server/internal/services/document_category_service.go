@@ -57,7 +57,6 @@ func (s *documentCategoryServiceImpl) CreateCategory(ctx context.Context, in dto
 		DocumentTypeID: docType.ID,
 		Code:           in.Code,
 		Name:           in.Name,
-		Description:    in.Description,
 		IsActive:       isActive,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -157,7 +156,6 @@ func (s *documentCategoryServiceImpl) ListCategories(ctx context.Context, params
 			ID:          c.ID,
 			Code:        c.Code,
 			Name:        c.Name,
-			Description: c.Description,
 			IsActive:    c.IsActive,
 			CreatedAt:   c.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   c.UpdatedAt.Format(time.RFC3339),
@@ -210,9 +208,6 @@ func (s *documentCategoryServiceImpl) UpdateCategory(ctx context.Context, id uin
 	}
 	if in.Name != nil {
 		category.Name = *in.Name
-	}
-	if in.Description != nil {
-		category.Description = in.Description
 	}
 	if in.IsActive != nil {
 		category.IsActive = *in.IsActive

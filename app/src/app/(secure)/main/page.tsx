@@ -190,8 +190,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">CertGRA</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard de certificados</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard de documentos</h1>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <User2 className="h-4 w-4" />
             <span>{userName}</span>

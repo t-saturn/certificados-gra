@@ -92,3 +92,28 @@ $RECYCLE.BIN/
 *.msi
 *.msm
 *.msp
+
+
+# Python / FastAPI (Backend) - /pdf-service
+pdf-service/.venv/
+pdf-service/__pycache__/
+pdf-service/**/__pycache__/
+pdf-service/**/*.pyc
+pdf-service/**/*.pyo
+pdf-service/**/*.pyd
+
+# Python tooling caches
+pdf-service/.pytest_cache/
+pdf-service/.mypy_cache/
+pdf-service/.ruff_cache/
+pdf-service/.coverage
+pdf-service/htmlcov/
+
+# Logs (FastAPI)
+pdf-service/logs/
+pdf-service/*.log
+
+# Local env for pdf-service
+pdf-service/.env
+pdf-service/.env.local
+pdf-service/.env.*.local

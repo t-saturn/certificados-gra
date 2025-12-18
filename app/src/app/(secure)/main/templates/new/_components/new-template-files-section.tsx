@@ -57,16 +57,19 @@ export const NewTemplateFilesSection: FC<NewTemplateFilesSectionProps> = ({
           <div className="flex items-center gap-2">
             <Input type="file" accept="application/pdf,.pdf" onChange={onTemplateFileChange} disabled={uploadingTemplate || isSubmitting} className="bg-muted border-border" />
           </div>
+
           <p className="flex items-center gap-1 text-muted-foreground text-xs">
             <FileText className="w-3 h-3" />
             Esta es la plantilla base en PDF. Se mostrará como <span className="font-semibold">previsualización de ejemplo</span>.
           </p>
+
           {uploadingTemplate && (
             <p className="flex items-center gap-1 text-muted-foreground text-xs">
               <Loader2 className="w-3 h-3 animate-spin" />
               Subiendo archivo...
             </p>
           )}
+
           {templateFileName && fileId && (
             <p className="text-muted-foreground text-xs">
               Archivo: <span className="font-medium">{templateFileName}</span>
@@ -105,20 +108,23 @@ export const NewTemplateFilesSection: FC<NewTemplateFilesSectionProps> = ({
         </div>
 
         <div className="space-y-2">
-          <label className="block mb-1 font-medium text-foreground text-sm">PDF asociado*</label>
+          <label className="block mb-1 font-medium text-foreground text-sm">PDF asociado *</label>
           <div className="flex items-center gap-2">
             <Input type="file" accept="application/pdf,.pdf" onChange={onPreviewFileChange} disabled={uploadingPreview || isSubmitting} className="bg-muted border-border" />
           </div>
+
           <p className="flex items-center gap-1 text-muted-foreground text-xs">
             <FileType className="w-3 h-3" />
             Este PDF se usará como referencia o respaldo de la plantilla.
           </p>
+
           {uploadingPreview && (
             <p className="flex items-center gap-1 text-muted-foreground text-xs">
               <Loader2 className="w-3 h-3 animate-spin" />
               Subiendo PDF...
             </p>
           )}
+
           {previewFileName && prevFileId && (
             <p className="text-muted-foreground text-xs">
               Archivo: <span className="font-medium">{previewFileName}</span>

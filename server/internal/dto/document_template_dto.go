@@ -2,26 +2,32 @@ package dto
 
 import "github.com/google/uuid"
 
+type DocumentTemplateFieldCreateItem struct {
+	Key       string  `json:"key" validate:"required,max=120"`
+	Label     string  `json:"label" validate:"required,max=200"`
+	FieldType *string `json:"field_type,omitempty" validate:"omitempty,max=30"` // default "text"
+	Required  *bool   `json:"required,omitempty"`
+}
+
 // DocumentTemplateCreateRequest represents the payload for creating a document template.
 type DocumentTemplateCreateRequest struct {
-	DocTypeCode     string  `json:"doc_type_code" validate:"required,max=50"`                // document type code, e.g. "CERTIFICATE"
-	DocCategoryCode *string `json:"doc_category_code,omitempty" validate:"omitempty,max=50"` // document category code, e.g. "CUR"
-	Code            string  `json:"code" validate:"required,max=50"`                         // template code/series
-	Name            string  `json:"name" validate:"required,max=150"`
-	Description     *string `json:"description,omitempty" validate:"omitempty,max=1000"`
-	FileID          string  `json:"file_id" validate:"required"`      // must be a valid UUID
-	PrevFileID      string  `json:"prev_file_id" validate:"required"` // must be a valid UUID
-	IsActive        *bool   `json:"is_active,omitempty"`
+	DocTypeCode     string                            `json:"doc_type_code" validate:"required,max=50"`                // document type code, e.g. "CERTIFICATE"
+	DocCategoryCode *string                           `json:"doc_category_code,omitempty" validate:"omitempty,max=50"` // document category code, e.g. "CUR"
+	Code            string                            `json:"code" validate:"required,max=50"`                         // template code/series
+	Name            string                            `json:"name" validate:"required,max=150"`
+	Fields          []DocumentTemplateFieldCreateItem `json:"fields,omitempty" validate:"omitempty,dive"`
+	FileID          string                            `json:"file_id" validate:"required"`      // must be a valid UUID
+	PrevFileID      string                            `json:"prev_file_id" validate:"required"` // must be a valid UUID
+	IsActive        *bool                             `json:"is_active,omitempty"`
 }
 
 // DocumentTemplateUpdateRequest represents the payload for partially updating a document template.
 type DocumentTemplateUpdateRequest struct {
-	Code        *string `json:"code,omitempty" validate:"omitempty,max=50"`
-	Name        *string `json:"name,omitempty" validate:"omitempty,max=150"`
-	Description *string `json:"description,omitempty" validate:"omitempty,max=1000"`
-	FileID      *string `json:"file_id,omitempty"`
-	PrevFileID  *string `json:"prev_file_id,omitempty"`
-	IsActive    *bool   `json:"is_active,omitempty"`
+	Code       *string `json:"code,omitempty" validate:"omitempty,max=50"`
+	Name       *string `json:"name,omitempty" validate:"omitempty,max=150"`
+	FileID     *string `json:"file_id,omitempty"`
+	PrevFileID *string `json:"prev_file_id,omitempty"`
+	IsActive   *bool   `json:"is_active,omitempty"`
 }
 
 // DocumentTemplateListQuery captures filters and pagination for listing document templates.
@@ -39,7 +45,6 @@ type DocumentTemplateListItem struct {
 	ID               uuid.UUID `json:"id"`
 	Code             string    `json:"code"`
 	Name             string    `json:"name"`
-	Description      *string   `json:"description,omitempty"`
 	FileID           string    `json:"file_id"`
 	PrevFileID       string    `json:"prev_file_id"`
 	IsActive         bool      `json:"is_active"`
