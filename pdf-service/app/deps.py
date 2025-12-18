@@ -12,6 +12,8 @@ from app.repositories.files_repository import HttpFilesRepository
 from app.services.file_service import FileService
 from app.services.health_service import HealthService
 from app.services.qr_service import QrService
+from app.services.pdf_service import PdfService
+from app.services.pdf_generation_service import PdfGenerationService
 
 # --- shared app startup time (used by health) ---
 _started_at = time.monotonic()
@@ -50,3 +52,20 @@ def get_file_service(
 def get_qr_service() -> QrService:
     logo_path = Path(__file__).resolve().parent / "assets" / "logo.png"
     return QrService(logo_path=logo_path)
+
+
+def get_pdf_service() -> PdfService:
+    return PdfService()
+
+def get_pdf_generation_service(
+    settings: Settings = Depends(get_settings),
+    file_svc: FileService = Depends(get_file_service),
+    qr_svc: QrService = Depends(get_qr_service),
+    pdf_svc: PdfService = Depends(get_pdf_service),
+) -> PdfGenerationService:
+    return PdfGenerationService(
+        settings=settings,
+        file_service=file_svc,
+        qr_service=qr_svc,
+        pdf_service=pdf_svc,
+    )

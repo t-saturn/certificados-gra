@@ -60,15 +60,7 @@ class FileService:
 
         return resp
 
-    async def fn_upload_file(
-        self,
-        *,
-        user_id: str,
-        is_public: bool,
-        filename: str,
-        content_type: str,
-        content: bytes,
-    ) -> httpx.Response:
+    async def fn_upload_file(self, *, user_id: str,is_public: bool, filename: str, content_type: str, content: bytes) -> httpx.Response:
         # Upload endpoint (API)
         path = "/api/v1/files"
         headers = self._auth_headers(method="POST", path=path)
