@@ -12,3 +12,13 @@ class GenerateDocRequest(BaseModel):
     qr: List[Dict[str, Any]] = Field(default_factory=list)
     qr_pdf: List[Dict[str, Any]] = Field(default_factory=list)
     pdf: List[Dict[str, str]] = Field(default_factory=list)
+
+
+class GenerateDocItemResult(BaseModel):
+    user_id: str
+    file_id: str
+
+
+class GenerateDocsResponse(BaseModel):
+    message: str
+    docs: List[GenerateDocItemResult] = Field(default_factory=list)
