@@ -75,13 +75,23 @@ async def test_generate_and_upload_pipeline(monkeypatch):
 
     resp = await gen.generate_and_upload(
         template_file_id=UUID("665190a7-8996-4612-b2a1-de8ead4ec3bb"),
-        verify_code="CERT-2025-ABCD",
-        placeholders={"{{nombre_participante}}": "JUAN PEREZ"},
-        qr_page=0,
-        # our template is portrait, so we must pass rect
-        portrait_qr_rect=(450, 40, 540, 130),
+        qr=[
+            {"base_url": "https://regionayacucho.gob.pe/verify"},
+            {"verify_code": "CERT-2025-ABCD"},
+        ],
+        qr_pdf=[
+            {"qr_size_cm": "2.5"},
+            {"qr_margin_y_cm": "1.0"},
+            {"qr_margin_x_cm": "1.0"},
+            {"qr_page": "0"},
+            {"qr_rect": "450,40,540,130"},
+        ],
+        pdf=[
+            {"key": "nombre_participante", "value": "JUAN PEREZ"},
+        ],
         output_filename="out.pdf",
         user_id="system",
+        is_public=True,
     )
 
     assert resp.status_code == 200
