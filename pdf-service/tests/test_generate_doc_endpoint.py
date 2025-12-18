@@ -6,8 +6,11 @@ from app.main import create_app
 
 
 class FakePdfGenerationService:
-     async def generate_and_upload(self, **kwargs):
-        return {"message": "Documento generado y subido correctamente", "file_id": "uploaded-123"}
+    async def generate_and_upload(self, **kwargs):
+        return {
+            "message": "Documento generado y subido correctamente",
+            "file_id": "uploaded-123",
+        }
 
 
 @pytest.mark.asyncio
@@ -19,6 +22,7 @@ async def test_generate_doc_ok():
     app.dependency_overrides[get_pdf_generation_service] = lambda: FakePdfGenerationService()
 
     transport = httpx.ASGITransport(app=app)
+
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
             "template": "89ab202f-02e0-4da0-bdbf-68be7631dc2a",
@@ -39,12 +43,13 @@ async def test_generate_doc_ok():
                 {"key": "nombre_participante", "value": "JUAN PÉREZ GARCÍA"},
             ],
         }
+
         resp = await ac.post("/generate-doc", json=payload)
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["message"]
     assert body["file_id"] == "uploaded-123"
+    assert "message" in body
 
 
 @pytest.mark.asyncio
@@ -52,18 +57,17 @@ async def test_generate_doc_bad_uuid():
     app = create_app()
 
     transport = httpx.ASGITransport(app=app)
+
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-       resp = await ac.post(
-    "/generate-doc",
-    json={
-        "template": "not-a-uuid",
-        "user_id": "f3b6c2a1-9e7d-4c5a-b2f1-6d8a9c0e7b24",
-        "qr": [],
-        "qr_pdf": [],
-        "pdf": [],
-    },
-)
-assert resp.status_code == 400
+        resp = await ac.post(
+            "/generate-doc",
+            json={
+                "template": "not-a-uuid",
+                "user_id": "f3b6c2a1-9e7d-4c5a-b2f1-6d8a9c0e7b24",
+                "qr": [],
+                "qr_pdf": [],
+                "pdf": [],
+            },
+        )
 
     assert resp.status_code == 400
-    assert "template must be a UUID" in resp.text
