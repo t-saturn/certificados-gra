@@ -3,12 +3,18 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import AsyncGenerator
-
-import httpx
+from redis.asyncio import Redis
 from fastapi import Depends
+import httpx
 
+from app.core.redis import get_redis
 from app.core.config import Settings, get_settings
+
+from app.repositories.redis_jobs_repository import RedisJobsRepository
+from app.repositories.jobs_repository import JobsRepository
 from app.repositories.files_repository import HttpFilesRepository
+
+from app.services.jobs_service import JobsService
 from app.services.file_service import FileService
 from app.services.health_service import HealthService
 from app.services.qr_service import QrService
@@ -69,3 +75,17 @@ def get_pdf_generation_service(
         qr_service=qr_svc,
         pdf_service=pdf_svc,
     )
+
+def get_redis_client(settings: Settings = Depends(get_settings)) -> Redis:
+    return get_redis(settings)
+
+def get_jobs_repository(
+    settings: Settings = Depends(get_settings),
+    redis: Redis = Depends(get_redis_client),
+) -> JobsRepository:
+    return RedisJobsRepository(redis=redis, settings=settings)
+
+def get_jobs_service(
+    repo: JobsRepository = Depends(get_jobs_repository),
+) -> JobsService:
+    return JobsService(repo=repo)
