@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
-
-import httpx
+import re
 
 from app.core.config import Settings
 from app.services.file_service import FileService
@@ -56,6 +55,12 @@ def _first_value(items: List[Dict[str, Any]], key: str) -> Optional[str]:
             return str(it[key]).strip()
     return None
 
+def _safe_filename(name: str) -> str:
+    name = (name or "").strip()
+    # deja letras/números/guion/underscore/punto
+    name = re.sub(r"[^a-zA-Z0-9._-]+", "_", name)
+    name = name.strip("._-")
+    return name or "generated"
 
 @dataclass(frozen=True)
 class PdfGenerationService:
@@ -79,7 +84,7 @@ class PdfGenerationService:
         qr: List[Dict[str, Any]],
         qr_pdf: List[Dict[str, Any]],
         pdf: List[Dict[str, str]],
-        output_filename: str = "generated.pdf",
+        output_filename: str | None = None,
         is_public: bool = True,
         user_id: str = "system",
     ) -> Dict[str, Any]:
@@ -134,8 +139,12 @@ class PdfGenerationService:
             qr_margin_y_cm=qr_margin_y_cm,
         )
 
+
         # -------- 6) Upload final PDF --------
         # Uses project id from env (Settings.FILE_PROJECT_ID)
+        if not output_filename:
+            output_filename = f"{_safe_filename(verify_code)}.pdf"
+
         up_resp = await self.file_service.fn_upload_file(
             user_id=user_id,
             is_public=is_public,
