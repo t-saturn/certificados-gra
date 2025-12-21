@@ -22,6 +22,7 @@ export type CategoryOption = {
 export type TemplateFieldType = 'text' | 'date' | 'number' | 'boolean';
 
 export type TemplateFieldForm = {
+  id: string;
   key: string;
   label: string;
   field_type: TemplateFieldType;

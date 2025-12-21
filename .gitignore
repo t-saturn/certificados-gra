@@ -117,3 +117,19 @@ pdf-service/*.log
 pdf-service/.env
 pdf-service/.env.local
 pdf-service/.env.*.local
+
+
+# Rust (Worker) - /pdf-worker
+pdf-worker/target/
+pdf-worker/.cargo/
+# pdf-worker/Cargo.lock
+pdf-worker/**/*.rs.bk
+
+# Logs del worker (si generas logs/YYYY-MM-DD.log)
+pdf-worker/logs/
+pdf-worker/*.log
+
+# Env local del worker
+pdf-worker/.env
+pdf-worker/.env.local
+pdf-worker/.env.*.local

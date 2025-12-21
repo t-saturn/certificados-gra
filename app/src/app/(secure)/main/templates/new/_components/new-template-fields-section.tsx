@@ -53,6 +53,7 @@ export const NewTemplateFieldsSection: FC<NewTemplateFieldsSectionProps> = ({ fi
     const next: TemplateFieldForm[] = [
       ...fields,
       {
+        id: crypto.randomUUID(),
         key: '',
         label: '',
         field_type: 'text',
@@ -71,6 +72,11 @@ export const NewTemplateFieldsSection: FC<NewTemplateFieldsSectionProps> = ({ fi
     const next = fields.map((f, i) => (i === idx ? { ...f, ...patch } : f));
     onChange(next);
   };
+
+  const sanitizeKey = (raw: string): string =>
+    raw
+      .replace(/\s+/g, '') // no espacios
+      .replace(/[^a-zA-Z0-9_]/g, ''); // solo letras, números y _
 
   return (
     <div className="space-y-4 pt-6 border-border border-t">
@@ -102,13 +108,13 @@ export const NewTemplateFieldsSection: FC<NewTemplateFieldsSectionProps> = ({ fi
 
       <div className="space-y-3">
         {fields.map((f, idx) => {
-          const keyNorm = normalizeKey(f.key);
-          const isDup = f.key.trim() !== '' && duplicatedKeys.has(f.key.trim());
-          const isEmptyKey = f.key.trim() === '';
+          const keySanitized = sanitizeKey(f.key);
+          const isDup = keySanitized !== '' && duplicatedKeys.has(keySanitized);
+          const isEmptyKey = keySanitized === '';
           const isEmptyLabel = f.label.trim() === '';
 
           return (
-            <Card key={`${idx}-${f.key}`} className="p-4 border-border">
+            <Card key={f.id} className="p-4 border-border">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-3 flex-1">
                   <div className="grid gap-3 md:grid-cols-2">
@@ -117,12 +123,14 @@ export const NewTemplateFieldsSection: FC<NewTemplateFieldsSectionProps> = ({ fi
                       <Input
                         value={f.key}
                         disabled={disabled}
-                        placeholder="Ej: NOMBRE_PARTICIPANTE"
-                        onChange={(e) => updateField(idx, { key: normalizeKey(e.target.value) })}
-                        className="bg-muted border-border"
+                        placeholder="Ej: nombre_participante"
+                        onKeyDown={(e) => {
+                          if (e.key === ' ') e.preventDefault();
+                        }}
+                        onChange={(e) => updateField(idx, { key: sanitizeKey(e.target.value) })}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Placeholder: <span className="font-mono">{`{{${keyNorm || 'KEY'}}}`}</span>
+                        Placeholder: <span className="font-mono">{`{{${f.key || 'key'}}}`}</span>
                       </p>
                       {(isEmptyKey || isDup) && (
                         <p className="text-xs text-destructive flex items-center gap-1">
