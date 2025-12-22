@@ -99,8 +99,11 @@ async def run_worker() -> None:
                     try:
                         template_uuid = UUID(item["template"])
 
-                        # ⚠️ importante: NO fuerces "generated.pdf"
-                        # deja que PdfGenerationService use verify_code.pdf
+                        # PdfGenerationService ahora:
+                        # - construye filename determinista
+                        # - calcula sha256 y size bytes
+                        # - sube el PDF
+                        # y devuelve: file_id, file_name, file_hash, file_size_bytes, storage_provider, verify_code
                         result = await gen.generate_and_upload(
                             template_file_id=template_uuid,
                             qr=item["qr"],
@@ -111,27 +114,48 @@ async def run_worker() -> None:
                             user_id=item.get("user_id") or "system",
                         )
 
-                        await redis.rpush(
-                            results_key,
-                            json.dumps({"user_id": item.get("user_id"), "file_id": result["file_id"]}),
-                        )
+                        payload = {
+                            "user_id": item.get("user_id"),
+                            "file_id": result.get("file_id"),
+                            "file_name": result.get("file_name"),
+                            "file_hash": result.get("file_hash"),
+                            "file_size_bytes": result.get("file_size_bytes"),
+                            "storage_provider": result.get("storage_provider"),
+                            "verify_code": result.get("verify_code") or verify_code,
+                        }
+
+                        # Validación mínima: si falta algo crítico, falla el item
+                        if not payload["file_id"] or not payload["file_name"] or not payload["file_hash"] or payload["file_size_bytes"] is None:
+                            raise RuntimeError(f"incomplete result metadata: {payload}")
+
+                        await redis.rpush(results_key, json.dumps(payload))
+
                         processed += 1
 
                         log.info(
                             "item_done",
                             job_id=job_id,
                             index=idx,
-                            verify_code=verify_code,
+                            verify_code=payload["verify_code"],
                             processed=processed,
                             failed=failed,
                             total=total,
+                            file_id=payload["file_id"],
+                            file_name=payload["file_name"],
+                            file_size_bytes=payload["file_size_bytes"],
                         )
 
                     except Exception as e:
                         failed += 1
                         await redis.rpush(
                             errors_key,
-                            json.dumps({"index": idx, "verify_code": verify_code, "error": str(e)}),
+                            json.dumps(
+                                {
+                                    "index": idx,
+                                    "verify_code": verify_code,
+                                    "error": str(e),
+                                }
+                            ),
                         )
                         log.error(
                             "item_failed",

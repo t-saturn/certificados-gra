@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 import re
+import hashlib
 
 from app.core.config import Settings
 from app.services.file_service import FileService
@@ -139,6 +140,8 @@ class PdfGenerationService:
             qr_margin_y_cm=qr_margin_y_cm,
         )
 
+        file_size_bytes = len(final_pdf_bytes)
+        file_hash = hashlib.sha256(final_pdf_bytes).hexdigest()
 
         # -------- 6) Upload final PDF --------
         # Uses project id from env (Settings.FILE_PROJECT_ID)
@@ -171,5 +174,9 @@ class PdfGenerationService:
         return {
             "message": "Documento generado y subido correctamente",
             "file_id": str(uploaded_file_id),
+            "file_name": output_filename,
+            "file_hash": file_hash,
+            "file_size_bytes": file_size_bytes,
+            "storage_provider": "file-server",  # string simple, estable
             "verify_code": verify_code,
         }

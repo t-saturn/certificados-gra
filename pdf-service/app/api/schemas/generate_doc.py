@@ -18,6 +18,11 @@ class GenerateDocItemResult(BaseModel):
     user_id: str
     file_id: str
 
+    file_name: Optional[str] = None
+    file_hash: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+    storage_provider: Optional[str] = None
+
 
 class GenerateDocsResponse(BaseModel):
     message: str
