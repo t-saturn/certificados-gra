@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
 class GenerateDocRequest(BaseModel):
+    client_ref: Optional[str] = None
     template: str
     user_id: str
     is_public: bool = True
@@ -15,8 +16,10 @@ class GenerateDocRequest(BaseModel):
 
 
 class GenerateDocItemResult(BaseModel):
+    client_ref: Optional[str] = None
     user_id: str
     file_id: str
+    verify_code: Optional[str] = None
 
 
 class GenerateDocsResponse(BaseModel):

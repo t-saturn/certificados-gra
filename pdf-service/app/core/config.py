@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     REDIS_DB: int = Field(default=0, ge=0)
     REDIS_PASSWORD: SecretStr | None = Field(default=None)
 
-    # ✅ claves/colas para jobs
+    # claves/colas para jobs
     REDIS_QUEUE_PDF_JOBS: str = Field(default="queue:pdf:jobs")
     REDIS_JOB_TTL_SECONDS: int = Field(default=60 * 60, ge=60)
 
