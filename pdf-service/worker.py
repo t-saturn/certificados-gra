@@ -128,7 +128,19 @@ async def run_worker() -> None:
                         if not payload["file_id"] or not payload["file_name"] or not payload["file_hash"] or payload["file_size_bytes"] is None:
                             raise RuntimeError(f"incomplete result metadata: {payload}")
 
-                        await redis.rpush(results_key, json.dumps(payload))
+                        await redis.rpush(
+                            results_key,
+                            json.dumps({
+                                "client_ref": item.get("client_ref"),  # <- document_id desde Go/Rust
+                                "user_id": item.get("user_id"),
+                                "file_id": result["file_id"],
+                                "verify_code": result.get("verify_code") or verify_code,
+                                "file_name": result.get("file_name"),
+                                "file_hash": result.get("file_hash"),
+                                "file_size_bytes": result.get("file_size_bytes"),
+                                "storage_provider": result.get("storage_provider"),
+                            }),
+                        )
 
                         processed += 1
 
@@ -149,24 +161,14 @@ async def run_worker() -> None:
                         failed += 1
                         await redis.rpush(
                             errors_key,
-                            json.dumps(
-                                {
-                                    "index": idx,
-                                    "verify_code": verify_code,
-                                    "error": str(e),
-                                }
-                            ),
+                            json.dumps({
+                                "index": idx,
+                                "client_ref": item.get("client_ref"),
+                                "verify_code": verify_code,
+                                "error": str(e),
+                            }),
                         )
-                        log.error(
-                            "item_failed",
-                            job_id=job_id,
-                            index=idx,
-                            verify_code=verify_code,
-                            error=str(e),
-                            processed=processed,
-                            failed=failed,
-                            total=total,
-                        )
+                        log.error("item_failed", job_id=job_id, index=idx, verify_code=verify_code, error=str(e), processed=processed, failed=failed, total=total)
 
                     # Update meta cada item
                     await redis.hset(meta_key, mapping={"processed": processed, "failed": failed, "total": total})

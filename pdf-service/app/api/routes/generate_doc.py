@@ -1,22 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException
+from __future__ import annotations
+
 from typing import List
+from uuid import uuid4
 
+from fastapi import APIRouter, Depends
+from app.deps import get_jobs_repository
+from app.repositories.jobs_repository import JobsRepository
 from app.api.schemas.generate_doc import GenerateDocRequest
-from app.deps import get_jobs_service
-from app.services.jobs_service import JobsService
 
-router = APIRouter(tags=["generate"])
+router = APIRouter(tags=["generate-doc"])
 
-@router.post("/generate-doc", status_code=202)
+@router.post("/generate-doc")
 async def generate_doc(
-    payload: List[GenerateDocRequest],
-    jobs: JobsService = Depends(get_jobs_service),
+    items: List[GenerateDocRequest],
+    repo: JobsRepository = Depends(get_jobs_repository),
 ):
-    if not payload:
-        raise HTTPException(status_code=400, detail="payload must be a non-empty array")
+    job_id = str(uuid4())
+    total = len(items)
 
-    # Convert pydantic models to plain dict (serializable)
-    items = [p.model_dump() for p in payload]
+    await repo.create_job(job_id, total=total)
 
-    job_id = await jobs.submit_generate_docs(items)
-    return {"job_id": job_id, "status": "QUEUED", "total": len(items)}
+    payload = {
+        "type": "GENERATE_DOCS",
+        "job_id": job_id,
+        "items": [it.model_dump() for it in items],  # <-- incluye client_ref
+    }
+
+    await repo.push_job(payload)
+
+    return {"job_id": job_id, "status": "QUEUED", "total": total}
