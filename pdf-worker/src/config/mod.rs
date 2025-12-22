@@ -1,11 +1,8 @@
 use std::env;
 
-#[derive(Clone)]
 pub struct Config {
     pub redis_url: String,
     pub redis_queue: String,
-
-    pub pg_url: String,
 
     pub pdf_service_base_url: String,
     pub pdf_poll_interval_ms: u64,
@@ -14,53 +11,39 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Self {
-        let redis_host = env::var("REDIS_HOST").expect("REDIS_HOST missing");
-        let redis_port = env::var("REDIS_PORT").expect("REDIS_PORT missing");
-        let redis_db = env::var("REDIS_DB").unwrap_or_else(|_| "0".into());
-        let redis_queue = env::var("REDIS_QUEUE_PDF_JOBS").expect("REDIS_QUEUE_PDF_JOBS missing");
+        let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
+        let redis_db = env::var("REDIS_DB").unwrap_or_else(|_| "0".to_string());
 
-        let pg_host = env::var("PG_HOST").expect("PG_HOST missing");
-        let pg_port = env::var("PG_PORT").unwrap_or_else(|_| "5432".into());
-        let pg_user = env::var("PG_USER").expect("PG_USER missing");
-        let pg_password = env::var("PG_PASSWORD").expect("PG_PASSWORD missing");
-        let pg_database = env::var("PG_DATABASE").expect("PG_DATABASE missing");
-        let pg_sslmode = env::var("PG_SSLMODE").unwrap_or_else(|_| "disable".into());
+        let redis_password = env::var("REDIS_PASSWORD").ok().filter(|s| !s.is_empty());
 
-        let pg_url = format!(
-            "postgres://{}:{}@{}:{}/{}?sslmode={}",
-            pg_user, pg_password, pg_host, pg_port, pg_database, pg_sslmode
-        );
+        let redis_url = match redis_password {
+            Some(pw) => format!("redis://:{}@{}:{}/{}", pw, redis_host, redis_port, redis_db),
+            None => format!("redis://{}:{}/{}", redis_host, redis_port, redis_db),
+        };
+
+        let redis_queue = env::var("REDIS_QUEUE_PDF_JOBS")
+            .unwrap_or_else(|_| "queue:cert:generate".to_string());
 
         let pdf_service_base_url =
-            env::var("PDF_SERVICE_BASE_URL").unwrap_or_else(|_| "http://localhost:5050".into());
+            env::var("PDF_SERVICE_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:5050".to_string());
 
-        let pdf_poll_interval_ms = env::var("PDF_SERVICE_POLL_INTERVAL_MS")
+        let pdf_poll_interval_ms = env::var("PDF_POLL_INTERVAL_MS")
             .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(800);
+            .and_then(|x| x.parse::<u64>().ok())
+            .unwrap_or(750);
 
-        let pdf_max_poll_seconds = env::var("PDF_SERVICE_MAX_POLL_SECONDS")
+        let pdf_max_poll_seconds = env::var("PDF_MAX_POLL_SECONDS")
             .ok()
-            .and_then(|v| v.parse::<u64>().ok())
+            .and_then(|x| x.parse::<u64>().ok())
             .unwrap_or(120);
 
         Self {
-            redis_url: format!("redis://{}:{}/{}", redis_host, redis_port, redis_db),
+            redis_url,
             redis_queue,
-            pg_url,
             pdf_service_base_url,
             pdf_poll_interval_ms,
             pdf_max_poll_seconds,
-            // pdf_service_base_url: env::var("PDF_SERVICE_BASE_URL")
-            //     .expect("PDF_SERVICE_BASE_URL missing"),
-            // pdf_poll_interval_ms: env::var("PDF_SERVICE_POLL_INTERVAL_MS")
-            //     .expect("PDF_SERVICE_POLL_INTERVAL_MS missing")
-            //     .parse()
-            //     .expect("PDF_SERVICE_POLL_INTERVAL_MS must be a number"),
-            // pdf_max_poll_seconds: env::var("PDF_SERVICE_MAX_POLL_SECONDS")
-            //     .expect("PDF_SERVICE_MAX_POLL_SECONDS missing")
-            //     .parse()
-            //     .expect("PDF_SERVICE_MAX_POLL_SECONDS must be a number"),
         }
     }
 }

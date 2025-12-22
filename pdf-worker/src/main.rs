@@ -9,7 +9,6 @@ use tracing::info;
 
 use application::worker::Worker;
 use config::Config;
-use infrastructure::db::{documents_repo::DocumentsRepository, pool};
 use infrastructure::pdf_service::client::PdfServiceClient;
 use infrastructure::redis::queue::RedisQueue;
 
@@ -20,16 +19,18 @@ async fn main() -> anyhow::Result<()> {
 
     let cfg = Config::from_env();
 
-    info!(queue = %cfg.redis_queue, redis_url = %cfg.redis_url, "PDF Worker starting");
+    info!(
+        queue = %cfg.redis_queue,
+        redis_url = %cfg.redis_url,
+        pdf_service_base_url = %cfg.pdf_service_base_url,
+        "PDF Worker starting"
+    );
 
     let redis_queue = RedisQueue::connect(&cfg.redis_url, &cfg.redis_queue).await?;
-    let pg_pool = pool::connect(&cfg.pg_url).await?;
-    let docs_repo = DocumentsRepository::new(pg_pool);
-
     let pdf_client = PdfServiceClient::new(cfg.pdf_service_base_url.clone());
+
     let worker = Worker::new(
         redis_queue,
-        docs_repo,
         pdf_client,
         cfg.pdf_poll_interval_ms,
         cfg.pdf_max_poll_seconds,
