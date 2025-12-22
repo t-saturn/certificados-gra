@@ -1,6 +1,10 @@
 package main
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"server/internal/config"
 	"server/internal/middlewares"
 	"server/internal/routes"
@@ -19,6 +23,8 @@ func main() {
 
 	config.LoadConfig()
 	config.ConnectDB()
+	config.ConnectRedis()
+	defer config.CloseRedis()
 
 	if err := validator.InitValidator(); err != nil {
 		logger.Log.Fatal().Msgf("Error al inicializar el validador: %v", err)
@@ -32,6 +38,15 @@ func main() {
 	app.Use(middlewares.LoggerMiddleware())
 
 	routes.RegisterRoutes(app)
+
+	// Shutdown graceful (opcional, pero útil)
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		<-ch
+		logger.Log.Info().Msg("Shutting down server...")
+		_ = app.Shutdown()
+	}()
 
 	port := config.GetConfig().SERVERPort
 	logger.Log.Info().Msgf("server-listening-in http://localhost:%s", port)
