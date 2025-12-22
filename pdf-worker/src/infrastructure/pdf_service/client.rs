@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::{info, instrument};
 
 #[derive(Clone)]
@@ -21,6 +22,7 @@ impl PdfServiceClient {
         payload: &[GenerateDocItem],
     ) -> anyhow::Result<GenerateDocResponse> {
         let url = format!("{}/generate-doc", self.base_url);
+
         let res = self.http.post(url).json(payload).send().await?;
         let status = res.status();
 
@@ -41,6 +43,7 @@ impl PdfServiceClient {
     #[instrument(name = "pdf_service.get_job", skip(self), fields(job_id = %job_id))]
     pub async fn get_job(&self, job_id: &str) -> anyhow::Result<JobStatusResponse> {
         let url = format!("{}/jobs/{}", self.base_url, job_id);
+
         let res = self.http.get(url).send().await?;
         let status = res.status();
 
@@ -53,45 +56,28 @@ impl PdfServiceClient {
             ));
         }
 
-        Ok(res.json().await?)
+        let out: JobStatusResponse = res.json().await?;
+        info!(requested_job_id = %job_id, response_job_id = %out.job_id, status = %out.meta.status, "pdf-service job fetched");
+        Ok(out)
     }
 }
 
-/* -------------------- DTOs (request/response) -------------------- */
+/* -------------------- DTOs -------------------- */
 
 #[derive(Debug, Serialize)]
 pub struct GenerateDocItem {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_ref: Option<String>,
+
     pub template: String,
     pub user_id: String,
     pub is_public: bool,
 
-    // tu pdf-service actual usa arrays de objetos
-    pub qr: Vec<QrPart>,
-    pub qr_pdf: Vec<QrPdfPart>,
+    // coincide con tu dominio actual:
+    pub qr: Vec<HashMap<String, serde_json::Value>>,
+    pub qr_pdf: Vec<HashMap<String, serde_json::Value>>,
 
     pub pdf: Vec<PdfField>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct QrPart {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub base_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub verify_code: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct QrPdfPart {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub qr_size_cm: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub qr_margin_y_cm: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub qr_margin_x_cm: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub qr_page: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub qr_rect: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -111,12 +97,12 @@ pub struct GenerateDocResponse {
 pub struct JobStatusResponse {
     pub job_id: String,
     pub meta: JobMeta,
-    pub results: Option<Vec<JobResultItem>>,
+    pub results: Vec<JobResultItem>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JobMeta {
-    pub status: String, // "QUEUED" | "RUNNING" | "DONE" | "FAILED"
+    pub status: String,
     pub total: String,
     pub processed: String,
     pub failed: String,
@@ -124,6 +110,13 @@ pub struct JobMeta {
 
 #[derive(Debug, Deserialize)]
 pub struct JobResultItem {
+    pub client_ref: Option<String>,
     pub user_id: String,
     pub file_id: String,
+    pub verify_code: Option<String>,
+
+    pub file_name: Option<String>,
+    pub file_hash: Option<String>,
+    pub file_size_bytes: Option<i64>,
+    pub storage_provider: Option<String>,
 }

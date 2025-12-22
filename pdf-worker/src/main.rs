@@ -27,6 +27,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let redis_queue = RedisQueue::connect(&cfg.redis_url, &cfg.redis_queue).await?;
+
     let pdf_client = PdfServiceClient::new(cfg.pdf_service_base_url.clone());
 
     let worker = Worker::new(
