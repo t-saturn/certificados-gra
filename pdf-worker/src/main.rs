@@ -10,6 +10,7 @@ use tracing::info;
 use application::worker::Worker;
 use config::Config;
 use infrastructure::db::{documents_repo::DocumentsRepository, pool};
+use infrastructure::pdf_service::client::PdfServiceClient;
 use infrastructure::redis::queue::RedisQueue;
 
 #[tokio::main]
@@ -25,7 +26,14 @@ async fn main() -> anyhow::Result<()> {
     let pg_pool = pool::connect(&cfg.pg_url).await?;
     let docs_repo = DocumentsRepository::new(pg_pool);
 
-    let worker = Worker::new(redis_queue, docs_repo);
+    let pdf_client = PdfServiceClient::new(cfg.pdf_service_base_url.clone());
+    let worker = Worker::new(
+        redis_queue,
+        docs_repo,
+        pdf_client,
+        cfg.pdf_poll_interval_ms,
+        cfg.pdf_max_poll_seconds,
+    );
 
     info!(queue = %cfg.redis_queue, "Worker ready: listening for jobs");
     worker.run().await

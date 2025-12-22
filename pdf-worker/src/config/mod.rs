@@ -6,6 +6,10 @@ pub struct Config {
     pub redis_queue: String,
 
     pub pg_url: String,
+
+    pub pdf_service_base_url: String,
+    pub pdf_poll_interval_ms: u64,
+    pub pdf_max_poll_seconds: u64,
 }
 
 impl Config {
@@ -27,10 +31,36 @@ impl Config {
             pg_user, pg_password, pg_host, pg_port, pg_database, pg_sslmode
         );
 
+        let pdf_service_base_url =
+            env::var("PDF_SERVICE_BASE_URL").unwrap_or_else(|_| "http://localhost:5050".into());
+
+        let pdf_poll_interval_ms = env::var("PDF_SERVICE_POLL_INTERVAL_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(800);
+
+        let pdf_max_poll_seconds = env::var("PDF_SERVICE_MAX_POLL_SECONDS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(120);
+
         Self {
             redis_url: format!("redis://{}:{}/{}", redis_host, redis_port, redis_db),
             redis_queue,
             pg_url,
+            pdf_service_base_url,
+            pdf_poll_interval_ms,
+            pdf_max_poll_seconds,
+            // pdf_service_base_url: env::var("PDF_SERVICE_BASE_URL")
+            //     .expect("PDF_SERVICE_BASE_URL missing"),
+            // pdf_poll_interval_ms: env::var("PDF_SERVICE_POLL_INTERVAL_MS")
+            //     .expect("PDF_SERVICE_POLL_INTERVAL_MS missing")
+            //     .parse()
+            //     .expect("PDF_SERVICE_POLL_INTERVAL_MS must be a number"),
+            // pdf_max_poll_seconds: env::var("PDF_SERVICE_MAX_POLL_SECONDS")
+            //     .expect("PDF_SERVICE_MAX_POLL_SECONDS missing")
+            //     .parse()
+            //     .expect("PDF_SERVICE_MAX_POLL_SECONDS must be a number"),
         }
     }
 }
