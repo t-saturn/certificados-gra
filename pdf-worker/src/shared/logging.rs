@@ -2,13 +2,14 @@ use chrono::Local;
 use std::{fs, path::PathBuf};
 
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{EnvFilter, fmt};
 
 /// Inicializa tracing a consola + archivo diario: logs/YYYY-MM-DD.log
 /// Devuelve un guard para mantener el writer vivo (NO lo descartes).
 pub fn init_tracing() -> anyhow::Result<WorkerGuard> {
     // logs/ (relativo al working dir)
-    let mut log_dir = PathBuf::from("logs");
+    let log_dir = PathBuf::from("logs");
     fs::create_dir_all(&log_dir)?;
 
     let date = Local::now().format("%Y-%m-%d").to_string();
