@@ -20,16 +20,35 @@ import (
 )
 
 type EventActionService interface {
-	RunEventAction(ctx context.Context, eventID uuid.UUID, action string, participantIDs []uuid.UUID, qrRect *string) (*string, int, int, int, error)
+	// qrRect: string tipo "460,40,540,120" (opcional)
+	RunEventAction(
+		ctx context.Context,
+		eventID uuid.UUID,
+		action string,
+		participantIDs []uuid.UUID,
+		qrRect *string,
+	) (*string, int, int, int, error)
 }
 
 type eventActionServiceImpl struct {
-	db        *gorm.DB
-	queueRepo repositories.PdfJobQueueRepository
+	db                *gorm.DB
+	queueRepo         repositories.PdfJobQueueRepository
+	templateFieldRepo repositories.DocumentTemplateFieldRepository
+	userDetailRepo    repositories.UserDetailRepository
 }
 
-func NewEventActionService(db *gorm.DB, queueRepo repositories.PdfJobQueueRepository) EventActionService {
-	return &eventActionServiceImpl{db: db, queueRepo: queueRepo}
+func NewEventActionService(
+	db *gorm.DB,
+	queueRepo repositories.PdfJobQueueRepository,
+	templateFieldRepo repositories.DocumentTemplateFieldRepository,
+	userDetailRepo repositories.UserDetailRepository,
+) EventActionService {
+	return &eventActionServiceImpl{
+		db:                db,
+		queueRepo:         queueRepo,
+		templateFieldRepo: templateFieldRepo,
+		userDetailRepo:    userDetailRepo,
+	}
 }
 
 func normalizeAction(s string) string { return strings.TrimSpace(strings.ToLower(s)) }
@@ -137,20 +156,12 @@ func (s *eventActionServiceImpl) RunEventAction(
 	eventID uuid.UUID,
 	action string,
 	participantIDs []uuid.UUID,
-	qrRect *string, // <- NUEVO
+	qrRect *string,
 ) (*string, int, int, int, error) {
 	act := normalizeAction(action)
 	if act != "generate_certificates" {
 		return nil, 0, 0, 0, fmt.Errorf("invalid action (only generate_certificates implemented)")
 	}
-
-	hasQrRect := qrRect != nil && strings.TrimSpace(*qrRect) != ""
-	logger.Log.Info().
-		Str("event_id", eventID.String()).
-		Str("action", act).
-		Int("participants_in_req", len(participantIDs)).
-		Bool("has_qr_rect", hasQrRect).
-		Msg("event_action received")
 
 	// 1) cargar evento + participantes
 	var ev models.Event
@@ -173,10 +184,13 @@ func (s *eventActionServiceImpl) RunEventAction(
 
 	created, skipped, updated := 0, 0, 0
 	tplID := *ev.TemplateID
+
+	// firma: por ahora 1 (si tu Event guarda esto, cámbialo)
 	requiredSigs := 1
 
 	// 2) tx crear docs si no existen
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// lock event
 		if err := tx.WithContext(ctx).
 			Clauses(clause.Locking{Strength: "UPDATE"}).
 			First(&models.Event{}, "id = ?", ev.ID).Error; err != nil {
@@ -230,6 +244,7 @@ func (s *eventActionServiceImpl) RunEventAction(
 			}
 		}
 
+		// updated = cuantos docs están en ese set
 		res := tx.WithContext(ctx).
 			Model(&models.Document{}).
 			Where("event_id = ? AND user_detail_id IN ?", ev.ID, targetIDs).
@@ -244,15 +259,7 @@ func (s *eventActionServiceImpl) RunEventAction(
 		return nil, 0, 0, 0, err
 	}
 
-	logger.Log.Info().
-		Str("event_id", ev.ID.String()).
-		Int("created", created).
-		Int("skipped", skipped).
-		Int("updated", updated).
-		Int("target_participants", len(targetIDs)).
-		Msg("event_action documents prepared")
-
-	// 3) template_id -> file_id
+	// 3) document_templates.id -> file_id (FileServer)
 	type trow struct {
 		ID     uuid.UUID
 		FileID uuid.UUID
@@ -266,7 +273,7 @@ func (s *eventActionServiceImpl) RunEventAction(
 		return nil, created, skipped, updated, err
 	}
 
-	// 4) docs payload
+	// 4) traer docs para payload
 	var docs []models.Document
 	if err := s.db.WithContext(ctx).
 		Select("id", "user_detail_id", "verification_code").
@@ -275,9 +282,22 @@ func (s *eventActionServiceImpl) RunEventAction(
 		return nil, created, skipped, updated, err
 	}
 
+	// 4.1) cargar template_fields una sola vez (document_template_fields)
+	templateFields, err := s.templateFieldRepo.GetByTemplateID(ctx, tplID)
+	if err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 4.2) cargar user_details (para resolver nombre_participante, etc.)
+	userMap, err := s.userDetailRepo.GetByIDs(ctx, targetIDs)
+	if err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 5) construir job rust
 	baseURL := "https://regionayacucho.gob.pe/verify"
 
-	// qr_pdf requerido por pdf-service
+	// qr_pdf por defecto + rect si viene
 	qrPdf := []map[string]any{
 		{"qr_size_cm": "2.5"},
 		{"qr_margin_y_cm": "1.0"},
@@ -288,7 +308,7 @@ func (s *eventActionServiceImpl) RunEventAction(
 	// default rect si no viene del request
 	rect := "460,40,540,120"
 	if qrRect != nil && strings.TrimSpace(*qrRect) != "" {
-		rect = strings.TrimSpace(*qrRect)
+		qrPdf = append(qrPdf, map[string]any{"qr_rect": strings.TrimSpace(*qrRect)})
 	}
 	qrPdf = append(qrPdf, map[string]any{"qr_rect": rect})
 
@@ -300,9 +320,17 @@ func (s *eventActionServiceImpl) RunEventAction(
 	}
 
 	for _, d := range docs {
+		participant, ok := userMap[d.UserDetailID]
+		if !ok {
+			// si no encontramos el user, igual construimos pdf con vacíos (no rompemos)
+			participant = models.UserDetail{}
+		}
+
+		pdfFields := BuildPdfFields(templateFields, participant, ev)
+
 		job.Items = append(job.Items, dto.RustDocsJobItem{
 			ClientRef: d.ID,
-			Template:  tr.FileID,
+			Template:  tr.FileID, // file_id (FileServer)
 			UserID:    d.UserDetailID,
 			IsPublic:  true,
 			QR: []map[string]any{
@@ -310,38 +338,18 @@ func (s *eventActionServiceImpl) RunEventAction(
 				{"verify_code": d.VerificationCode},
 			},
 			QRPdf: qrPdf,
-			PDF: []dto.PdfField{
-				{Key: "nombre_participante", Value: "PENDING_NAME"},
-				{Key: "fecha", Value: time.Now().Format("02/01/2006")},
-			},
+
+			// ✅ YA NO hardcode: viene de template_fields + resolver
+			PDF: pdfFields,
 		})
 	}
 
-	logger.Log.Info().
-		Str("event_id", ev.ID.String()).
-		Str("job_id", job.JobID.String()).
-		Bool("has_qr_rect", hasQrRect).
-		Str("qr_rect_used", rect).
-		Int("qr_pdf_entries", len(qrPdf)).
-		Int("total_items", len(job.Items)).
-		Msg("event_action job payload built")
-
 	cfg := config.GetConfig()
-	logger.Log.Info().
-		Str("job_id", job.JobID.String()).
-		Int("ttl_seconds", cfg.REDISJobTTLSeconds).
-		Msg("event_action enqueue start")
-
 	if err := s.queueRepo.EnqueueGenerateDocs(ctx, job, cfg.REDISJobTTLSeconds); err != nil {
 		return nil, created, skipped, updated, err
 	}
 
-	logger.Log.Info().
-		Str("job_id", job.JobID.String()).
-		Int("total_items", len(job.Items)).
-		Msg("event_action enqueue ok")
-
-	// 5) marcar docs
+	// 6) marcar docs con PDF_QUEUED + pdf_job_id
 	docIDs := make([]uuid.UUID, 0, len(job.Items))
 	for _, it := range job.Items {
 		docIDs = append(docIDs, it.ClientRef)
@@ -357,8 +365,8 @@ func (s *eventActionServiceImpl) RunEventAction(
 
 	logger.Log.Info().
 		Str("job_id", job.JobID.String()).
-		Int("doc_ids", len(docIDs)).
-		Msg("event_action documents marked PDF_QUEUED")
+		Int("total", len(job.Items)).
+		Msg("queued docs job from /event/:id")
 
 	jid := job.JobID.String()
 	return &jid, created, skipped, updated, nil

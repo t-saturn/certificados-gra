@@ -173,6 +173,13 @@ impl Worker {
                             .context("push_result")?;
                     }
 
+                    let final_status = st.meta.status.as_str(); // "DONE" o "DONE_WITH_ERRORS"
+
+                    let _ = self
+                        .queue
+                        .push_done_message(&rust_job_id, &job.event_id.to_string(), final_status)
+                        .await;
+
                     let _ = self
                         .queue
                         .set_meta_done_from_pdf_meta(
@@ -196,6 +203,11 @@ impl Worker {
                             &rust_job_id,
                             &json!({"error": "pdf-service job FAILED", "pdf_job_id": queued.job_id}).to_string(),
                         )
+                        .await;
+
+                    let _ = self
+                        .queue
+                        .push_done_message(&rust_job_id, &job.event_id.to_string(), "FAILED")
                         .await;
 
                     return Err(anyhow::anyhow!("pdf-service job FAILED: {}", queued.job_id));

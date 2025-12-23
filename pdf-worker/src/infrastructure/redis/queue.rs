@@ -1,6 +1,7 @@
 use crate::domain::job::PdfJob;
 
 use redis::AsyncCommands;
+use serde_json::json;
 use tracing::{info, instrument};
 
 fn truncate(s: &str, max: usize) -> &str {
@@ -36,6 +37,10 @@ impl RedisQueue {
 
     fn errors_key(job_id: &str) -> String {
         format!("job:{}:errors", job_id)
+    }
+
+    fn done_queue(&self) -> String {
+        format!("{}:done", self.queue) // queue:docs:generate:done
     }
 
     /// BLPOP bloqueante del queue del worker (queue:docs:generate)
@@ -139,6 +144,27 @@ impl RedisQueue {
         let key = Self::meta_key(job_id);
 
         let _: () = conn.hset(&key, "status", "FAILED").await?;
+        Ok(())
+    }
+
+    pub async fn push_done_message(
+        &self,
+        job_id: &str,
+        event_id: &str,
+        status: &str,
+    ) -> anyhow::Result<()> {
+        let mut conn = self.client.get_multiplexed_async_connection().await?;
+        let q = self.done_queue();
+
+        let msg = json!({
+            "job_id": job_id,
+            "event_id": event_id,
+            "job_type": "GENERATE_DOCS",
+            "status": status, // "DONE" | "FAILED" | "DONE_WITH_ERRORS"
+        })
+        .to_string();
+
+        let _: () = conn.lpush(&q, msg).await?;
         Ok(())
     }
 }

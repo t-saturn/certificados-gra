@@ -10,11 +10,18 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+// POST /event/:id
 func RegisterEventActionRoutes(app *fiber.App) {
-	redisJobsRepo := repositories.NewRedisJobsRepository(config.GetRedis())
-	queueRepo := repositories.NewPdfJobQueueRepository(redisJobsRepo)
+	// repos base
+	queueRedisRepo := repositories.NewRedisJobsRepository(config.GetRedis())
+	queueRepo := repositories.NewPdfJobQueueRepository(queueRedisRepo)
 
-	svc := services.NewEventActionService(config.DB, queueRepo)
+	// nuevos repos
+	templateFieldRepo := repositories.NewDocumentTemplateFieldRepository(config.DB)
+	userDetailRepo := repositories.NewUserDetailRepository(config.DB)
+
+	// service + handler
+	svc := services.NewEventActionService(config.DB, queueRepo, templateFieldRepo, userDetailRepo)
 	h := handlers.NewEventActionHandler(svc)
 
 	app.Post("/event/:id", httpwrap.Wrap(h.RunEventAction))

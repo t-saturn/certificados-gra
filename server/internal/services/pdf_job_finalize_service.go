@@ -53,34 +53,58 @@ func (s *pdfJobFinalizeServiceImpl) RunOnce(ctx context.Context) error {
 
 		var msg dto.RustJobDoneMessage
 		if err := json.Unmarshal([]byte(raw), &msg); err != nil {
-			logger.Log.Error().Err(err).Msg("invalid done message")
+			logger.Log.Error().Err(err).Str("raw", raw).Msg("invalid done message")
 			continue
 		}
 		if msg.JobType != dto.RustJobTypeGenerateDocs {
+			logger.Log.Debug().
+				Str("job_type", msg.JobType).
+				Str("job_id", msg.JobID.String()).
+				Msg("done message ignored (unknown job type)")
 			continue
 		}
 
-		jobID := msg.JobID
+		jobID := msg.JobID.String()
 
-		results, _ := s.redisRepo.GetResults(ctx, jobID.String())
-		errorsLines, _ := s.redisRepo.GetErrors(ctx, jobID.String())
+		results, err := s.redisRepo.GetResults(ctx, jobID)
+		if err != nil {
+			logger.Log.Error().Err(err).Str("job_id", jobID).Msg("GetResults failed")
+			continue
+		}
+
+		errorsLines, err := s.redisRepo.GetErrors(ctx, jobID)
+		if err != nil {
+			logger.Log.Error().Err(err).Str("job_id", jobID).Msg("GetErrors failed")
+			continue
+		}
+
+		logger.Log.Info().
+			Str("job_id", jobID).
+			Str("status", msg.Status).
+			Int("results", len(results)).
+			Int("errors", len(errorsLines)).
+			Msg("pdf finalize got job data from redis")
 
 		genRows := make([]repositories.GeneratedPdfRow, 0, len(results))
 		genDocIDs := make([]uuid.UUID, 0, len(results))
-		failDocIDs := make([]uuid.UUID, 0, len(errorsLines))
 
 		// results -> INSERT document_pdfs + mark PDF_GENERATED
 		for _, line := range results {
 			it, err := dto.ParseRedisResultLine(line)
 			if err != nil || it.ClientRef == nil || *it.ClientRef == "" {
+				logger.Log.Warn().Err(err).Str("job_id", jobID).Str("line", line).Msg("invalid result line")
 				continue
 			}
+
 			docID, err := uuid.Parse(*it.ClientRef)
 			if err != nil {
+				logger.Log.Warn().Err(err).Str("job_id", jobID).Str("client_ref", *it.ClientRef).Msg("invalid client_ref uuid")
 				continue
 			}
+
 			fileID, err := uuid.Parse(it.FileID)
 			if err != nil {
+				logger.Log.Warn().Err(err).Str("job_id", jobID).Str("file_id", it.FileID).Msg("invalid file_id uuid")
 				continue
 			}
 
@@ -105,35 +129,30 @@ func (s *pdfJobFinalizeServiceImpl) RunOnce(ctx context.Context) error {
 			genDocIDs = append(genDocIDs, docID)
 		}
 
-		// errors -> mark PDF_FAILED (ideal: errors con client_ref)
-		for _, line := range errorsLines {
-			it, err := dto.ParseRedisResultLine(line)
-			if err != nil || it.ClientRef == nil || *it.ClientRef == "" {
-				continue
-			}
-			docID, err := uuid.Parse(*it.ClientRef)
-			if err != nil {
-				continue
-			}
-			failDocIDs = append(failDocIDs, docID)
-		}
+		logger.Log.Info().
+			Str("job_id", jobID).
+			Int("gen_rows", len(genRows)).
+			Int("gen_docs", len(genDocIDs)).
+			Msg("pdf finalize parsed redis results")
 
-		_ = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// ✅ AQUÍ estaba el bug: ahora sí capturamos el error
+		if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			if err := s.finalizeRepo.UpsertGeneratedPDFs(ctx, tx, genRows); err != nil {
 				return err
 			}
 			if err := s.finalizeRepo.MarkDocumentsGenerated(ctx, tx, genDocIDs); err != nil {
 				return err
 			}
-			// no sobre-escribir generados
-			if err := s.finalizeRepo.MarkDocumentsFailed(ctx, tx, failDocIDs); err != nil {
-				return err
-			}
 			return nil
-		})
+		}); err != nil {
+			logger.Log.Error().Err(err).Str("job_id", jobID).Msg("pdf finalize transaction failed")
+			// importante: no “pierdas” el mensaje. Si quieres reintentos,
+			// lo ideal es NO consumirlo hasta que la tx pase.
+			continue
+		}
 
 		processed++
-		logger.Log.Info().Str("job_id", jobID.String()).Msg("pdf finalize processed")
+		logger.Log.Info().Str("job_id", jobID).Msg("pdf finalize processed")
 	}
 
 	return nil
