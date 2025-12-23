@@ -3,6 +3,10 @@ use crate::domain::job::PdfJob;
 use redis::AsyncCommands;
 use tracing::{info, instrument};
 
+fn truncate(s: &str, max: usize) -> &str {
+    if s.len() <= max { s } else { &s[..max] }
+}
+
 pub struct RedisQueue {
     client: redis::Client,
     queue: String,
@@ -39,9 +43,24 @@ impl RedisQueue {
     pub async fn pop_job(&self) -> anyhow::Result<PdfJob> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        // redis::Commands::blpop(key, timeout_seconds as f64)
-        let (_q, payload): (String, String) = conn.blpop(&self.queue, 0.0).await?;
+        let (q, payload): (String, String) = conn.blpop(&self.queue, 0.0).await?;
+
+        info!(
+            queue = %q,
+            payload_len = payload.len(),
+            payload_preview = %truncate(&payload, 2000),
+            "redis_blpop_payload_raw"
+        );
+
         let job: PdfJob = serde_json::from_str(&payload)?;
+
+        info!(
+            job_id = %job.job_id,
+            event_id = %job.event_id,
+            job_type = %job.job_type,
+            items = job.items.len(),
+            "redis_payload_parsed_to_job"
+        );
 
         Ok(job)
     }
