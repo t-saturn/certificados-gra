@@ -33,11 +33,17 @@ func (h *EventActionHandler) RunEventAction(c fiber.Ctx) (interface{}, string, e
 		return nil, "", fmt.Errorf("invalid body")
 	}
 
+	hasQrRect := req.QrRect != nil && strings.TrimSpace(*req.QrRect) != ""
+	// log rápido (si ya tienes middleware logger, puedes quitarlo)
+	fmt.Printf("[event_action] incoming event_id=%s action=%s participants=%d has_qr_rect=%v\n",
+		evID.String(), req.Action, len(req.ParticipantsID), hasQrRect)
+
 	jobID, created, skipped, updated, err := h.svc.RunEventAction(
 		context.Background(),
 		evID,
 		req.Action,
 		req.ParticipantsID,
+		req.QrRect, // <- NUEVO
 	)
 	if err != nil {
 		return nil, "", err

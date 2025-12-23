@@ -31,17 +31,17 @@ func main() {
 		logger.Log.Fatal().Msgf("Error al inicializar el validador: %v", err)
 	}
 
-	// Background runner: finalize PDFs (pull)
+	// Background runner: finalize PDFs (consume queue:docs:generate:done)
 	docFinalizeRepo := repositories.NewDocumentPdfFinalizeRepository(config.DB)
-	redisRepo := repositories.NewPdfJobRedisRepository(config.GetRedis())
+
+	redisJobsRepo := repositories.NewRedisJobsRepository(config.GetRedis())
+	redisRepo := repositories.NewPdfJobRedisRepository(redisJobsRepo)
 
 	finalizeSvc := services.NewPdfJobFinalizeService(config.DB, docFinalizeRepo, redisRepo, 50)
-
 	runner := background.NewPdfFinalizeRunner(finalizeSvc, 3*time.Second)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	runner.Start(ctx)
 
 	app := fiber.New(fiber.Config{

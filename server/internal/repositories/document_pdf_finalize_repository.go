@@ -2,36 +2,29 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"server/internal/models"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-// Esto te devuelve pdf_job_ids únicos que aún están pendientes.
-type PendingPdfJobRow struct {
-	PDFJobID uuid.UUID `gorm:"column:pdf_job_id"`
+type GeneratedPdfRow struct {
+	DocumentID       uuid.UUID
+	FileID           uuid.UUID
+	FileName         string
+	FileHash         string
+	FileSizeBytes    *int64
+	StorageProvider  *string
+	CreatedAt        time.Time
 }
 
 type DocumentPdfFinalizeRepository interface {
-	ListPendingPdfJobs(ctx context.Context, limit int) ([]uuid.UUID, error)
-	ListDocumentsByPdfJobID(ctx context.Context, pdfJobID uuid.UUID) ([]uuid.UUID, error)
-
-	UpsertDocumentPDF(
-		ctx context.Context,
-		tx *gorm.DB,
-		documentID uuid.UUID,
-		stage string,
-		version int,
-		fileName string,
-		fileID uuid.UUID,
-		fileHash string,
-		fileSizeBytes *int64,
-		storageProvider *string,
-	) error
-
-	MarkDocumentsGenerated(ctx context.Context, tx *gorm.DB, documentIDs []uuid.UUID) error
-	MarkDocumentsFailedByPdfJob(ctx context.Context, tx *gorm.DB, pdfJobID uuid.UUID, excludeIDs []uuid.UUID) (int64, error)
+	UpsertGeneratedPDFs(ctx context.Context, tx *gorm.DB, rows []GeneratedPdfRow) error
+	MarkDocumentsGenerated(ctx context.Context, tx *gorm.DB, docIDs []uuid.UUID) error
+	MarkDocumentsFailed(ctx context.Context, tx *gorm.DB, docIDs []uuid.UUID) error
 }
 
 type documentPdfFinalizeRepositoryImpl struct {
@@ -42,120 +35,71 @@ func NewDocumentPdfFinalizeRepository(db *gorm.DB) DocumentPdfFinalizeRepository
 	return &documentPdfFinalizeRepositoryImpl{db: db}
 }
 
-func (r *documentPdfFinalizeRepositoryImpl) ListPendingPdfJobs(ctx context.Context, limit int) ([]uuid.UUID, error) {
-	// Estados pendientes que Go debe mirar (ajusta si usas PDF_GENERATING también)
-	statuses := []string{"PDF_QUEUED", "PDF_GENERATING"}
-
-	var rows []PendingPdfJobRow
-	err := r.db.WithContext(ctx).
-		Table("documents").
-		Select("DISTINCT pdf_job_id").
-		Where("pdf_job_id IS NOT NULL").
-		Where("status IN ?", statuses).
-		Order("pdf_job_id").
-		Limit(limit).
-		Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-
-	out := make([]uuid.UUID, 0, len(rows))
+func (r *documentPdfFinalizeRepositoryImpl) UpsertGeneratedPDFs(ctx context.Context, tx *gorm.DB, rows []GeneratedPdfRow) error {
 	for _, row := range rows {
-		out = append(out, row.PDFJobID)
+		var count int64
+		if err := tx.WithContext(ctx).
+			Model(&models.DocumentPDF{}).
+			Where("document_id = ? AND file_id = ? AND stage = ?", row.DocumentID, row.FileID, "GENERATED").
+			Count(&count).Error; err != nil {
+			return err
+		}
+
+		if count > 0 {
+			continue
+		}
+
+		var maxV int64
+		_ = tx.WithContext(ctx).
+			Model(&models.DocumentPDF{}).
+			Select("COALESCE(MAX(version),0)").
+			Where("document_id = ? AND stage = ?", row.DocumentID, "GENERATED").
+			Scan(&maxV).Error
+
+		p := models.DocumentPDF{
+			ID:              uuid.New(),
+			DocumentID:       row.DocumentID,
+			Stage:            "GENERATED",
+			Version:          int(maxV) + 1,
+			FileName:         row.FileName,
+			FileID:           row.FileID,
+			FileHash:         row.FileHash,
+			FileSizeBytes:    row.FileSizeBytes,
+			StorageProvider:  row.StorageProvider,
+			CreatedAt:        row.CreatedAt,
+		}
+
+		if err := tx.WithContext(ctx).Create(&p).Error; err != nil {
+			return fmt.Errorf("insert document_pdfs failed: %w", err)
+		}
 	}
-	return out, nil
+	return nil
 }
 
-func (r *documentPdfFinalizeRepositoryImpl) ListDocumentsByPdfJobID(ctx context.Context, pdfJobID uuid.UUID) ([]uuid.UUID, error) {
-	type row struct {
-		ID uuid.UUID `gorm:"column:id"`
-	}
-	var rows []row
-	err := r.db.WithContext(ctx).
-		Table("documents").
-		Select("id").
-		Where("pdf_job_id = ?", pdfJobID).
-		Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-	out := make([]uuid.UUID, 0, len(rows))
-	for _, rr := range rows {
-		out = append(out, rr.ID)
-	}
-	return out, nil
-}
-
-func (r *documentPdfFinalizeRepositoryImpl) UpsertDocumentPDF(
-	ctx context.Context,
-	tx *gorm.DB,
-	documentID uuid.UUID,
-	stage string,
-	version int,
-	fileName string,
-	fileID uuid.UUID,
-	fileHash string,
-	fileSizeBytes *int64,
-	storageProvider *string,
-) error {
-	// Si quieres evitar duplicados: UNIQUE(document_id, stage, version) en DB sería ideal.
-	// Aquí hacemos "insert" simple. Si ya existe, puedes cambiarlo a upsert con clause.OnConflict.
-	now := time.Now()
-
-	type DocumentPDFRow struct {
-		ID              uuid.UUID  `gorm:"column:id"`
-		DocumentID      uuid.UUID  `gorm:"column:document_id"`
-		Stage           string     `gorm:"column:stage"`
-		Version         int        `gorm:"column:version"`
-		FileName        string     `gorm:"column:file_name"`
-		FileID          uuid.UUID  `gorm:"column:file_id"`
-		FileHash        string     `gorm:"column:file_hash"`
-		FileSizeBytes   *int64     `gorm:"column:file_size_bytes"`
-		StorageProvider *string    `gorm:"column:storage_provider"`
-		CreatedAt       time.Time  `gorm:"column:created_at"`
-	}
-
-	row := DocumentPDFRow{
-		ID:              uuid.New(),
-		DocumentID:      documentID,
-		Stage:           stage,
-		Version:         version,
-		FileName:        fileName,
-		FileID:          fileID,
-		FileHash:        fileHash,
-		FileSizeBytes:   fileSizeBytes,
-		StorageProvider: storageProvider,
-		CreatedAt:       now,
-	}
-
-	return tx.WithContext(ctx).Table("document_pdfs").Create(&row).Error
-}
-
-func (r *documentPdfFinalizeRepositoryImpl) MarkDocumentsGenerated(ctx context.Context, tx *gorm.DB, documentIDs []uuid.UUID) error {
-	if len(documentIDs) == 0 {
+func (r *documentPdfFinalizeRepositoryImpl) MarkDocumentsGenerated(ctx context.Context, tx *gorm.DB, docIDs []uuid.UUID) error {
+	if len(docIDs) == 0 {
 		return nil
 	}
+	now := time.Now()
 	return tx.WithContext(ctx).
-		Table("documents").
-		Where("id IN ?", documentIDs).
+		Model(&models.Document{}).
+		Where("id IN ?", docIDs).
 		Updates(map[string]any{
 			"status":     "PDF_GENERATED",
-			"updated_at": time.Now(),
+			"updated_at": now,
 		}).Error
 }
 
-func (r *documentPdfFinalizeRepositoryImpl) MarkDocumentsFailedByPdfJob(ctx context.Context, tx *gorm.DB, pdfJobID uuid.UUID, excludeIDs []uuid.UUID) (int64, error) {
-	q := tx.WithContext(ctx).Table("documents").
-		Where("pdf_job_id = ?", pdfJobID)
-
-	if len(excludeIDs) > 0 {
-		q = q.Where("id NOT IN ?", excludeIDs)
+func (r *documentPdfFinalizeRepositoryImpl) MarkDocumentsFailed(ctx context.Context, tx *gorm.DB, docIDs []uuid.UUID) error {
+	if len(docIDs) == 0 {
+		return nil
 	}
-
-	res := q.Updates(map[string]any{
-		"status":     "PDF_FAILED",
-		"updated_at": time.Now(),
-	})
-
-	return res.RowsAffected, res.Error
+	now := time.Now()
+	return tx.WithContext(ctx).
+		Model(&models.Document{}).
+		Where("id IN ?", docIDs).
+		Updates(map[string]any{
+			"status":     "PDF_FAILED",
+			"updated_at": now,
+		}).Error
 }

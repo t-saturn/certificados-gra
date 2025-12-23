@@ -24,6 +24,7 @@ type Config struct {
 	REDISDB                int
 	REDISPassword          string
 	REDISQueueDocsGenerate string // queue:docs:generate
+	REDISQueueDocsDone     string // queue:docs:generate:done
 	REDISJobTTLSeconds     int    // seconds
 }
 
@@ -45,8 +46,9 @@ func LoadConfig() {
 		REDISHost:              getEnv("REDIS_HOST", "127.0.0.1"),
 		REDISPort:              getEnv("REDIS_PORT", "6379"),
 		REDISDB:                getEnvInt("REDIS_DB", 0),
-		REDISPassword:          os.Getenv("REDIS_PASSWORD"), // opcional
+		REDISPassword:          os.Getenv("REDIS_PASSWORD"),
 		REDISQueueDocsGenerate: getEnv("REDIS_QUEUE_DOCS_GENERATE", "queue:docs:generate"),
+		REDISQueueDocsDone:     getEnv("REDIS_QUEUE_DOCS_DONE", "queue:docs:generate:done"),
 		REDISJobTTLSeconds:     getEnvInt("REDIS_JOB_TTL_SECONDS", 3600),
 	}
 }

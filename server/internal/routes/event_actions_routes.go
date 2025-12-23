@@ -11,10 +11,10 @@ import (
 )
 
 func RegisterEventActionRoutes(app *fiber.App) {
-	cfg := config.GetConfig()
+	redisJobsRepo := repositories.NewRedisJobsRepository(config.GetRedis())
+	queueRepo := repositories.NewPdfJobQueueRepository(redisJobsRepo)
 
-	redisRepo := repositories.NewRedisJobsRepository(config.GetRedis())
-	svc := services.NewEventActionService(config.DB, redisRepo, cfg)
+	svc := services.NewEventActionService(config.DB, queueRepo)
 	h := handlers.NewEventActionHandler(svc)
 
 	app.Post("/event/:id", httpwrap.Wrap(h.RunEventAction))

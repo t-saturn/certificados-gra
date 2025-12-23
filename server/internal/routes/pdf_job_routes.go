@@ -11,21 +11,11 @@ import (
 )
 
 func RegisterPdfJobRoutes(app *fiber.App) {
-	// deps
-	docRepo := repositories.NewDocumentRepository(config.DB)
-	queueRepo := repositories.NewPdfJobQueueRepository(config.GetRedis())
+	redisJobsRepo := repositories.NewRedisJobsRepository(config.GetRedis())
+	queueRepo := repositories.NewPdfJobQueueRepository(redisJobsRepo)
 
-	cfg := config.GetConfig()
+	pdfJobSvc := services.NewPdfJobService(config.DB, queueRepo)
+	h := handlers.NewPdfJobHandler(pdfJobSvc)
 
-	svc := services.NewPdfJobService(
-		config.DB,
-		docRepo,
-		queueRepo,
-		cfg.REDISQueueDocsGenerate,
-	)
-
-	h := handlers.NewPdfJobHandler(svc)
-
-	g := app.Group("/pdf-jobs")
-	g.Post("/generate-docs", httpwrap.Wrap(h.EnqueueGenerateDocs))
+	app.Post("/pdf-jobs/generate-docs", httpwrap.Wrap(h.GenerateDocs))
 }
