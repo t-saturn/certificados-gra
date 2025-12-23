@@ -1,0 +1,19 @@
+meta {
+  name: pdf-jobs
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/event/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 
+}
+
+settings {
+  encodeUrl: true
+}

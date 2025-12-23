@@ -5,15 +5,15 @@ meta {
 }
 
 get {
-  url: {{base_url}}/events?search_query=seminario&page=1&page_size=10
+  url: {{base_url}}/events?page=1&page_size=10
   body: none
   auth: inherit
 }
 
 params:query {
-  search_query: seminario
   page: 1
   page_size: 10
+  ~search_query: seminario
   ~is_public: true
   ~status: SCHEDULED
   ~user_id: 980014a4-7574-4b2d-b061-0660868b120a
