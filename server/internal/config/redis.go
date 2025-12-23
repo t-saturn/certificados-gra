@@ -27,9 +27,13 @@ func ConnectRedis() {
 	pong, err := redisClient.Ping(ctx).Result()
 	if err != nil {
 		logger.Log.Fatal().Msgf("redis connection failed: %v", err)
+		return
 	}
 
-	logger.Log.Info().Msgf("redis connected successfully: %s db=%d addr=%s:%s", pong, cfg.REDISDB, cfg.REDISHost, cfg.REDISPort)
+	logger.Log.Info().Msgf(
+		"redis connected successfully: %s db=%d addr=%s:%s",
+		pong, cfg.REDISDB, cfg.REDISHost, cfg.REDISPort,
+	)
 }
 
 func GetRedis() *redis.Client {

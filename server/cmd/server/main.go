@@ -1,13 +1,15 @@
 package main
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
+	"context"
+	"time"
 
+	"server/internal/background"
 	"server/internal/config"
 	"server/internal/middlewares"
+	"server/internal/repositories"
 	"server/internal/routes"
+	"server/internal/services"
 	"server/pkgs/logger"
 	"server/pkgs/validator"
 
@@ -24,11 +26,23 @@ func main() {
 	config.LoadConfig()
 	config.ConnectDB()
 	config.ConnectRedis()
-	defer config.CloseRedis()
 
 	if err := validator.InitValidator(); err != nil {
 		logger.Log.Fatal().Msgf("Error al inicializar el validador: %v", err)
 	}
+
+	// Background runner: finalize PDFs (pull)
+	docFinalizeRepo := repositories.NewDocumentPdfFinalizeRepository(config.DB)
+	redisRepo := repositories.NewPdfJobRedisRepository(config.GetRedis())
+
+	finalizeSvc := services.NewPdfJobFinalizeService(config.DB, docFinalizeRepo, redisRepo, 50)
+
+	runner := background.NewPdfFinalizeRunner(finalizeSvc, 3*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runner.Start(ctx)
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: middlewares.JSONErrorHandler,
@@ -38,15 +52,6 @@ func main() {
 	app.Use(middlewares.LoggerMiddleware())
 
 	routes.RegisterRoutes(app)
-
-	// Shutdown graceful (opcional, pero útil)
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-		<-ch
-		logger.Log.Info().Msg("Shutting down server...")
-		_ = app.Shutdown()
-	}()
 
 	port := config.GetConfig().SERVERPort
 	logger.Log.Info().Msgf("server-listening-in http://localhost:%s", port)

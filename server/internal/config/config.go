@@ -19,12 +19,12 @@ type Config struct {
 	DBSSLMode  string
 
 	// Redis
-	REDISHost      string
-	REDISPort      string
-	REDISDB        int
-	REDISPassword  string
-	REDISQueueDocs string // queue:docs:generate
-	REDISJobTTL    int    // seconds
+	REDISHost              string
+	REDISPort              string
+	REDISDB                int
+	REDISPassword          string
+	REDISQueueDocsGenerate string // queue:docs:generate
+	REDISJobTTLSeconds     int    // seconds
 }
 
 var cfg Config
@@ -42,12 +42,12 @@ func LoadConfig() {
 		DBName:     getEnv("DB_NAME", "postgres_db"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
-		REDISHost:      getEnv("REDIS_HOST", "127.0.0.1"),
-		REDISPort:      getEnv("REDIS_PORT", "6379"),
-		REDISDB:        getEnvInt("REDIS_DB", 0),
-		REDISPassword:  os.Getenv("REDIS_PASSWORD"), // opcional
-		REDISQueueDocs: getEnv("REDIS_QUEUE_DOCS_GENERATE", "queue:docs:generate"),
-		REDISJobTTL:    getEnvInt("REDIS_JOB_TTL_SECONDS", 3600),
+		REDISHost:              getEnv("REDIS_HOST", "127.0.0.1"),
+		REDISPort:              getEnv("REDIS_PORT", "6379"),
+		REDISDB:                getEnvInt("REDIS_DB", 0),
+		REDISPassword:          os.Getenv("REDIS_PASSWORD"), // opcional
+		REDISQueueDocsGenerate: getEnv("REDIS_QUEUE_DOCS_GENERATE", "queue:docs:generate"),
+		REDISJobTTLSeconds:     getEnvInt("REDIS_JOB_TTL_SECONDS", 3600),
 	}
 }
 
