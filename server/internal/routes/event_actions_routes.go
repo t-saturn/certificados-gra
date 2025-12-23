@@ -3,6 +3,7 @@ package routes
 import (
 	"server/internal/config"
 	"server/internal/handlers"
+	"server/internal/repositories"
 	"server/internal/services"
 	"server/pkgs/httpwrap"
 
@@ -10,12 +11,11 @@ import (
 )
 
 func RegisterEventActionRoutes(app *fiber.App) {
-	svc := services.NewEventActionService(config.DB)
+	cfg := config.GetConfig()
+
+	redisRepo := repositories.NewRedisJobsRepository(config.GetRedis())
+	svc := services.NewEventActionService(config.DB, redisRepo, cfg)
 	h := handlers.NewEventActionHandler(svc)
 
-	// pedido: POST /event/:id
 	app.Post("/event/:id", httpwrap.Wrap(h.RunEventAction))
-
-	// opcional: alias consistente con otros endpoints
-	// app.Post("/events/:id", httpwrap.Wrap(h.RunEventAction))
 }

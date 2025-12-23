@@ -22,4 +22,5 @@ func RegisterRoutes(app *fiber.App) {
 	RegisterDocumentTypeRoutes(app)
 	RegisterDocumentTemplateRoutes(app)
 	RegisterEventActionRoutes(app)
+	RegisterPdfJobRoutes(app)
 }
