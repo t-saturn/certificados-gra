@@ -1,6 +1,8 @@
 mod adapters;
+mod application;
 mod bootstrap;
 mod config;
+mod domain;
 mod infra;
 
 #[tokio::main]

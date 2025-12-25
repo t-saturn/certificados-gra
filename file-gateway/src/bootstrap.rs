@@ -2,12 +2,15 @@ use anyhow::{Context, Result};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tracing::info;
 
+use crate::application::services::file_service::FileService;
+use crate::infra::http::file_server_repository::HttpFileRepository;
 use crate::{adapters, config::settings::Settings, infra};
 
 pub struct AppState {
     pub settings: Settings,
     pub redis: infra::redis::RedisClient,
     pub http: reqwest::Client,
+    pub file_service: FileService,
 }
 
 pub async fn run() -> Result<()> {
@@ -40,10 +43,14 @@ pub async fn run() -> Result<()> {
 
     info!("Redis connected successfully");
 
+    let repo = HttpFileRepository::new(http.clone(), settings.file_public_url.clone());
+    let file_service = FileService::new(Arc::new(repo));
+
     let state = Arc::new(AppState {
         settings: settings.clone(),
         redis,
         http,
+        file_service,
     });
 
     let app = adapters::rest::routes::router(state);
