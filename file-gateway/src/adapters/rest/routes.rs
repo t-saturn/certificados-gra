@@ -1,10 +1,11 @@
 use axum::{
     Json, Router,
     body::Body,
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::{Response, StatusCode, header},
-    routing::get,
+    routing::{get, post},
 };
+
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -17,6 +18,7 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health_proxy))
         .route("/public/files/:file_id", get(download_public))
+        .route("/api/v1/files", post(upload_file))
         .fallback(not_found)
         .with_state(state)
 }
@@ -123,8 +125,6 @@ async fn health_proxy(
         url.push_str("?db=true");
     }
 
-    info!(%url, db, "proxy health");
-
     match state.http.get(url).send().await {
         Ok(resp) => {
             let status =
@@ -157,4 +157,84 @@ async fn health_proxy(
             )
         }
     }
+}
+
+async fn upload_file(
+    State(state): State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    let mut user_id: Option<String> = None;
+    let mut is_public: bool = true;
+
+    let mut filename: Option<String> = None;
+    let mut content_type: Option<String> = None;
+    let mut content: Option<Vec<u8>> = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "success": false,
+                "message": "Multipart inválido",
+                "data": null,
+                "error": { "code": "INVALID_MULTIPART", "details": e.to_string() }
+            })),
+        )
+    })? {
+        let name = field.name().unwrap_or("").to_string();
+
+        match name.as_str() {
+            "user_id" => {
+                user_id = Some(field.text().await.unwrap_or_default());
+            }
+            "is_public" => {
+                let v = field.text().await.unwrap_or_default();
+                is_public = v == "true" || v == "1";
+            }
+            "file" => {
+                filename = field.file_name().map(|s| s.to_string());
+                content_type = field.content_type().map(|s| s.to_string());
+                content = Some(field.bytes().await.map(|b| b.to_vec()).unwrap_or_default());
+            }
+            _ => {
+                // ignorar campos no usados (project_id no lo aceptamos, viene de env)
+            }
+        }
+    }
+
+    let cmd = crate::application::dtos::UploadFileCommand {
+        user_id: user_id.unwrap_or_default(),
+        is_public,
+        filename: filename.unwrap_or_else(|| "file.bin".into()),
+        content_type: content_type.unwrap_or_else(|| "application/octet-stream".into()),
+        content: content.unwrap_or_default(),
+    };
+
+    let out = state.file_service.upload_file(cmd).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({
+                "success": false,
+                "message": "Upstream error",
+                "data": null,
+                "error": { "code": "UPSTREAM_ERROR", "details": e.to_string() }
+            })),
+        )
+    })?;
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "success",
+            "message": "Archivo subido correctamente",
+            "data": {
+                "id": out.id,
+                "original_name": out.original_name,
+                "size": out.size,
+                "mime_type": out.mime_type,
+                "is_public": out.is_public,
+                "created_at": out.created_at
+            }
+        })),
+    ))
 }

@@ -45,8 +45,18 @@ pub async fn run() -> Result<()> {
 
     info!("Redis connected successfully");
 
-    let repo = HttpFileRepository::new(http.clone(), settings.file_public_url.clone());
-    let file_service = FileService::new(Arc::new(repo));
+    let repo = HttpFileRepository::new(
+        http.clone(),
+        settings.file_public_url.clone(),
+        settings.file_api_url.clone(),
+    );
+
+    let file_service = FileService::new(
+        Arc::new(repo),
+        settings.file_access_key.clone(),
+        settings.file_secret_key.clone(),
+        settings.file_project_id.clone(),
+    );
 
     let state = Arc::new(AppState {
         settings: settings.clone(),
