@@ -1,11 +1,14 @@
 use anyhow::{Context, Result};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+
 use tower_http::trace::TraceLayer;
-use tracing::Level;
-use tracing::info;
+use tracing::{Level, info};
 
 use crate::application::services::file_service::FileService;
+use crate::application::services::job_service::JobService;
 use crate::infra::http::file_server_repository::HttpFileRepository;
+use crate::infra::nats::{NatsEventBus, start_upload_consumer};
+use crate::infra::redis::RedisJobRepository;
 use crate::{adapters, config::settings::Settings, infra};
 
 pub struct AppState {
@@ -19,7 +22,7 @@ pub async fn run() -> Result<()> {
     let settings = Settings::from_env().context("loading settings from env")?;
 
     // logging
-    let _guard = infra::logging::init_tracing(&settings.log_dir)?;
+    infra::logging::init_tracing(&settings.log_dir).context("init tracing")?;
 
     // http client
     let http = reqwest::Client::builder()
@@ -33,24 +36,26 @@ pub async fn run() -> Result<()> {
         .await
         .context("creating redis pool")?;
 
-    //  fail-fast redis ping
+    // fail-fast redis ping
     verify_redis(&redis).await.context("redis ping failed")?;
 
     info!(
-      http_addr = %settings.http_addr(),
-      redis = %format!("{}:{}/{}", settings.redis_host, settings.redis_port, settings.redis_db),
-      nats_url = %settings.nats_url,
-      "File Gateway starting"
+        http_addr = %settings.http_addr(),
+        redis = %format!("{}:{}/{}", settings.redis_host, settings.redis_port, settings.redis_db),
+        nats_url = %settings.nats_url,
+        "File Gateway starting"
     );
 
     info!("Redis connected successfully");
 
+    // Repo HTTP (File Server)
     let repo = HttpFileRepository::new(
         http.clone(),
         settings.file_public_url.clone(),
         settings.file_api_url.clone(),
     );
 
+    // File service (firma HMAC + casos de uso)
     let file_service = FileService::new(
         Arc::new(repo),
         settings.file_access_key.clone(),
@@ -58,13 +63,42 @@ pub async fn run() -> Result<()> {
         settings.file_project_id.clone(),
     );
 
+    // App state
     let state = Arc::new(AppState {
         settings: settings.clone(),
-        redis,
-        http,
-        file_service,
+        redis: redis.clone(),
+        http: http.clone(),
+        file_service: file_service.clone(),
     });
 
+    // NATS + Redis Jobs (consumer)
+    let nats = async_nats::connect(settings.nats_url.clone())
+        .await
+        .context("connect nats")?;
+
+    info!("NATS connected successfully");
+
+    let bus = Arc::new(NatsEventBus::new(nats.clone()));
+    let jobs = Arc::new(RedisJobRepository::new(
+        redis.clone(),
+        settings.redis_key_prefix.clone(),
+    ));
+
+    let job_service = JobService::new(
+        jobs,
+        bus,
+        file_service.clone(),
+        settings.redis_job_ttl_seconds,
+    );
+
+    // Consumer en background
+    tokio::spawn(async move {
+        if let Err(e) = start_upload_consumer(nats, job_service).await {
+            tracing::error!(error=%e, "nats consumer crashed");
+        }
+    });
+
+    // HTTP Router + middleware
     let app = adapters::rest::routes::router(state).layer(
         TraceLayer::new_for_http()
             .make_span_with(|req: &axum::http::Request<_>| {
