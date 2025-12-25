@@ -1,13 +1,14 @@
 use axum::{
-    extract::{Query, State},
-    routing::get,
     Json, Router,
+    extract::{Query, State},
+    http::StatusCode,
+    routing::get,
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
-use crate::AppState;
+use crate::bootstrap::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct HealthQuery {
@@ -16,48 +17,57 @@ pub struct HealthQuery {
 
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
-        .route("/health", get(health))
+        .route("/health", get(health_proxy))
         .with_state(state)
 }
 
-async fn health(
+async fn health_proxy(
     State(state): State<Arc<AppState>>,
     Query(q): Query<HealthQuery>,
-) -> Json<serde_json::Value> {
+) -> (StatusCode, Json<serde_json::Value>) {
     let db = q.db.unwrap_or(false);
-    info!(db, "health requested");
 
-    // Por ahora: health local (rápido para validar server)
-    // Próximo: proxy a FILE_BASE_URL/health y si db=true, ?db=true
-    let mut data = serde_json::json!({
-        "status": "ok",
-        "version": env!("CARGO_PKG_VERSION"),
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    });
-
-    // opcional: ping redis cuando db=true para sanity
+    let mut url = format!(
+        "{}/health",
+        state.settings.file_base_url.trim_end_matches('/')
+    );
     if db {
-        let mut conn = match state.redis.pool().get().await {
-            Ok(c) => c,
-            Err(_) => {
-                return Json(serde_json::json!({
-                    "data": { "status": "degraded", "redis": { "status": "down" } },
-                    "status": "success",
-                    "message": "ok"
-                }));
-            }
-        };
-
-        let pong: Result<String, _> = redis::cmd("PING").query_async(&mut *conn).await;
-        let redis_status = if pong.is_ok() { "up" } else { "down" };
-
-        data["redis"] = serde_json::json!({ "status": redis_status });
+        url.push_str("?db=true");
     }
 
+    info!(%url, db, "proxy health");
 
-    Json(serde_json::json!({
-        "data": data,
-        "status": "success",
-        "message": "ok"
-    }))
+    match state.http.get(url).send().await {
+        Ok(resp) => {
+            let status =
+                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+
+            // intentamos leer JSON upstream
+            match resp.json::<serde_json::Value>().await {
+                Ok(json) => (status, Json(json)),
+                Err(e) => {
+                    warn!(error=%e, "upstream health not json");
+                    (
+                        StatusCode::BAD_GATEWAY,
+                        Json(serde_json::json!({
+                            "status": "failed",
+                            "message": "Upstream health invalid JSON",
+                            "data": null
+                        })),
+                    )
+                }
+            }
+        }
+        Err(e) => {
+            warn!(error=%e, "upstream health unreachable");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({
+                    "status": "failed",
+                    "message": "Upstream health unreachable",
+                    "data": null
+                })),
+            )
+        }
+    }
 }
