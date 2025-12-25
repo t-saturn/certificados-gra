@@ -14,6 +14,8 @@ bytes = "1.11.0"
 chrono = { version = "0.4.42", features = ["serde"] }
 config = "0.15.19"
 dotenvy = "0.15.7"
+futures-core = "0.3.31"
+futures-util = "0.3.31"
 hex = "0.4.3"
 hmac = "0.12.1"
 redis = { version = "1.0.1", features = ["tokio-comp"] }

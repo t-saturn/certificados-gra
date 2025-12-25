@@ -638,6 +638,8 @@ dependencies = [
  "chrono",
  "config",
  "dotenvy",
+ "futures-core",
+ "futures-util",
  "hex",
  "hmac",
  "redis",
