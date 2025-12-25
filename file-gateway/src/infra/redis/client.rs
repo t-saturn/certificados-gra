@@ -1,21 +1,21 @@
-use redis::aio::ConnectionManager;
-use redis::Client;
+use bb8::Pool;
+use bb8_redis::RedisConnectionManager;
 
-pub type RedisConn = ConnectionManager;
+pub type RedisPool = Pool<RedisConnectionManager>;
 
 #[derive(Clone)]
 pub struct RedisClient {
-    client: Client,
+    pool: RedisPool,
 }
 
 impl RedisClient {
-    pub fn new(redis_url: &str) -> Result<Self, redis::RedisError> {
-        let client = Client::open(redis_url)?;
-        Ok(Self { client })
+    pub async fn new(redis_url: &str) -> Result<Self, bb8::RunError<redis::RedisError>> {
+        let manager = RedisConnectionManager::new(redis_url).unwrap();
+        let pool = Pool::builder().build(manager).await?;
+        Ok(Self { pool })
     }
 
-    pub async fn connect(&self) -> Result<RedisConn, redis::RedisError> {
-        let conn = self.client.get_tokio_connection_manager().await?;
-        Ok(conn)
+    pub fn pool(&self) -> &RedisPool {
+        &self.pool
     }
 }

@@ -37,7 +37,7 @@ async fn health(
 
     // opcional: ping redis cuando db=true para sanity
     if db {
-        let mut conn = match state.redis_conn().await {
+        let mut conn = match state.redis.pool().get().await {
             Ok(c) => c,
             Err(_) => {
                 return Json(serde_json::json!({
@@ -48,12 +48,12 @@ async fn health(
             }
         };
 
-        // PING
-        let pong: Result<String, _> = redis::cmd("PING").query_async(&mut conn).await;
+        let pong: Result<String, _> = redis::cmd("PING").query_async(&mut *conn).await;
         let redis_status = if pong.is_ok() { "up" } else { "down" };
 
         data["redis"] = serde_json::json!({ "status": redis_status });
     }
+
 
     Json(serde_json::json!({
         "data": data,

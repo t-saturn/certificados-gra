@@ -1,3 +1,3 @@
 pub mod client;
 
-pub use client::{RedisClient, RedisConn};
+pub use client::RedisClient;

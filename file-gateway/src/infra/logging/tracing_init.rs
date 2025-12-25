@@ -1,4 +1,5 @@
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 
 /// Inicializa tracing:
@@ -12,16 +13,8 @@ pub fn init_tracing(log_dir: &str, log_file: &str) -> tracing_appender::non_bloc
 
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    // Logs a archivo en JSON (ideal para Loki)
-    let file_layer = fmt::layer()
-        .with_writer(file_writer)
-        .json()
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_thread_names(true);
-
-    // Logs a consola (dev)
-    let console_layer = fmt::layer().pretty().with_target(true);
+    let file_layer = fmt::layer().with_writer(file_writer).json();
+    let console_layer = fmt::layer().pretty();
 
     tracing_subscriber::registry()
         .with(filter)

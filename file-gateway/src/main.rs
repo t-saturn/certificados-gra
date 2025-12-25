@@ -3,20 +3,13 @@ mod infra;
 mod adapters;
 
 use std::{net::SocketAddr, sync::Arc};
-use tracing::{info, error};
+use tracing::{error, info};
 
 use crate::config::settings::Settings;
-use crate::infra::redis::RedisClient;
 
 pub struct AppState {
     pub settings: Settings,
-    pub redis: RedisClient,
-}
-
-impl AppState {
-    pub async fn redis_conn(&self) -> Result<infra::redis::RedisConn, redis::RedisError> {
-        self.redis.connect().await
-    }
+    pub redis: infra::redis::RedisClient,
 }
 
 #[tokio::main]
@@ -34,16 +27,19 @@ async fn main() {
     let _log_guard = infra::logging::init_tracing(&settings.log_dir, &settings.log_file);
     info!("starting file-gateway");
 
-    // 3) Redis client
-    let redis = match RedisClient::new(&settings.redis_url()) {
+    // 3) Redis pool
+    let redis = match infra::redis::RedisClient::new(&settings.redis_url()).await {
         Ok(c) => c,
         Err(e) => {
-            error!(error = %e, "failed to create redis client");
+            error!(error = %e, "failed to create redis pool");
             std::process::exit(1);
         }
     };
 
-    let state = Arc::new(AppState { settings: settings.clone(), redis });
+    let state = Arc::new(AppState {
+        settings: settings.clone(),
+        redis,
+    });
 
     // 4) Router
     let app = adapters::rest::routes::router(state);
@@ -53,5 +49,5 @@ async fn main() {
     info!(%addr, "HTTP listening");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app.into_make_service()).await.unwrap();
 }
