@@ -16,6 +16,14 @@ pub struct Worker {
     max_poll_seconds: u64,
 }
 
+fn truncate_owned(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}...<truncated {} chars>", &s[..max], s.len() - max)
+    }
+}
+
 impl Worker {
     pub fn new(
         queue: RedisQueue,
@@ -69,14 +77,14 @@ impl Worker {
                 user_id: it.user_id.to_string(),
                 is_public: it.is_public,
 
-                // ✅ ya coinciden con el DTO (Vec<HashMap<String, Value>>)
+                // ya coinciden con el DTO (Vec<HashMap<String, Value>>)
                 qr: it.qr,
                 qr_pdf: it.qr_pdf,
 
                 pdf: it
                     .pdf
                     .into_iter()
-                    .map(|f| OutPdfField {
+                    .map(|f: crate::domain::job::PdfField| OutPdfField {
                         key: f.key,
                         value: f.value,
                     })
@@ -84,7 +92,42 @@ impl Worker {
             })
             .collect();
 
+        info!(
+            total = payload.len(),
+            "mapped job items -> pdf-service payload"
+        );
+
+        for (idx, it) in payload.iter().enumerate() {
+            let qr_count = it.qr.len();
+            let qr_pdf_count = it.qr_pdf.len();
+
+            // detecta si existe qr_rect dentro de qr_pdf
+            let has_qr_rect = it.qr_pdf.iter().any(|m| m.contains_key("qr_rect"));
+
+            info!(
+                idx = idx,
+                client_ref = ?it.client_ref,
+                template = %it.template,
+                user_id = %it.user_id,
+                is_public = it.is_public,
+                qr_count = qr_count,
+                qr_pdf_count = qr_pdf_count,
+                has_qr_rect = has_qr_rect,
+                "payload_item_summary"
+            );
+        }
+
+        let payload_json = serde_json::to_string_pretty(&payload)
+            .unwrap_or_else(|e| format!("<failed to serialize payload: {}>", e));
+
+        info!(
+            payload_len = payload_json.len(),
+            payload_preview = %truncate_owned(&payload_json, 4000),
+            "pdf_service_payload_json_preview"
+        );
+
         info!(total = payload.len(), "calling pdf-service /generate-doc");
+
         let queued = self
             .pdf_client
             .generate_doc(&payload)
@@ -130,6 +173,13 @@ impl Worker {
                             .context("push_result")?;
                     }
 
+                    let final_status = st.meta.status.as_str(); // "DONE" o "DONE_WITH_ERRORS"
+
+                    let _ = self
+                        .queue
+                        .push_done_message(&rust_job_id, &job.event_id.to_string(), final_status)
+                        .await;
+
                     let _ = self
                         .queue
                         .set_meta_done_from_pdf_meta(
@@ -153,6 +203,11 @@ impl Worker {
                             &rust_job_id,
                             &json!({"error": "pdf-service job FAILED", "pdf_job_id": queued.job_id}).to_string(),
                         )
+                        .await;
+
+                    let _ = self
+                        .queue
+                        .push_done_message(&rust_job_id, &job.event_id.to_string(), "FAILED")
                         .await;
 
                     return Err(anyhow::anyhow!("pdf-service job FAILED: {}", queued.job_id));

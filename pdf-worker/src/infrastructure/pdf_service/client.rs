@@ -2,6 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{info, instrument};
 
+fn truncate(s: &str, max: usize) -> &str {
+    if s.len() <= max { s } else { &s[..max] }
+}
+
 #[derive(Clone)]
 pub struct PdfServiceClient {
     base_url: String,
@@ -23,7 +27,18 @@ impl PdfServiceClient {
     ) -> anyhow::Result<GenerateDocResponse> {
         let url = format!("{}/generate-doc", self.base_url);
 
-        let res = self.http.post(url).json(payload).send().await?;
+        // preview JSON (útil para ver si qr_pdf sale vacío)
+        let preview = serde_json::to_string(payload)
+            .map(|s| truncate(&s, 2000).to_string())
+            .unwrap_or_else(|e| format!("<failed to serialize payload preview: {}>", e));
+
+        info!(
+            endpoint = %url,
+            payload_preview = %preview,
+            "pdf_service_request_preview"
+        );
+
+        let res = self.http.post(&url).json(payload).send().await?;
         let status = res.status();
 
         if !status.is_success() {

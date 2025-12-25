@@ -206,18 +206,35 @@ type Document struct {
 	EventID      *uuid.UUID `gorm:"type:uuid;index"`
 	TemplateID   *uuid.UUID `gorm:"type:uuid;index"`
 
-	SerialCode             string    `gorm:"size:100;not null;uniqueIndex"`
-	VerificationCode       string    `gorm:"size:100;not null;uniqueIndex"`
-	HashValue              string    `gorm:"size:255;not null"`
-	QRText                 *string   `gorm:"size:255"`
-	IssueDate              time.Time `gorm:"not null"`
-	SignedAt               *time.Time
-	DigitalSignatureStatus string    `gorm:"size:50;not null;default:'PENDING'"`
-	Status                 string    `gorm:"size:50;not null;default:'ISSUED'"`
-	CreatedBy              uuid.UUID `gorm:"type:uuid;not null;index"`
-	CreatedAt              time.Time `gorm:"not null"`
-	UpdatedAt              time.Time `gorm:"not null"`
+	SerialCode       string `gorm:"size:100;not null;uniqueIndex"`
+	VerificationCode string `gorm:"size:100;not null;uniqueIndex"`
 
+	IssueDate time.Time `gorm:"not null"`
+	SignedAt  *time.Time
+
+	// Estado del ciclo del documento / PDF
+	// CREATED | PDF_QUEUED | PDF_GENERATING | PDF_GENERATED | PDF_FAILED
+	Status string `gorm:"size:50;not null;default:'CREATED'"`
+
+	// Estado de firma digital
+	// PENDING | SIGNED_1 | SIGNED_2 | SIGNED | SIGN_FAILED
+	DigitalSignatureStatus string `gorm:"size:50;not null;default:'PENDING'"`
+
+	// Política de firmas
+	// Número de firmas requeridas (1 o 2)
+	RequiredSignatures int `gorm:"not null;default:1"`
+
+	// Número de firmas ya aplicadas (0..2)
+	SignedSignatures int `gorm:"not null;default:0"`
+
+	// pdf_job_id (uuid, nullable, index)
+	PdfJobID *uuid.UUID `gorm:"type:uuid;index" json:"pdf_job_id,omitempty"`
+
+	CreatedBy uuid.UUID `gorm:"type:uuid;not null;index"`
+	CreatedAt time.Time `gorm:"not null"`
+	UpdatedAt time.Time `gorm:"not null"`
+
+	// Relaciones
 	UserDetail    UserDetail        `gorm:"foreignKey:UserDetailID"`
 	Event         *Event            `gorm:"foreignKey:EventID"`
 	Template      *DocumentTemplate `gorm:"foreignKey:TemplateID"`

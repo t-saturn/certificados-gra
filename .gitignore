@@ -133,3 +133,19 @@ pdf-worker/*.log
 pdf-worker/.env
 pdf-worker/.env.local
 pdf-worker/.env.*.local
+
+
+# Rust (Worker) - /pdf-worker
+file-gateway/target/
+file-gateway/.cargo/
+# file-gateway/Cargo.lock
+file-gateway/**/*.rs.bk
+
+# Logs del worker (si generas logs/YYYY-MM-DD.log)
+file-gateway/logs/
+file-gateway/*.log
+
+# Env local del worker
+file-gateway/.env
+file-gateway/.env.local
+file-gateway/.env.*.local

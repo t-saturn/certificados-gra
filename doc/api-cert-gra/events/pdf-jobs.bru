@@ -1,0 +1,45 @@
+meta {
+  name: pdf-jobs
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/pdf-jobs/generate-docs
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "event_id": "97b67269-f071-4e2e-a4e0-56ea150455d8",
+    "items": [
+      {
+        "document_id": "38d66d2d-d5a9-458b-a895-82fd8c54c6fb",
+        "template_id": "dc7251d6-4d1e-4515-87c8-476bf443c1b3",
+        "user_id": "777af043-6ee2-42c0-b512-ecd70384eb24",
+        "is_public": true,
+        "qr": [
+          { "base_url": "https://regionayacucho.gob.pe/verify" },
+          { "verify_code": "CERT-M2UQ1IH960" }
+        ],
+        "qr_pdf": [
+          { "qr_size_cm": "2.5" },
+          { "qr_page": "0" }
+        ],
+        "pdf": [
+          { "key": "nombre_participante", "value": "MARÍA LUQUE RIVERA QUISPE" },
+          { "key": "fecha", "value": "16/12/2024" },
+          { "key": "firma_1_nombre", "value": "Dr. Carlos Mendoza" },
+          { "key": "firma_1_cargo", "value": "Director de Bienestar Social" }
+        ]
+      }
+    ]
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -8,7 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/config"
+	"server/internal/dto"
 	"server/internal/models"
+	"server/internal/repositories"
+	"server/pkgs/logger"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -16,51 +20,44 @@ import (
 )
 
 type EventActionService interface {
-	RunEventAction(ctx context.Context, eventID uuid.UUID, action string, participantIDs []uuid.UUID) (created int, skipped int, updated int, err error)
+	// qrRect: string tipo "460,40,540,120" (opcional)
+	RunEventAction(
+		ctx context.Context,
+		eventID uuid.UUID,
+		action string,
+		participantIDs []uuid.UUID,
+		qrRect *string,
+	) (*string, int, int, int, error)
 }
 
 type eventActionServiceImpl struct {
-	db *gorm.DB
+	db                *gorm.DB
+	queueRepo         repositories.PdfJobQueueRepository
+	templateFieldRepo repositories.DocumentTemplateFieldRepository
+	userDetailRepo    repositories.UserDetailRepository
 }
 
-func NewEventActionService(db *gorm.DB) EventActionService {
-	return &eventActionServiceImpl{db: db}
-}
-
-func normalizeAction(s string) string {
-	return strings.TrimSpace(strings.ToLower(s))
-}
-
-func buildDraftDocument(ev models.Event, userDetailID uuid.UUID, templateID uuid.UUID, serial, verification string) models.Document {
-	now := time.Now()
-
-	return models.Document{
-		ID:                     uuid.New(),
-		UserDetailID:           userDetailID,
-		EventID:                &ev.ID,
-		TemplateID:             &templateID,
-		SerialCode:             serial,
-		VerificationCode:       verification,
-		HashValue:              "PENDING_HASH", // si quieres, luego lo recalculas cuando generas PDF
-		IssueDate:              now,
-		SignedAt:               nil,
-		DigitalSignatureStatus: "PENDING",
-		Status:                 "CREATED",
-		CreatedBy:              ev.CreatedBy,
-		CreatedAt:              now,
-		UpdatedAt:              now,
+func NewEventActionService(
+	db *gorm.DB,
+	queueRepo repositories.PdfJobQueueRepository,
+	templateFieldRepo repositories.DocumentTemplateFieldRepository,
+	userDetailRepo repositories.UserDetailRepository,
+) EventActionService {
+	return &eventActionServiceImpl{
+		db:                db,
+		queueRepo:         queueRepo,
+		templateFieldRepo: templateFieldRepo,
+		userDetailRepo:    userDetailRepo,
 	}
 }
 
-// si participantIDs vacío => todos los del evento
-// si viene => se filtra a los que pertenezcan al evento
+func normalizeAction(s string) string { return strings.TrimSpace(strings.ToLower(s)) }
+
 func resolveParticipantIDs(ev models.Event, participantIDs []uuid.UUID) []uuid.UUID {
 	valid := make(map[uuid.UUID]struct{}, len(ev.EventParticipants))
 	for _, ep := range ev.EventParticipants {
 		valid[ep.UserDetailID] = struct{}{}
 	}
-
-	// todos
 	if len(participantIDs) == 0 {
 		out := make([]uuid.UUID, 0, len(valid))
 		for id := range valid {
@@ -69,7 +66,6 @@ func resolveParticipantIDs(ev models.Event, participantIDs []uuid.UUID) []uuid.U
 		return out
 	}
 
-	// filtrar/unique
 	out := make([]uuid.UUID, 0, len(participantIDs))
 	seen := make(map[uuid.UUID]struct{}, len(participantIDs))
 	for _, id := range participantIDs {
@@ -84,10 +80,7 @@ func resolveParticipantIDs(ev models.Event, participantIDs []uuid.UUID) []uuid.U
 	return out
 }
 
-// -------- helpers --------
-
 func pickSeries(ev models.Event) string {
-	// Tu ejemplo usa "CERT". En tu modelo ya existe Event.CertificateSeries.
 	series := strings.TrimSpace(ev.CertificateSeries)
 	if series == "" {
 		series = "CERT"
@@ -96,28 +89,24 @@ func pickSeries(ev models.Event) string {
 }
 
 func makeSerial(evCode, series string, n int) string {
-	// EVT-2025-OTIC-0008-CERT-000001
 	return fmt.Sprintf("%s-%s-%06d", evCode, series, n)
 }
 
 const verAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func newVerificationCode() (string, error) {
-	// VER-XXX-XXX (6 chars)
-	b := make([]byte, 6)
+	b := make([]byte, 10)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	out := make([]byte, 6)
-	for i := 0; i < 6; i++ {
+	out := make([]byte, 10)
+	for i := range out {
 		out[i] = verAlphabet[int(b[i])%len(verAlphabet)]
 	}
-	return fmt.Sprintf("VER-%s-%s", string(out[:3]), string(out[3:])), nil
+	return fmt.Sprintf("CERT-%s", string(out)), nil
 }
 
 func isDuplicateErr(err error) bool {
-	// gorm suele mapear duplicados a ErrDuplicatedKey (según driver/version),
-	// si no, caemos a string match.
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return true
 	}
@@ -125,219 +114,260 @@ func isDuplicateErr(err error) bool {
 	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint")
 }
 
-// Obtiene el siguiente correlativo (max + 1) para (event_code + series)
-// sin tablas extra, con query al serial_code existente.
 func getNextSerialCounter(ctx context.Context, tx *gorm.DB, evCode, series string) (int, error) {
-	prefix := fmt.Sprintf("%s-%s-", evCode, series) // EVT-...-CERT-
+	prefix := fmt.Sprintf("%s-%s-", evCode, series)
 	var maxN int64
 
-	// Tomamos el sufijo numérico de los últimos 6 chars y lo maximizamos.
-	// Si no hay rows, maxN queda 0.
 	err := tx.WithContext(ctx).
 		Table("documents").
 		Select("COALESCE(MAX(CAST(RIGHT(serial_code, 6) AS INTEGER)), 0)").
 		Where("serial_code LIKE ?", prefix+"%").
 		Scan(&maxN).Error
-
 	if err != nil {
 		return 0, err
 	}
 	return int(maxN) + 1, nil
 }
 
-// 1) generate_certificates: create missing (CREATED) + set GENERATED
-func (s *eventActionServiceImpl) GenerateCertificates(ctx context.Context, tx *gorm.DB, ev models.Event, participantIDs []uuid.UUID) (created int, skipped int, updated int, err error) {
-	if ev.TemplateID == nil {
-		return 0, 0, 0, fmt.Errorf("event has no template_id; cannot generate certificates")
-	}
-	tplID := *ev.TemplateID
-	series := pickSeries(ev)
-
-	// (A) Bloquear el evento para evitar carreras en correlativo
-	// Re-lee el evento con FOR UPDATE dentro del tx
-	if err = tx.WithContext(ctx).
-		Clauses(clause.Locking{Strength: "UPDATE"}).
-		First(&models.Event{}, "id = ?", ev.ID).Error; err != nil {
-		return 0, 0, 0, err
-	}
-
-	// (B) Obtener el correlativo inicial (max+1)
-	nextN, err := getNextSerialCounter(ctx, tx, ev.Code, series)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	// (C) Crear faltantes con correlativo consecutivo
-	for _, udID := range participantIDs {
-		var existing models.Document
-		findErr := tx.WithContext(ctx).
-			Select("id").
-			Where("event_id = ? AND user_detail_id = ? AND template_id = ?", ev.ID, udID, tplID).
-			First(&existing).Error
-
-		if findErr == nil {
-			skipped++
-			continue
-		}
-		if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-			return 0, 0, 0, findErr
-		}
-
-		serial := makeSerial(ev.Code, series, nextN)
-		nextN++
-
-		// verification_code único: reintento si colisiona (muy raro, pero posible)
-		var lastErr error
-		for attempt := 0; attempt < 10; attempt++ {
-			ver, verr := newVerificationCode()
-			if verr != nil {
-				return 0, 0, 0, verr
-			}
-
-			doc := buildDraftDocument(ev, udID, tplID, serial, ver)
-
-			// IMPORTANTE: hash_value es NOT NULL en tu modelo.
-			// Si no quieres "PENDING_HASH", puedes hacerlo determinista:
-			// doc.HashValue = sha256(serial + "|" + ver + "|" + timestamp) ...
-			doc.HashValue = fmt.Sprintf("HASH-%s-%s", serial, ver)
-
-			if err := tx.WithContext(ctx).Create(&doc).Error; err != nil {
-				lastErr = err
-				if isDuplicateErr(err) {
-					// si choca verification_code, reintenta con otro.
-					// si choca serial_code, algo corrió en paralelo: con FOR UPDATE no debería ocurrir.
-					continue
-				}
-				return 0, 0, 0, err
-			}
-
-			created++
-			lastErr = nil
-			break
-		}
-
-		if lastErr != nil {
-			return 0, 0, 0, fmt.Errorf("could not create document after retries: %w", lastErr)
-		}
-	}
-
-	// (D) Set GENERATED solo para ese grupo (manteniendo tu lógica)
-	res := tx.WithContext(ctx).
-		Model(&models.Document{}).
-		Where("event_id = ? AND user_detail_id IN ?", ev.ID, participantIDs).
-		Where("status IN ?", []string{"CREATED", "GENERATED"}).
-		Updates(map[string]any{
-			"status":     "GENERATED",
-			"updated_at": time.Now(),
-		})
-
-	if res.Error != nil {
-		return created, skipped, 0, res.Error
-	}
-	updated = int(res.RowsAffected)
-
-	return created, skipped, updated, nil
-}
-
-// 2) sign_certificates (por ahora): marcar firmado
-func (s *eventActionServiceImpl) SignCertificates(ctx context.Context, tx *gorm.DB, ev models.Event, participantIDs []uuid.UUID) (updated int, err error) {
+func buildDraftDocument(ev models.Event, userDetailID uuid.UUID, templateID uuid.UUID, serial, verification string, requiredSigs int) models.Document {
 	now := time.Now()
-
-	res := tx.WithContext(ctx).
-		Model(&models.Document{}).
-		Where("event_id = ? AND user_detail_id IN ?", ev.ID, participantIDs).
-		// normalmente solo firmar lo generado:
-		Where("status IN ?", []string{"GENERATED", "ISSUED"}).
-		Updates(map[string]any{
-			"digital_signature_status": "SIGNED",
-			"signed_at":                &now,
-			"updated_at":               now,
-		})
-
-	if res.Error != nil {
-		return 0, res.Error
+	return models.Document{
+		ID:                     uuid.New(),
+		UserDetailID:           userDetailID,
+		EventID:                &ev.ID,
+		TemplateID:             &templateID,
+		SerialCode:             serial,
+		VerificationCode:       verification,
+		IssueDate:              now,
+		SignedAt:               nil,
+		Status:                 "CREATED",
+		DigitalSignatureStatus: "PENDING",
+		RequiredSignatures:     requiredSigs,
+		SignedSignatures:       0,
+		PdfJobID:               nil,
+		CreatedBy:              ev.CreatedBy,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
-	return int(res.RowsAffected), nil
 }
 
-// 3) rejected_certificates: status=REJECTED
-func (s *eventActionServiceImpl) RejectCertificates(ctx context.Context, tx *gorm.DB, ev models.Event, participantIDs []uuid.UUID) (updated int, err error) {
-	now := time.Now()
-
-	res := tx.WithContext(ctx).
-		Model(&models.Document{}).
-		Where("event_id = ? AND user_detail_id IN ?", ev.ID, participantIDs).
-		// evita tocar algunos finales si quieres:
-		Where("status NOT IN ?", []string{"ANNULLED", "REPLACED"}).
-		Updates(map[string]any{
-			"status":     "REJECTED",
-			"updated_at": now,
-		})
-
-	if res.Error != nil {
-		return 0, res.Error
-	}
-	return int(res.RowsAffected), nil
-}
-
-func (s *eventActionServiceImpl) RunEventAction(ctx context.Context, eventID uuid.UUID, action string, participantIDs []uuid.UUID) (int, int, int, error) {
+func (s *eventActionServiceImpl) RunEventAction(
+	ctx context.Context,
+	eventID uuid.UUID,
+	action string,
+	participantIDs []uuid.UUID,
+	qrRect *string,
+) (*string, int, int, int, error) {
 	act := normalizeAction(action)
-	if act != "generate_certificates" && act != "sign_certificates" && act != "rejected_certificates" {
-		return 0, 0, 0, fmt.Errorf("invalid action")
+	if act != "generate_certificates" {
+		return nil, 0, 0, 0, fmt.Errorf("invalid action (only generate_certificates implemented)")
 	}
 
+	// 1) cargar evento + participantes
 	var ev models.Event
 	if err := s.db.WithContext(ctx).
 		Preload("EventParticipants").
 		First(&ev, "id = ?", eventID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, 0, 0, fmt.Errorf("event not found")
+			return nil, 0, 0, 0, fmt.Errorf("event not found")
 		}
-		return 0, 0, 0, err
+		return nil, 0, 0, 0, err
+	}
+	if ev.TemplateID == nil {
+		return nil, 0, 0, 0, fmt.Errorf("event has no template_id")
 	}
 
 	targetIDs := resolveParticipantIDs(ev, participantIDs)
 	if len(targetIDs) == 0 {
-		return 0, 0, 0, fmt.Errorf("no valid participants for this event")
+		return nil, 0, 0, 0, fmt.Errorf("no valid participants for this event")
 	}
 
-	created := 0
-	skipped := 0
-	updated := 0
+	created, skipped, updated := 0, 0, 0
+	tplID := *ev.TemplateID
 
+	// firma: por ahora 1 (si tu Event guarda esto, cámbialo)
+	requiredSigs := 1
+
+	// 2) tx crear docs si no existen
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		switch act {
-		case "generate_certificates":
-			c, s2, u, err := s.GenerateCertificates(ctx, tx, ev, targetIDs)
-			if err != nil {
-				return err
-			}
-			created, skipped, updated = c, s2, u
-			return nil
-
-		case "sign_certificates":
-			u, err := s.SignCertificates(ctx, tx, ev, targetIDs)
-			if err != nil {
-				return err
-			}
-			updated = u
-			return nil
-
-		case "rejected_certificates":
-			u, err := s.RejectCertificates(ctx, tx, ev, targetIDs)
-			if err != nil {
-				return err
-			}
-			updated = u
-			return nil
+		// lock event
+		if err := tx.WithContext(ctx).
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&models.Event{}, "id = ?", ev.ID).Error; err != nil {
+			return err
 		}
 
+		series := pickSeries(ev)
+		nextN, err := getNextSerialCounter(ctx, tx, ev.Code, series)
+		if err != nil {
+			return err
+		}
+
+		for _, udID := range targetIDs {
+			var existing models.Document
+			findErr := tx.WithContext(ctx).
+				Select("id").
+				Where("event_id = ? AND user_detail_id = ? AND template_id = ?", ev.ID, udID, tplID).
+				First(&existing).Error
+
+			if findErr == nil {
+				skipped++
+				continue
+			}
+			if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return findErr
+			}
+
+			serial := makeSerial(ev.Code, series, nextN)
+			nextN++
+
+			var lastErr error
+			for attempt := 0; attempt < 10; attempt++ {
+				ver, verr := newVerificationCode()
+				if verr != nil {
+					return verr
+				}
+				doc := buildDraftDocument(ev, udID, tplID, serial, ver, requiredSigs)
+				if err := tx.WithContext(ctx).Create(&doc).Error; err != nil {
+					lastErr = err
+					if isDuplicateErr(err) {
+						continue
+					}
+					return err
+				}
+				created++
+				lastErr = nil
+				break
+			}
+			if lastErr != nil {
+				return fmt.Errorf("could not create document after retries: %w", lastErr)
+			}
+		}
+
+		// updated = cuantos docs están en ese set
+		res := tx.WithContext(ctx).
+			Model(&models.Document{}).
+			Where("event_id = ? AND user_detail_id IN ?", ev.ID, targetIDs).
+			Updates(map[string]any{"updated_at": time.Now()})
+		if res.Error != nil {
+			return res.Error
+		}
+		updated = int(res.RowsAffected)
 		return nil
 	})
-
 	if err != nil {
-		return 0, 0, 0, err
+		return nil, 0, 0, 0, err
 	}
 
-	return created, skipped, updated, nil
+	// 3) document_templates.id -> file_id (FileServer)
+	type trow struct {
+		ID     uuid.UUID
+		FileID uuid.UUID
+	}
+	var tr trow
+	if err := s.db.WithContext(ctx).
+		Table("document_templates").
+		Select("id, file_id").
+		Where("id = ?", tplID).
+		Scan(&tr).Error; err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 4) traer docs para payload
+	var docs []models.Document
+	if err := s.db.WithContext(ctx).
+		Select("id", "user_detail_id", "verification_code").
+		Where("event_id = ? AND user_detail_id IN ? AND template_id = ?", ev.ID, targetIDs, tplID).
+		Find(&docs).Error; err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 4.1) cargar template_fields una sola vez (document_template_fields)
+	templateFields, err := s.templateFieldRepo.GetByTemplateID(ctx, tplID)
+	if err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 4.2) cargar user_details (para resolver nombre_participante, etc.)
+	userMap, err := s.userDetailRepo.GetByIDs(ctx, targetIDs)
+	if err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 5) construir job rust
+	baseURL := "https://regionayacucho.gob.pe/verify"
+
+	// qr_pdf por defecto + rect si viene
+	qrPdf := []map[string]any{
+		{"qr_size_cm": "2.5"},
+		{"qr_margin_y_cm": "1.0"},
+		{"qr_margin_x_cm": "1.0"},
+		{"qr_page": "0"},
+	}
+
+	// default rect si no viene del request
+	rect := "460,40,540,120"
+	if qrRect != nil && strings.TrimSpace(*qrRect) != "" {
+		qrPdf = append(qrPdf, map[string]any{"qr_rect": strings.TrimSpace(*qrRect)})
+	}
+	qrPdf = append(qrPdf, map[string]any{"qr_rect": rect})
+
+	job := dto.RustDocsGenerateJob{
+		JobID:   uuid.New(),
+		JobType: dto.RustJobTypeGenerateDocs,
+		EventID: ev.ID,
+		Items:   make([]dto.RustDocsJobItem, 0, len(docs)),
+	}
+
+	for _, d := range docs {
+		participant, ok := userMap[d.UserDetailID]
+		if !ok {
+			// si no encontramos el user, igual construimos pdf con vacíos (no rompemos)
+			participant = models.UserDetail{}
+		}
+
+		pdfFields := BuildPdfFields(templateFields, participant, ev)
+
+		job.Items = append(job.Items, dto.RustDocsJobItem{
+			ClientRef: d.ID,
+			Template:  tr.FileID, // file_id (FileServer)
+			UserID:    d.UserDetailID,
+			IsPublic:  true,
+			QR: []map[string]any{
+				{"base_url": baseURL},
+				{"verify_code": d.VerificationCode},
+			},
+			QRPdf: qrPdf,
+
+			// ✅ YA NO hardcode: viene de template_fields + resolver
+			PDF: pdfFields,
+		})
+	}
+
+	cfg := config.GetConfig()
+	if err := s.queueRepo.EnqueueGenerateDocs(ctx, job, cfg.REDISJobTTLSeconds); err != nil {
+		return nil, created, skipped, updated, err
+	}
+
+	// 6) marcar docs con PDF_QUEUED + pdf_job_id
+	docIDs := make([]uuid.UUID, 0, len(job.Items))
+	for _, it := range job.Items {
+		docIDs = append(docIDs, it.ClientRef)
+	}
+	now := time.Now()
+	_ = s.db.WithContext(ctx).Model(&models.Document{}).
+		Where("id IN ?", docIDs).
+		Updates(map[string]any{
+			"status":     "PDF_QUEUED",
+			"pdf_job_id": job.JobID,
+			"updated_at": now,
+		}).Error
+
+	logger.Log.Info().
+		Str("job_id", job.JobID.String()).
+		Int("total", len(job.Items)).
+		Msg("queued docs job from /event/:id")
+
+	jid := job.JobID.String()
+	return &jid, created, skipped, updated, nil
 }
