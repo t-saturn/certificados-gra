@@ -1,17 +1,16 @@
 use std::sync::Arc;
-use tracing::{info, instrument, warn};
 
 use base64::{Engine as _, engine::general_purpose};
+use tracing::{info, instrument, warn};
 
-use crate::application::dtos::UploadFileCommand;
-use crate::application::services::file_service::FileService;
-use crate::{
-    application::{
-        dtos::{UploadCompletedEvent, UploadFailedEvent, UploadRequestedEvent},
-        ports::{EventBus, JobRepository},
-    },
-    domain::job_status::JobStatus,
+use crate::application::dtos::{
+    JobErrorDto, JobResultDto, JobStateDto, JobStatusDto, UploadCompletedEvent, UploadFailedEvent,
+    UploadFileCommand, UploadRequestedEvent,
 };
+use crate::application::ports::job_repository::JobRecord;
+use crate::application::ports::{EventBus, JobRepository};
+use crate::application::services::file_service::FileService;
+use crate::domain::job_status::JobStatus;
 
 #[derive(Clone)]
 pub struct JobService {
@@ -44,14 +43,14 @@ impl JobService {
             .create_pending_if_absent(&evt.job_id, self.ttl_seconds)
             .await
         {
-            Ok(true) => info!(job_id=%evt.job_id, "job created PENDING"),
+            Ok(true) => info!(job_id = %evt.job_id, "job created PENDING"),
             Ok(false) => {
                 let st = self.jobs.get_status(&evt.job_id).await.ok().flatten();
-                info!(job_id=%evt.job_id, status=?st, "job already exists; skipping");
+                info!(job_id = %evt.job_id, status = ?st, "job already exists; skipping");
                 return;
             }
             Err(e) => {
-                warn!(job_id=%evt.job_id, error=%e, "failed to create job record");
+                warn!(job_id = %evt.job_id, error = %e, "failed to create job record");
                 return;
             }
         }
@@ -86,6 +85,7 @@ impl JobService {
                     warn!(job_id=%evt.job_id, error=%e, "failed set_success in redis");
                 }
 
+                // Publish completed
                 let completed = UploadCompletedEvent {
                     job_id: evt.job_id,
                     file_id: out.id,
@@ -126,6 +126,67 @@ impl JobService {
         let payload = serde_json::to_vec(&failed).unwrap_or_default();
         if let Err(e) = self.bus.publish("files.upload.failed", payload).await {
             warn!(error=%e, "failed publish failed");
+        }
+    }
+
+    pub async fn get_job_status(&self, job_id: &str) -> Result<Option<JobStatusDto>, String> {
+        let rec: Option<JobRecord> = self.jobs.get_record(job_id).await?;
+        let Some(rec) = rec else {
+            return Ok(None);
+        };
+
+        match rec.status {
+            JobStatus::Pending => Ok(Some(JobStatusDto {
+                job_id: job_id.to_string(),
+                state: JobStateDto::Pending,
+                result: None,
+                error: None,
+            })),
+
+            JobStatus::Success => {
+                let raw = rec.raw_json.unwrap_or_default();
+                let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+
+                let file_id = v
+                    .get("result")
+                    .and_then(|r| r.get("file_id"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                Ok(Some(JobStatusDto {
+                    job_id: job_id.to_string(),
+                    state: JobStateDto::Success,
+                    result: Some(JobResultDto { file_id }),
+                    error: None,
+                }))
+            }
+
+            JobStatus::Failed => {
+                let raw = rec.raw_json.unwrap_or_default();
+                let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+
+                let code = v
+                    .get("error")
+                    .and_then(|e| e.get("code"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("UNKNOWN")
+                    .to_string();
+
+                let message = v
+                    .get("error")
+                    .and_then(|e| e.get("message"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("Unknown error")
+                    .to_string();
+
+                Ok(Some(JobStatusDto {
+                    job_id: job_id.to_string(),
+                    state: JobStateDto::Failed,
+                    result: None,
+                    error: Some(JobErrorDto { code, message }),
+                }))
+            }
         }
     }
 }

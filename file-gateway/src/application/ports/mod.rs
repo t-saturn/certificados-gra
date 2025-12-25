@@ -4,4 +4,4 @@ pub mod job_repository;
 
 pub use event_bus::EventBus;
 pub use file_repository::FileRepository;
-pub use job_repository::{JobRecord, JobRepository};
+pub use job_repository::JobRepository;

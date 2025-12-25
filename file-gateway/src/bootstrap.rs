@@ -7,15 +7,16 @@ use tracing::{Level, info};
 use crate::application::services::file_service::FileService;
 use crate::application::services::job_service::JobService;
 use crate::infra::http::file_server_repository::HttpFileRepository;
-use crate::infra::nats::{NatsEventBus, start_upload_consumer};
-use crate::infra::redis::RedisJobRepository;
+use crate::infra::nats::nats_bus::NatsEventBus;
+use crate::infra::nats::start_upload_consumer;
+use crate::infra::redis::job_repository::RedisJobRepository;
 use crate::{adapters, config::settings::Settings, infra};
 
 pub struct AppState {
     pub settings: Settings,
-    pub redis: infra::redis::RedisClient,
     pub http: reqwest::Client,
     pub file_service: FileService,
+    pub job_service: JobService,
 }
 
 pub async fn run() -> Result<()> {
@@ -63,27 +64,22 @@ pub async fn run() -> Result<()> {
         settings.file_project_id.clone(),
     );
 
-    // App state
-    let state = Arc::new(AppState {
-        settings: settings.clone(),
-        redis: redis.clone(),
-        http: http.clone(),
-        file_service: file_service.clone(),
-    });
-
-    // NATS + Redis Jobs (consumer)
+    // NATS
     let nats = async_nats::connect(settings.nats_url.clone())
         .await
         .context("connect nats")?;
-
     info!("NATS connected successfully");
 
+    // Event bus
     let bus = Arc::new(NatsEventBus::new(nats.clone()));
+
+    // Jobs repo (Redis)
     let jobs = Arc::new(RedisJobRepository::new(
         redis.clone(),
         settings.redis_key_prefix.clone(),
     ));
 
+    // Job service
     let job_service = JobService::new(
         jobs,
         bus,
@@ -91,10 +87,18 @@ pub async fn run() -> Result<()> {
         settings.redis_job_ttl_seconds,
     );
 
+    // App state (YA completo)
+    let state = Arc::new(AppState {
+        settings: settings.clone(),
+        http: http.clone(),
+        file_service: file_service.clone(),
+        job_service: job_service.clone(),
+    });
+
     // Consumer en background
     tokio::spawn(async move {
         if let Err(e) = start_upload_consumer(nats, job_service).await {
-            tracing::error!(error=%e, "nats consumer crashed");
+            tracing::error!(error = %e, "nats consumer crashed");
         }
     });
 

@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use redis::AsyncCommands;
 
 use crate::application::ports::JobRepository;
+use crate::application::ports::job_repository::JobRecord;
 use crate::domain::job_status::JobStatus;
 use crate::infra::redis::RedisClient;
 
@@ -38,7 +39,7 @@ impl JobRepository for RedisJobRepository {
             .arg("PENDING")
             .arg("NX")
             .arg("EX")
-            .arg(ttl_seconds) // ✅ u64, no usize
+            .arg(ttl_seconds) // u64, no usize
             .query_async(&mut *conn)
             .await
             .map_err(|e| e.to_string())?;
@@ -114,6 +115,39 @@ impl JobRepository for RedisJobRepository {
                 "FAILED" => Some(JobStatus::Failed),
                 _ => None,
             });
+        }
+
+        Ok(None)
+    }
+
+    async fn get_record(&self, job_id: &str) -> Result<Option<JobRecord>, String> {
+        let key = self.key(job_id);
+        let mut conn = self.redis.pool().get().await.map_err(|e| e.to_string())?;
+
+        let val: Option<String> = conn.get(key).await.map_err(|e| e.to_string())?;
+        let Some(v) = val else {
+            return Ok(None);
+        };
+
+        if v == "PENDING" {
+            return Ok(Some(JobRecord {
+                status: JobStatus::Pending,
+                raw_json: None,
+            }));
+        }
+
+        // si es JSON => SUCCESS o FAILED
+        if let Ok(js) = serde_json::from_str::<serde_json::Value>(&v) {
+            let st = js.get("status").and_then(|x| x.as_str()).unwrap_or("");
+            let status = match st {
+                "SUCCESS" => JobStatus::Success,
+                "FAILED" => JobStatus::Failed,
+                _ => JobStatus::Failed, // fallback
+            };
+            return Ok(Some(JobRecord {
+                status,
+                raw_json: Some(v),
+            }));
         }
 
         Ok(None)
