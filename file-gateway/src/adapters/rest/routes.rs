@@ -17,7 +17,24 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health_proxy))
         .route("/public/files/:file_id", get(download_public))
+        .fallback(not_found)
         .with_state(state)
+}
+
+async fn not_found(uri: axum::http::Uri) -> (StatusCode, Json<serde_json::Value>) {
+    warn!(%uri, "route not found");
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({
+            "success": false,
+            "message": "Ruta no encontrada",
+            "data": null,
+            "error": {
+                "code": "ROUTE_NOT_FOUND",
+                "details": format!("No existe la ruta {}", uri)
+            }
+        })),
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,16 +46,23 @@ async fn download_public(
     State(state): State<Arc<AppState>>,
     Path(file_id): Path<String>,
 ) -> Result<Response<Body>, (StatusCode, Json<serde_json::Value>)> {
-    let file_id = Uuid::parse_str(&file_id).map_err(|_| {
+    let file_id = Uuid::parse_str(&file_id).map_err(|e| {
+        warn!(error=%e, raw_file_id=%file_id, "invalid uuid");
         (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
-                "status": "failed",
-                "message": "Invalid file_id",
-                "data": null
+                "success": false,
+                "message": "ID inválido",
+                "data": null,
+                "error": {
+                    "code": "INVALID_UUID",
+                    "details": "El ID del archivo debe ser un UUID válido"
+                }
             })),
         )
     })?;
+
+    info!(file_id=%file_id, "download public requested");
 
     let result = state.file_service.download_public(file_id).await;
 

@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tower_http::trace::TraceLayer;
+use tracing::Level;
 use tracing::info;
 
 use crate::application::services::file_service::FileService;
@@ -53,7 +55,42 @@ pub async fn run() -> Result<()> {
         file_service,
     });
 
-    let app = adapters::rest::routes::router(state);
+    let app = adapters::rest::routes::router(state).layer(
+        TraceLayer::new_for_http()
+            .make_span_with(|req: &axum::http::Request<_>| {
+                tracing::span!(
+                    Level::INFO,
+                    "http_request",
+                    method = %req.method(),
+                    uri = %req.uri(),
+                )
+            })
+            .on_request(|_req: &axum::http::Request<_>, _span: &tracing::Span| {
+                tracing::info!("request started");
+            })
+            .on_response(
+                |res: &axum::http::Response<_>,
+                 latency: std::time::Duration,
+                 _span: &tracing::Span| {
+                    tracing::info!(
+                        status = %res.status(),
+                        latency_ms = latency.as_millis(),
+                        "request finished"
+                    );
+                },
+            )
+            .on_failure(
+                |err: tower_http::classify::ServerErrorsFailureClass,
+                 latency: std::time::Duration,
+                 _span: &tracing::Span| {
+                    tracing::warn!(
+                        error = %err,
+                        latency_ms = latency.as_millis(),
+                        "request failed"
+                    );
+                },
+            ),
+    );
 
     let addr: SocketAddr = settings.http_addr().parse().context("invalid http addr")?;
     let listener = tokio::net::TcpListener::bind(addr)
