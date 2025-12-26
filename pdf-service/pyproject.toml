@@ -11,6 +11,9 @@ dependencies = [
     "structlog>=24.1.0",
     "python-dotenv>=1.0.1",
     "watchfiles>=0.22.0",
+    "segno>=1.6.1",
+    "pillow>=10.0.0",
+    "pymupdf>=1.24.0",
 ]
 
 [dependency-groups]

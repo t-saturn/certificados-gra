@@ -10,9 +10,21 @@ from pdfsvc.infrastructure.nats.subscribers import register_subscribers
 async def main() -> None:
     settings = Settings()
     container = Container(settings)
-    logger, redis, broker = container.build()
+    (
+        logger, redis, broker,
+        tmp_store, qr_service, pdf_replace_service, pdf_qr_insert_service,
+        job_repo, queue_repo, lock_repo,
+        accept_batch_uc,
+    ) = container.build() 
 
-    register_subscribers(broker=broker, redis=redis, logger=logger, settings=settings)
+    register_subscribers(
+        broker=broker,
+        redis=redis,
+        logger=logger,
+        settings=settings,
+        accept_batch_uc=accept_batch_uc,
+    )
+
 
     logger.info("service_starting", service="pdf-service")
 

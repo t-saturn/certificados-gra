@@ -40,7 +40,7 @@ async def main():
     await nc.publish("pdf.batch.requested", json.dumps(PAYLOAD).encode())
     await nc.flush()
     await nc.close()
-    print("✅ published pdf.batch.requested")
+    print("published pdf.batch.requested")
 
 
 if __name__ == "__main__":

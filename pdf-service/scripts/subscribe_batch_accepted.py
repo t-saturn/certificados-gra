@@ -9,11 +9,11 @@ async def main():
 
     async def handler(msg):
         data = json.loads(msg.data.decode())
-        print("✅ received pdf.batch.accepted:")
+        print("received pdf.batch.accepted:")
         print(json.dumps(data, indent=2))
 
     await nc.subscribe("pdf.batch.accepted", cb=handler)
-    print("👂 listening on pdf.batch.accepted ...")
+    print("listening on pdf.batch.accepted ...")
     while True:
         await asyncio.sleep(1)
 

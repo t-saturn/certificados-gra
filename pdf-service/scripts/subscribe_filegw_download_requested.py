@@ -34,7 +34,7 @@ async def main() -> None:
         data = _try_parse_json(msg.data)
 
         print("\n" + "=" * 72)
-        print(f"✅ Received on subject: {msg.subject}")
+        print(f"Received on subject: {msg.subject}")
         print("-" * 72)
 
         if isinstance(data, dict):
@@ -46,14 +46,14 @@ async def main() -> None:
     for s in SUBJECTS:
         await nc.subscribe(s, cb=handler)
 
-    print(f"👂 listening on: {', '.join(SUBJECTS)}")
+    print(f"listening on: {', '.join(SUBJECTS)}")
     print("Press Ctrl+C to stop.\n")
 
     try:
         while True:
             await asyncio.sleep(1)
     except KeyboardInterrupt:
-        print("\n🛑 stopping subscriber...")
+        print("\nstopping subscriber...")
     finally:
         await nc.close()
 
