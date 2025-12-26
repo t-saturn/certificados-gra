@@ -24,7 +24,6 @@ class Settings(BaseSettings):
 
     # Logging
     LOG_DIR: str = "./logs"
-    LOG_FILE: str = "pdf-service.log"
     LOG_LEVEL: str = "info"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

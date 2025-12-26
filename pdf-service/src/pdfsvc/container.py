@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import structlog
 
-from pdfsvc.settings import Settings
-from pdfsvc.logging import configure_logging
-from pdfsvc.infrastructure.redis.redis_client import RedisClientFactory
-from pdfsvc.infrastructure.nats.broker import create_broker
+from pdfsvc.config.settings import Settings
+from pdfsvc.config.redis_connect import create_redis
+from pdfsvc.config.nats_connect import create_broker
+from pdfsvc.shared.logging import configure_logging
 
 
 @dataclass(frozen=True)
@@ -15,27 +16,12 @@ class Container:
     def build(self):
         logger = configure_logging(
             log_dir=self.settings.LOG_DIR,
-            log_file=self.settings.LOG_FILE,
             level=self.settings.LOG_LEVEL,
+            service_name="pdf-service",
         )
 
-        redis = RedisClientFactory(
-            host=self.settings.REDIS_HOST,
-            port=self.settings.REDIS_PORT,
-            db=self.settings.REDIS_DB,
-            password=self.settings.REDIS_PASSWORD,
-        ).create()
+        redis = create_redis(self.settings, logger)
+        broker = create_broker(self.settings, logger)
 
-        # test redis
-        try:
-            redis.ping()
-            logger.info("redis_connected", host=self.settings.REDIS_HOST, port=self.settings.REDIS_PORT, db=self.settings.REDIS_DB)
-        except Exception as e:
-            logger.error("redis_connection_failed", error=str(e))
-            raise
-
-        broker = create_broker(self.settings.NATS_URL)
-
-        logger.info("nats_configured", url=self.settings.NATS_URL)
-
+        logger.info("container_built")
         return logger, redis, broker

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from pdfsvc.settings import Settings
+from pdfsvc.config.settings import Settings
 from pdfsvc.container import Container
 from pdfsvc.infrastructure.nats.subscribers import register_subscribers
 
@@ -16,9 +16,9 @@ async def main() -> None:
 
     logger.info("service_starting", service="pdf-service")
 
-    # Start broker
     await broker.start()
     logger.info("nats_connected", url=settings.NATS_URL)
+
     logger.info("service_started", service="pdf-service", mode="event-driven")
 
     try:
@@ -29,3 +29,7 @@ async def main() -> None:
     finally:
         await broker.close()
         logger.info("service_stopped", service="pdf-service")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
