@@ -1,151 +1,100 @@
-# Raíz del proyecto
+# -- VARIABLES DE ENTORNO
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.template
+
+# -- SISTEMA OPERATIVO
 .DS_Store
-*.log
-node_modules/
-dist/
-coverage/
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# -- IDEs / EDITORES
 .vscode/
 .idea/
-*.swp
+*.sublime-*
+*.code-workspace
 
-# Next.js (Frontend) - /app
-app/.next/
-app/out/
-app/node_modules/
-app/.env
-app/.env.local
-app/.env.*.local
-app/.turbo/
-app/.vercel/
-app/.eslintcache
-app/next-env.d.ts
-app/.cache/
-app/build/
+# -- LOGS
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Archivos de sistema o de prueba
-app/npm-debug.log*
-app/yarn-debug.log*
-app/yarn-error.log*
-app/pnpm-debug.log*
+# -- NODE.JS / NEXT.JS / REACT
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+.vercel/
+.eslintcache
+.cache/
+*.tsbuildinfo
+next-env.d.ts
 
-# Go (Backend) - /server
-server/bin/
-server/build/
-server/tmp/
-server/vendor/
-server/coverage/
-server/.env
-server/.env.local
-server/.env.*.local
-server/*.log
-server/*.out
-server/*.exe
-server/*.test
-server/go.sum.old
-# server/.air.toml
-server/.air/
-server/.idea/
-server/.vscode/
-server/debug
+# -- PYTHON
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.venv/
+venv/
+ENV/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Compilados y cachés
-server/*.exe
-server/*.dll
-server/*.so
-server/*.dylib
-server/*.test
-server/*.out
+# -- Testing / Coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
 
-# Caché de dependencias
-server/.cache/
-server/.modcache/
+# -- RUST
+target/
+**/*.rs.bk
+*.rlib
+*.rmeta
+.cargo/
+!.cargo/config.toml
 
-# Docker / General
-*.pid
-*.pid.lock
-docker-compose.override.yml
+# -- GO
+bin/
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.sum.old
+
+# -- Air (hot reload)
+tmp/
+.air/
+
+# -- DOCKER
 docker-data/
-# .docker/
-# .dockerignore
-# docker-compose*.yml
-.env.docker
-.env.production
-.env.development
+.docker/
+docker-compose.override.yml
 
-# Test / Reports
+# -- TESTING / COVERAGE (GENERAL)
+coverage/
 *.coverprofile
-*.testlog
 *.prof
 *.bench
 *.tmp
-
-# Sistema operativo
-Thumbs.db
-ehthumbs.db
-Icon?
-Desktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msm
-*.msp
-
-
-# Python / FastAPI (Backend) - /pdf-service
-pdf-service/.venv/
-pdf-service/__pycache__/
-pdf-service/**/__pycache__/
-pdf-service/**/*.pyc
-pdf-service/**/*.pyo
-pdf-service/**/*.pyd
-
-# Python tooling caches
-pdf-service/.pytest_cache/
-pdf-service/.mypy_cache/
-pdf-service/.ruff_cache/
-pdf-service/.coverage
-pdf-service/htmlcov/
-
-# Logs (FastAPI)
-pdf-service/logs/
-pdf-service/*.log
-
-# Local env for pdf-service
-pdf-service/.env
-pdf-service/.env.local
-pdf-service/.env.*.local
-
-
-# Rust (Worker) - /pdf-worker
-pdf-worker/target/
-pdf-worker/.cargo/
-# pdf-worker/Cargo.lock
-pdf-worker/**/*.rs.bk
-
-# Logs del worker (si generas logs/YYYY-MM-DD.log)
-pdf-worker/logs/
-pdf-worker/*.log
-
-# Env local del worker
-pdf-worker/.env
-pdf-worker/.env.local
-pdf-worker/.env.*.local
-
-
-# Rust (Worker) - /pdf-worker
-file-gateway/target/
-file-gateway/.cargo/
-# file-gateway/Cargo.lock
-file-gateway/**/*.rs.bk
-
-# Logs del worker (si generas logs/YYYY-MM-DD.log)
-file-gateway/logs/
-file-gateway/*.log
-
-# Env local del worker
-file-gateway/.env
-file-gateway/.env.local
-file-gateway/.env.*.local
+*.pid
+*.pid.lock
