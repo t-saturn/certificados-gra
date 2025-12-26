@@ -1,0 +1,6 @@
+# Production configuration for file-svc
+# Override values from default.toml
+
+[log]
+dir = "/var/log/file-svc"
+max_files = 30
