@@ -19,6 +19,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/health", get(health_proxy))
         .route("/public/files/:file_id", get(download_public))
         .route("/api/v1/files", post(upload_file))
+        .route("/jobs/:job_id", get(get_job))
         .fallback(not_found)
         .with_state(state)
 }
@@ -237,4 +238,54 @@ async fn upload_file(
             }
         })),
     ))
+}
+
+async fn get_job(
+    State(state): State<Arc<AppState>>,
+    Path(job_id): Path<String>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    // validar UUID (opcional pero recomendado)
+    if Uuid::parse_str(&job_id).is_err() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "status": "failed",
+                "message": "ID inválido",
+                "data": null,
+                "error": {
+                    "code": "INVALID_UUID",
+                    "details": "El ID del job debe ser un UUID válido"
+                }
+            })),
+        ));
+    }
+
+    info!(%job_id, "get job status");
+
+    match state.job_service.get_job_status(&job_id).await {
+        Ok(Some(dto)) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "success",
+                "message": "ok",
+                "data": dto
+            })),
+        )),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "status": "failed",
+                "message": "Job not found",
+                "data": null
+            })),
+        )),
+        Err(e) => Err((
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({
+                "status": "failed",
+                "message": "Upstream error",
+                "data": { "detail": e }
+            })),
+        )),
+    }
 }

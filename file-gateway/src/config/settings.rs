@@ -15,7 +15,6 @@ pub struct Settings {
     pub redis_port: u16,
     pub redis_db: i64,
     pub redis_password: Option<String>,
-    pub redis_queue_file_jobs: String,
     pub redis_job_ttl_seconds: u64,
     pub redis_key_prefix: String,
 
@@ -28,7 +27,6 @@ pub struct Settings {
 
     // logs
     pub log_dir: String,
-    pub log_file: String,
 }
 
 impl Settings {
@@ -58,10 +56,5 @@ impl Settings {
                 self.redis_host, self.redis_port, self.redis_db
             ),
         }
-    }
-
-    pub fn key(&self, suffix: &str) -> String {
-        // namespacing general: filegw:<suffix>
-        format!("{}:{}", self.redis_key_prefix, suffix)
     }
 }
