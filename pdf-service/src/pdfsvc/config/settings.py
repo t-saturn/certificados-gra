@@ -26,4 +26,9 @@ class Settings(BaseSettings):
     LOG_DIR: str = "./logs"
     LOG_LEVEL: str = "info"
 
+    # QR Logo (optional)
+    QR_LOGO_URL: str | None = None
+    QR_LOGO_PATH: str | None = None  # optional local file path
+
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
