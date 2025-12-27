@@ -44,10 +44,10 @@ impl QueueRepositoryTrait for RedisQueueRepository {
 
         // Store job data
         let serialized = serde_json::to_string(job)?;
-        conn.set_ex(&job_key, &serialized, self.config.job_ttl_seconds).await?;
+        let _: () = conn.set_ex(&job_key, &serialized, self.config.job_ttl_seconds).await?;
 
         // Push job ID to queue
-        conn.rpush(&queue_key, job.id.to_string()).await?;
+        let _: () = conn.rpush(&queue_key, job.id.to_string()).await?;
 
         Ok(())
     }
@@ -94,7 +94,7 @@ impl QueueRepositoryTrait for RedisQueueRepository {
         let job_key = self.job_key(&job.id);
 
         let serialized = serde_json::to_string(job)?;
-        conn.set_ex(&job_key, serialized, self.config.job_ttl_seconds).await?;
+        let _: () = conn.set_ex(&job_key, serialized, self.config.job_ttl_seconds).await?;
 
         Ok(())
     }

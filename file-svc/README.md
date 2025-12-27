@@ -2,26 +2,26 @@
 
 Microservicio de gateway para gestión de archivos con REST API y eventos NATS.
 
-## 📁 Estructura
+## Estructura
 
 ```
 file-svc/
 ├── src/
 │   ├── main.rs                 # Entry point
 │   ├── lib.rs                  # Re-exports
-│   ├── config/                 # ⚙️ Configuración
-│   ├── models/                 # 📦 Entidades/Modelos
-│   ├── dto/                    # 📨 Data Transfer Objects
-│   ├── events/                 # 📡 Eventos NATS
-│   ├── repositories/           # 💾 Data Access
-│   ├── services/               # 🧠 Lógica de negocio
-│   ├── handlers/               # 🌐 HTTP Handlers
-│   ├── workers/                # 👷 Event Workers
-│   ├── middleware/             # 🛡️ Middleware
-│   ├── shared/                 # 🛠️ Utilidades
-│   ├── router.rs               # 🛤️ Router setup
-│   ├── state.rs                # 🗃️ AppState
-│   └── error.rs                # ❌ Error handling
+│   ├── config/                 # Configuración
+│   ├── models/                 # Entidades/Modelos
+│   ├── dto/                    # Data Transfer Objects
+│   ├── events/                 # Eventos NATS
+│   ├── repositories/           # Data Access
+│   ├── services/               # Lógica de negocio
+│   ├── handlers/               # HTTP Handlers
+│   ├── workers/                # Event Workers
+│   ├── middleware/             # Middleware
+│   ├── shared/                 # Utilidades
+│   ├── router.rs               # Router setup
+│   ├── state.rs                # AppState
+│   └── error.rs                # Error handling
 ├── config/
 │   ├── default.toml
 │   └── production.toml
@@ -31,7 +31,7 @@ file-svc/
 └── .env.example
 ```
 
-## 🚀 Inicio Rápido
+## Inicio Rápido
 
 ```bash
 # Setup inicial
@@ -44,15 +44,15 @@ make dev
 make run
 ```
 
-## 📡 API Endpoints
+## API Endpoints
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/health` | Health check básico |
-| GET | `/health?db=true` | Health check con estado de BD |
-| GET | `/health?full=true` | Health check completo |
-| POST | `/upload` | Subir archivo (multipart) |
-| GET | `/download/:id` | Descargar archivo |
+| Método | Ruta                | Descripción                   |
+| ------ | ------------------- | ----------------------------- |
+| GET    | `/health`           | Health check básico           |
+| GET    | `/health?db=true`   | Health check con estado de BD |
+| GET    | `/health?full=true` | Health check completo         |
+| POST   | `/upload`           | Subir archivo (multipart)     |
+| GET    | `/download/:id`     | Descargar archivo             |
 
 ### Upload (Multipart Form)
 
@@ -70,18 +70,18 @@ curl -X POST http://localhost:8080/upload \
 curl -O http://localhost:8080/download/550e8400-e29b-41d4-a716-446655440000
 ```
 
-## 📨 Eventos NATS
+## Eventos NATS
 
-| Subject | Descripción |
-|---------|-------------|
-| `files.upload.requested` | Upload iniciado |
-| `files.upload.completed` | Upload completado |
-| `files.upload.failed` | Upload fallido |
-| `files.download.requested` | Download iniciado |
+| Subject                    | Descripción         |
+| -------------------------- | ------------------- |
+| `files.upload.requested`   | Upload iniciado     |
+| `files.upload.completed`   | Upload completado   |
+| `files.upload.failed`      | Upload fallido      |
+| `files.download.requested` | Download iniciado   |
 | `files.download.completed` | Download completado |
-| `files.download.failed` | Download fallido |
+| `files.download.failed`    | Download fallido    |
 
-## 🔧 Comandos Make
+## Comandos Make
 
 ```bash
 make help      # Ver todos los comandos
@@ -96,7 +96,7 @@ make test      # Ejecutar tests
 make clean     # Limpiar artifacts
 ```
 
-## 🐳 Docker
+## Docker
 
 ```bash
 # Construir imagen
@@ -106,11 +106,11 @@ make docker-build
 make docker-run
 ```
 
-## ⚙️ Variables de Entorno
+## Variables de Entorno
 
 Ver `.env.example` para todas las variables disponibles.
 
-## 📐 Arquitectura
+## Arquitectura
 
 - **Repository Pattern**: Abstracción de acceso a datos
 - **SOLID Principles**: Single Responsibility, Open/Closed, etc.

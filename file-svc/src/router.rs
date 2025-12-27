@@ -8,7 +8,7 @@ use axum::{
 use tower_http::trace::TraceLayer;
 
 use crate::handlers;
-use crate::middleware::{error_handler, request_logger};
+use crate::middleware::request_logger;
 use crate::state::AppState;
 
 /// Create the application router

@@ -10,7 +10,7 @@ use crate::state::AppState;
 pub struct DownloadWorker;
 
 impl DownloadWorker {
-    #[instrument(skip(state, payload), fields(subject = %subject))]
+    #[instrument(skip_all, fields(subject = %subject))]
     pub async fn handle(
         _state: &Arc<AppState>,
         subject: &str,

@@ -53,7 +53,7 @@ impl CacheRepositoryTrait for RedisCacheRepository {
         let prefixed = self.prefixed_key(key);
         let serialized = serde_json::to_string(value)?;
 
-        conn.set_ex(&prefixed, serialized, ttl_secs).await?;
+        let _: () = conn.set_ex(&prefixed, serialized, ttl_secs).await?;
         Ok(())
     }
 
@@ -62,7 +62,7 @@ impl CacheRepositoryTrait for RedisCacheRepository {
         let mut conn = self.conn.clone();
         let prefixed = self.prefixed_key(key);
 
-        conn.del(&prefixed).await?;
+        let _: () = conn.del(&prefixed).await?;
         Ok(())
     }
 
@@ -78,7 +78,7 @@ impl CacheRepositoryTrait for RedisCacheRepository {
     #[instrument(skip(self))]
     async fn ping(&self) -> Result<()> {
         let mut conn = self.conn.clone();
-        redis::cmd("PING").query_async(&mut conn).await?;
+        let _: () = redis::cmd("PING").query_async(&mut conn).await?;
         Ok(())
     }
 }

@@ -65,9 +65,7 @@ impl AppState {
 
     // === Service factories ===
 
-    pub fn health_service(
-        &self,
-    ) -> HealthService<FileServerRepository, RedisCacheRepository> {
+    pub fn health_service(&self) -> HealthService<FileServerRepository, RedisCacheRepository> {
         HealthService::new(
             Arc::clone(&self.file_repo),
             Arc::clone(&self.cache_repo),
@@ -81,5 +79,9 @@ impl AppState {
 
     pub fn download_service(&self) -> DownloadService<FileServerRepository> {
         DownloadService::new(Arc::clone(&self.file_repo), self.event_publisher.clone())
+    }
+
+    pub fn queue_repo(&self) -> &Arc<RedisQueueRepository> {
+        &self.queue_repo
     }
 }

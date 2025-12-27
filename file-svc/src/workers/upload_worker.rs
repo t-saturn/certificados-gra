@@ -10,7 +10,7 @@ use crate::state::AppState;
 pub struct UploadWorker;
 
 impl UploadWorker {
-    #[instrument(skip(state, payload), fields(subject = %subject))]
+    #[instrument(skip_all, fields(subject = %subject))]
     pub async fn handle(
         _state: &Arc<AppState>,
         subject: &str,
@@ -19,7 +19,6 @@ impl UploadWorker {
         match subject {
             Subjects::UPLOAD_REQUESTED => {
                 info!("Processing upload.requested event");
-                // Log for other microservices to react
                 if let Some(event) = payload.get("payload") {
                     info!(
                         project_id = ?event.get("project_id"),
