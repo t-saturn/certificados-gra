@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 use std::time::Instant;
-use tracing::{info, Span};
+use tracing::info;
 use uuid::Uuid;
 
 /// Request logging middleware
