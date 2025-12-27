@@ -71,6 +71,36 @@ test:
 	@echo "$(GREEN)Running tests...$(NC)"
 	@$(CARGO) test
 
+## test-verbose: Run tests with output
+test-verbose:
+	@echo "$(GREEN)Running tests with output...$(NC)"
+	@$(CARGO) test -- --nocapture
+
+## test-upload: Run upload tests only
+test-upload:
+	@echo "$(GREEN)Running upload tests...$(NC)"
+	@$(CARGO) test --test upload_tests -- --nocapture
+
+## test-download: Run download tests only
+test-download:
+	@echo "$(GREEN)Running download tests...$(NC)"
+	@$(CARGO) test --test download_tests -- --nocapture
+
+## test-events: Run event tests only
+test-events:
+	@echo "$(GREEN)Running event tests...$(NC)"
+	@$(CARGO) test --test upload_events_tests --test download_events_tests -- --nocapture
+
+## test-signature: Run signature tests only
+test-signature:
+	@echo "$(GREEN)Running signature tests...$(NC)"
+	@$(CARGO) test --test signature_tests -- --nocapture
+
+## test-coverage: Run tests with coverage (requires cargo-tarpaulin)
+test-coverage:
+	@echo "$(GREEN)Running tests with coverage...$(NC)"
+	@cargo tarpaulin --out Html
+
 ## clean: Clean build artifacts
 clean:
 	@echo "$(RED)Cleaning build artifacts...$(NC)"

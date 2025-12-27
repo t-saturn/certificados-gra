@@ -69,6 +69,10 @@ mime_guess = "2.0"
 [dev-dependencies]
 tokio-test = "0.4"
 mockall = "0.13"
+axum-test = "16.4"
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3.14"
+wiremock = "0.6"
 
 [profile.release]
 lto = true
