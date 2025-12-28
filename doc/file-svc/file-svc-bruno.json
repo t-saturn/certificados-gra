@@ -1,0 +1,181 @@
+{
+  "name": "file-svc",
+  "version": "1",
+  "items": [
+    {
+      "type": "http",
+      "name": "Health Check (Basic)",
+      "filename": "Health Check (Basic).bru",
+      "seq": 2,
+      "settings": {
+        "encodeUrl": true,
+        "timeout": 0
+      },
+      "tags": [],
+      "examples": [],
+      "request": {
+        "url": "http://localhost:8080/health",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": [],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "inherit"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "Health Check (with DB)",
+      "filename": "Health Check (with DB).bru",
+      "seq": 3,
+      "settings": {
+        "encodeUrl": true,
+        "timeout": 0
+      },
+      "tags": [],
+      "examples": [],
+      "request": {
+        "url": "http://localhost:8080/health?db=true",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "db",
+            "value": "true",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": [],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "inherit"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "Upload File",
+      "filename": "Upload File.bru",
+      "seq": 4,
+      "settings": {
+        "encodeUrl": true,
+        "timeout": 0
+      },
+      "tags": [],
+      "examples": [],
+      "request": {
+        "url": "http://localhost:8080/upload",
+        "method": "POST",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "multipartForm",
+          "formUrlEncoded": [],
+          "multipartForm": [
+            {
+              "type": "text",
+              "name": "user_id",
+              "value": "584211ff-6e2a-4e59-a3bf-6738535ab5e0",
+              "enabled": true
+            },
+            {
+              "type": "text",
+              "name": "is_public",
+              "value": "true",
+              "enabled": true
+            },
+            {
+              "type": "file",
+              "name": "file",
+              "value": [
+                "C:\\Users\\rahman\\Downloads\\portrait-template-view[F].pdf"
+              ],
+              "enabled": true
+            }
+          ],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "inherit"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "View Public File",
+      "filename": "View Public File.bru",
+      "seq": 5,
+      "settings": {
+        "encodeUrl": true,
+        "timeout": 0
+      },
+      "tags": [],
+      "examples": [],
+      "request": {
+        "url": "http://localhost:8080/download?file_id=4027f1ee-4119-4bf3-a1a4-dc430146172b",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "file_id",
+            "value": "4027f1ee-4119-4bf3-a1a4-dc430146172b",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": [],
+          "file": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [],
+        "tests": "",
+        "docs": "",
+        "auth": {
+          "mode": "inherit"
+        }
+      }
+    }
+  ],
+  "environments": [],
+  "brunoConfig": {
+    "version": "1",
+    "name": "file-svc",
+    "type": "collection",
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "size": 0.0009450912475585938,
+    "filesCount": 4
+  }
+}
