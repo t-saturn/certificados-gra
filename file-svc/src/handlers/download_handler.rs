@@ -2,27 +2,29 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Query, State},
     http::{header, Response, StatusCode},
 };
 use tracing::instrument;
 use uuid::Uuid;
 
+use crate::dto::DownloadQuery;
 use crate::error::{AppError, Result};
 use crate::state::AppState;
 
-/// GET /download/:id
+/// GET /download?file_id=xxx
 #[instrument(skip(state))]
 pub async fn download(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
+    Query(query): Query<DownloadQuery>,
 ) -> Result<Response<Body>> {
-    // Parse UUID
-    let file_id = Uuid::parse_str(&id).map_err(|_| AppError::InvalidUuid(id.clone()))?;
+    // Parse UUID from query param
+    let file_id = Uuid::parse_str(&query.file_id)
+        .map_err(|_| AppError::InvalidUuid(query.file_id.clone()))?;
 
-    // TODO: Get project_id and user_id from auth context
-    let project_id = "default";
-    let user_id = "anonymous";
+    // Get project_id from config
+    let project_id = &state.settings().file_server.project_id;
+    let user_id = "anonymous"; // TODO: Get from auth context
 
     let download_service = state.download_service();
     let result = download_service

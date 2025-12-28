@@ -58,7 +58,11 @@ where
             .await?;
 
         // Perform upload
-        match self.file_repo.upload(params, file_name, content_type, data).await {
+        match self
+            .file_repo
+            .upload(params, file_name, content_type, data)
+            .await
+        {
             Ok(file_info) => {
                 let download_url = self.file_repo.get_download_url(&file_info.id);
 

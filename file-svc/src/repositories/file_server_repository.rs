@@ -26,10 +26,8 @@ impl FileServerRepository {
             .build()
             .expect("Failed to create HTTP client");
 
-        let signature_service = SignatureService::new(
-            config.access_key.clone(),
-            config.secret_key.clone(),
-        );
+        let signature_service =
+            SignatureService::new(config.access_key.clone(), config.secret_key.clone());
 
         Self {
             client,
@@ -72,10 +70,24 @@ impl FileRepositoryTrait for FileServerRepository {
         if let Some(data) = server_health.get("data") {
             if let Some(db) = data.get("database") {
                 health = health.with_database(DatabaseHealth {
-                    status: db.get("status").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                    engine: db.get("engine").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                    response_time_ms: db.get("response_time_ms").and_then(|v| v.as_u64()).unwrap_or(0),
-                    open_connections: db.get("open_connections").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                    status: db
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    engine: db
+                        .get("engine")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    response_time_ms: db
+                        .get("response_time_ms")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0),
+                    open_connections: db
+                        .get("open_connections")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32,
                     in_use: db.get("in_use").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
                     idle: db.get("idle").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
                 });

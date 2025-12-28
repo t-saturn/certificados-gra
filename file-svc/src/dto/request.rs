@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 /// Upload request parameters (from multipart form)
+/// NOTE: project_id comes from server config, not from request
 #[derive(Debug, Clone, Deserialize)]
 pub struct UploadParams {
     pub project_id: String,
@@ -20,4 +21,10 @@ pub struct HealthQuery {
     pub db: bool,
     #[serde(default)]
     pub full: bool,
+}
+
+/// Download query parameters
+#[derive(Debug, Clone, Deserialize)]
+pub struct DownloadQuery {
+    pub file_id: String,
 }

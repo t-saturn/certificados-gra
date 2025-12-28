@@ -18,7 +18,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/health", get(handlers::health))
         // File operations
         .route("/upload", post(handlers::upload))
-        .route("/download/{id}", get(handlers::download))
+        // Download with query param: GET /download?file_id=xxx
+        .route("/download", get(handlers::download))
         // Fallback for 404
         .fallback(crate::middleware::error_handler::not_found)
         // Middleware
