@@ -31,8 +31,7 @@ fn test_subject_hierarchy() {
     assert!(Subjects::UPLOAD_FAILED.starts_with("files.upload."));
 }
 
-// UPLOAD REQUESTED EVENT TESTS
-
+// -- upload requested event tests
 fn sample_upload_requested() -> UploadRequested {
     UploadRequested {
         job_id: Uuid::new_v4(),

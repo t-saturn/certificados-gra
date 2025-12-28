@@ -101,6 +101,23 @@ test-coverage:
 	@echo "$(GREEN)Running tests with coverage...$(NC)"
 	@cargo tarpaulin --out Html
 
+## test-integration: Run integration tests (requires running service)
+test-integration:
+	@echo "$(GREEN)Running integration tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Service must be running (make run)$(NC)"
+	@$(CARGO) test --test integration_upload_test --test integration_download_test -- --nocapture
+
+## test-integration-events: Run NATS event tests
+test-integration-events:
+	@echo "$(GREEN)Running NATS event tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Service and NATS must be running$(NC)"
+	@$(CARGO) test --test integration_events_test -- --nocapture
+
+## test-integration-all: Run all integration tests
+test-integration-all:
+	@echo "$(GREEN)Running all integration tests...$(NC)"
+	@$(CARGO) test --test integration_upload_test --test integration_download_test --test integration_events_test -- --nocapture
+
 ## clean: Clean build artifacts
 clean:
 	@echo "$(RED)Cleaning build artifacts...$(NC)"
