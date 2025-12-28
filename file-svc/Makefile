@@ -10,6 +10,7 @@ LOG_DIR := ./logs
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
 RED := \033[0;31m
+CYAN := \033[0;36m
 NC := \033[0m # No Color
 
 ## help: Show this help message
@@ -21,6 +22,15 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Commands:$(NC)"
 	@grep -E '^##' Makefile | sed -e 's/## /  /' | sed -e 's/:/: /'
+	@echo ""
+	@echo "$(YELLOW)Integration Tests (require running service):$(NC)"
+	@echo "  1. make run          $(CYAN)# Terminal 1: Start service$(NC)"
+	@echo "  2. make test-upload  $(CYAN)# Terminal 2: Run upload tests$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Windows Workflow:$(NC)"
+	@echo "  1. make test-compile $(CYAN)# Compile tests (service stopped)$(NC)"
+	@echo "  2. make run          $(CYAN)# Start service$(NC)"
+	@echo "  3. Run .exe files from target/debug/deps/"
 
 ## setup: Install dependencies and setup environment
 setup:
@@ -66,57 +76,56 @@ check:
 	@echo "$(GREEN)Checking code...$(NC)"
 	@$(CARGO) check
 
-## test: Run tests
+## test: Run all unit tests
 test:
-	@echo "$(GREEN)Running tests...$(NC)"
-	@$(CARGO) test
+	@echo "$(GREEN)Running unit tests...$(NC)"
+	@$(CARGO) test --lib
 
-## test-verbose: Run tests with output
-test-verbose:
-	@echo "$(GREEN)Running tests with output...$(NC)"
-	@$(CARGO) test -- --nocapture
+## test-compile: Compile all tests without running (for Windows workflow)
+test-compile:
+	@echo "$(GREEN)Compiling all tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Stop the service before compiling on Windows$(NC)"
+	@$(CARGO) test --no-run
+	@echo ""
+	@echo "$(GREEN)Tests compiled! Executables in target/debug/deps/$(NC)"
+	@echo "$(CYAN)Now start the service and run:$(NC)"
+	@echo "  ./target/debug/deps/integration_upload_test-* --nocapture --test-threads=1"
+	@echo "  ./target/debug/deps/integration_download_test-* --nocapture --test-threads=1"
+	@echo "  ./target/debug/deps/integration_events_test-* --nocapture --test-threads=1"
 
-## test-upload: Run upload tests only
+## test-upload: Run upload integration tests
 test-upload:
-	@echo "$(GREEN)Running upload tests...$(NC)"
-	@$(CARGO) test --test upload_tests -- --nocapture
+	@echo "$(GREEN)Running upload integration tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Service must be running on http://localhost:8080$(NC)"
+	@$(CARGO) test --test integration_upload_test -- --nocapture --test-threads=1
 
-## test-download: Run download tests only
+## test-download: Run download integration tests
 test-download:
-	@echo "$(GREEN)Running download tests...$(NC)"
-	@$(CARGO) test --test download_tests -- --nocapture
+	@echo "$(GREEN)Running download integration tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Service must be running on http://localhost:8080$(NC)"
+	@$(CARGO) test --test integration_download_test -- --nocapture --test-threads=1
 
-## test-events: Run event tests only
+## test-events: Run NATS events integration tests
 test-events:
-	@echo "$(GREEN)Running event tests...$(NC)"
-	@$(CARGO) test --test upload_events_tests --test download_events_tests -- --nocapture
+	@echo "$(GREEN)Running NATS events integration tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Service and NATS must be running$(NC)"
+	@$(CARGO) test --test integration_events_test -- --nocapture --test-threads=1
 
-## test-signature: Run signature tests only
-test-signature:
-	@echo "$(GREEN)Running signature tests...$(NC)"
-	@$(CARGO) test --test signature_tests -- --nocapture
+## test-integration: Run all integration tests
+test-integration:
+	@echo "$(GREEN)Running all integration tests...$(NC)"
+	@echo "$(YELLOW)NOTE: Service, Redis, and NATS must be running$(NC)"
+	@echo ""
+	@$(CARGO) test --test integration_upload_test -- --nocapture --test-threads=1
+	@echo ""
+	@$(CARGO) test --test integration_download_test -- --nocapture --test-threads=1
+	@echo ""
+	@$(CARGO) test --test integration_events_test -- --nocapture --test-threads=1
 
 ## test-coverage: Run tests with coverage (requires cargo-tarpaulin)
 test-coverage:
 	@echo "$(GREEN)Running tests with coverage...$(NC)"
 	@cargo tarpaulin --out Html
-
-## test-integration: Run integration tests (requires running service)
-test-integration:
-	@echo "$(GREEN)Running integration tests...$(NC)"
-	@echo "$(YELLOW)NOTE: Service must be running (make run)$(NC)"
-	@$(CARGO) test --test integration_upload_test --test integration_download_test -- --nocapture
-
-## test-integration-events: Run NATS event tests
-test-integration-events:
-	@echo "$(GREEN)Running NATS event tests...$(NC)"
-	@echo "$(YELLOW)NOTE: Service and NATS must be running$(NC)"
-	@$(CARGO) test --test integration_events_test -- --nocapture
-
-## test-integration-all: Run all integration tests
-test-integration-all:
-	@echo "$(GREEN)Running all integration tests...$(NC)"
-	@$(CARGO) test --test integration_upload_test --test integration_download_test --test integration_events_test -- --nocapture
 
 ## clean: Clean build artifacts
 clean:
@@ -134,6 +143,27 @@ docker-build:
 docker-run:
 	@echo "$(GREEN)Running Docker container...$(NC)"
 	@docker run --rm --env-file .env -p 8080:8080 $(BINARY):latest
+
+## docker-deps: Start Redis and NATS with Docker
+docker-deps:
+	@echo "$(GREEN)Starting dependencies (Redis + NATS)...$(NC)"
+	@docker run -d --name filesvc_redis -p 6379:6379 redis:7-alpine redis-server --requirepass "supersecret" 2>/dev/null || echo "Redis already running"
+	@docker run -d --name filesvc_nats -p 4222:4222 nats:2.10-alpine 2>/dev/null || echo "NATS already running"
+	@echo "$(GREEN)Dependencies started!$(NC)"
+	@echo "  Redis: localhost:6379"
+	@echo "  NATS:  localhost:4222"
+
+## docker-deps-stop: Stop Redis and NATS containers
+docker-deps-stop:
+	@echo "$(RED)Stopping dependencies...$(NC)"
+	@docker stop filesvc_redis filesvc_nats 2>/dev/null || true
+	@docker rm filesvc_redis filesvc_nats 2>/dev/null || true
+	@echo "$(GREEN)Dependencies stopped!$(NC)"
+
+## docker-deps-status: Check status of dependencies
+docker-deps-status:
+	@echo "$(GREEN)Checking dependencies status...$(NC)"
+	@docker ps --filter "name=filesvc_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 # Default target
 .DEFAULT_GOAL := help
