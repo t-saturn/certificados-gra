@@ -3,7 +3,7 @@
 # Uses uv for package management (uv sync, not pip)
 # =============================================================================
 
-.PHONY: help setup dev test test-unit test-integration lint format run clean
+.PHONY: help setup dev test test-unit test-int lint format run clean
 
 # Default target
 help:
@@ -19,8 +19,8 @@ help:
 	@echo ""
 	@echo "  Testing:"
 	@echo "    test         - Run all tests"
-	@echo "    test-unit    - Run unit tests only"
-	@echo "    test-int     - Run integration tests only"
+	@echo "    test-unit    - Run unit tests only (NO service required)"
+	@echo "    test-int     - Run integration tests (REQUIRES service running)"
 	@echo "    test-cov     - Run tests with coverage"
 	@echo ""
 	@echo "  Code Quality:"
@@ -30,7 +30,7 @@ help:
 	@echo ""
 	@echo "  NATS Debugging:"
 	@echo "    nats-sub     - Subscribe to pdf events"
-	@echo "    nats-pub     - Publish test event"
+	@echo "    nats-pub     - Publish test event (valid template)"
 	@echo ""
 	@echo "  Cleanup:"
 	@echo "    clean        - Clean up artifacts"
@@ -63,21 +63,35 @@ dev:
 # Testing
 # -----------------------------------------------------------------------------
 
-# Run all tests
+# Run all tests (unit only, integration requires service)
 test:
-	uv run pytest tests/ -v --tb=short
+	uv run pytest tests/ -v --tb=short -m "unit" -s
 
-# Run only unit tests
+# Run only unit tests (NO external services required)
+# These tests run locally without NATS, Redis, or file-svc
 test-unit:
-	uv run pytest tests/ -v --tb=short -m unit
+	@echo "Running unit tests (no service required)..."
+	uv run pytest tests/ -v --tb=short -m "unit" -s
 
-# Run only integration tests
+# Run integration tests (REQUIRES: make run/dev + Redis + NATS + file-svc)
+# These tests send real NATS events and verify responses
 test-int:
-	uv run pytest tests/ -v --tb=short -m integration
+	@echo ""
+	@echo "=============================================="
+	@echo "  INTEGRATION TESTS"
+	@echo "=============================================="
+	@echo "  Requirements:"
+	@echo "    - Redis running on localhost:6379"
+	@echo "    - NATS running on localhost:4222"
+	@echo "    - file-svc running on localhost:8080"
+	@echo "    - pdf-svc running (make run or make dev)"
+	@echo "=============================================="
+	@echo ""
+	uv run pytest tests/test_integration_real.py -v --tb=short -s
 
 # Run with coverage
 test-cov:
-	uv run pytest tests/ -v --cov=pdf_svc --cov-report=html --cov-report=term
+	uv run pytest tests/ -v --cov=pdf_svc --cov-report=html --cov-report=term -m "unit"
 
 # -----------------------------------------------------------------------------
 # Code Quality
@@ -101,9 +115,15 @@ nats-sub:
 	@echo "Subscribing to all pdf events..."
 	nats sub 'pdf.>'
 
+# Publish test event with VALID template
 nats-pub:
-	@echo "Publishing test batch request..."
-	nats pub pdf.batch.requested '{"event_type":"pdf.batch.requested","payload":{"pdf_job_id":"11111111-1111-1111-1111-111111111111","items":[{"user_id":"22222222-2222-2222-2222-222222222222","template_id":"33333333-3333-3333-3333-333333333333","serial_code":"TEST-001","is_public":true,"pdf":[{"key":"nombre","value":"Test User"}],"qr":[{"base_url":"https://example.com/verify"},{"verify_code":"TEST-001"}],"qr_pdf":[{"qr_size_cm":"2.5"},{"qr_page":"0"}]}]}}'
+	@echo "Publishing test batch request with VALID template..."
+	nats pub pdf.batch.requested '{"event_type":"pdf.batch.requested","payload":{"pdf_job_id":"11111111-1111-1111-1111-111111111111","items":[{"user_id":"22222222-2222-2222-2222-222222222222","template_id":"8748db65-9d84-4fdf-b47f-938cfa96366b","serial_code":"TEST-001","is_public":true,"pdf":[{"key":"nombre","value":"Test User"},{"key":"curso","value":"Test Course"},{"key":"fecha","value":"29/12/2024"}],"qr":[{"base_url":"https://verify.gob.pe"},{"verify_code":"TEST-001"}],"qr_pdf":[{"qr_size_cm":"2.5"},{"qr_page":"0"}]}]}}'
+
+# Publish test event with INVALID template (will fail)
+nats-pub-fail:
+	@echo "Publishing test batch request with INVALID template..."
+	nats pub pdf.batch.requested '{"event_type":"pdf.batch.requested","payload":{"pdf_job_id":"22222222-2222-2222-2222-222222222222","items":[{"user_id":"33333333-3333-3333-3333-333333333333","template_id":"25a14031-1bc5-4c6f-910e-c86cc9378336","serial_code":"FAIL-001","is_public":true,"pdf":[{"key":"nombre","value":"Fail User"}],"qr":[{"base_url":"https://verify.gob.pe"},{"verify_code":"FAIL-001"}],"qr_pdf":[{"qr_size_cm":"2.5"},{"qr_page":"0"}]}]}}'
 
 # Monitor file-svc events
 nats-sub-files:

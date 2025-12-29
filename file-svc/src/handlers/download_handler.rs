@@ -22,14 +22,11 @@ pub async fn download(
     let file_id = Uuid::parse_str(&query.file_id)
         .map_err(|_| AppError::InvalidUuid(query.file_id.clone()))?;
 
-    // Get project_id from config
-    let project_id = &state.settings().file_server.project_id;
-    let user_id = "anonymous"; // TODO: Get from auth context
+    // TODO: Get user_id from auth context
+    let user_id = "anonymous";
 
     let download_service = state.download_service();
-    let result = download_service
-        .download(&file_id, project_id, user_id)
-        .await?;
+    let result = download_service.download(&file_id, user_id).await?;
 
     // Build response with file
     let response = Response::builder()

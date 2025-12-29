@@ -85,17 +85,48 @@ Deberías ver logs como:
 
 ## Ejecutar Tests
 
+### Tests Unitarios (NO requieren servicio)
+
 ```bash
-# Todos los tests
-make test
-
-# Solo unit tests
 make test-unit
+```
 
-# Solo integration tests
+Estos tests corren localmente sin necesidad de Redis, NATS, o file-svc.
+Prueban los servicios de forma aislada:
+- `test_unit_qr_service.py` - Generación de QR
+- `test_unit_pdf_replace.py` - Reemplazo de placeholders
+- `test_unit_qr_insert.py` - Inserción de QR en PDF
+- `test_integration_pipeline.py` - Pipeline local simulado
+
+### Tests de Integración (REQUIEREN servicio levantado)
+
+```bash
+# Terminal 1: Levantar el servicio
+make run
+# o: make dev (con auto-reload)
+
+# Terminal 2: Ejecutar tests de integración
 make test-int
+```
 
-# Con coverage
+Estos tests se conectan a NATS real y envían eventos al servicio:
+- Publican `pdf.batch.requested`
+- Esperan respuesta en `pdf.batch.completed`
+- Verifican que el `file_id` sea válido
+
+**Requisitos:**
+- Redis corriendo en `localhost:6379`
+- NATS corriendo en `localhost:4222`
+- file-svc corriendo en `localhost:8080`
+- pdf-svc corriendo (`make run` o `make dev`)
+
+**Template IDs de prueba:**
+- Válido: `8748db65-9d84-4fdf-b47f-938cfa96366b`
+- Inválido: `25a14031-1bc5-4c6f-910e-c86cc9378336`
+
+### Coverage
+
+```bash
 make test-cov
 ```
 
@@ -117,8 +148,10 @@ pdf-svc/
 │   ├── shared/           # Logger, utils
 │   └── main.py           # Entry point
 ├── tests/
-│   ├── test_unit_*.py         # Tests unitarios
-│   └── test_integration_*.py  # Tests de integración
+│   ├── test_unit_*.py           # Tests unitarios (sin servicio)
+│   ├── test_integration_pipeline.py  # Tests locales
+│   └── test_integration_real.py      # Tests con servicio real
+├── dev.py                # Script de auto-reload
 ├── Dockerfile
 ├── Makefile
 └── pyproject.toml
@@ -270,12 +303,14 @@ make nats-pub
 | Comando | Descripción |
 |---------|-------------|
 | `make setup` | Instalar dependencias (crea .venv) |
-| `make sync` | Sincronizar dependencias |
 | `make run` | Ejecutar el servicio |
 | `make dev` | Ejecutar con auto-reload |
-| `make test` | Ejecutar todos los tests |
-| `make test-unit` | Solo tests unitarios |
-| `make test-int` | Solo tests de integración |
+| `make test` | Ejecutar tests unitarios |
+| `make test-unit` | Solo tests unitarios (NO requiere servicio) |
+| `make test-int` | Tests de integración (REQUIERE servicio) |
+| `make nats-pub` | Publicar evento de prueba (template válido) |
+| `make nats-pub-fail` | Publicar evento con template inválido |
+| `make nats-sub` | Suscribirse a eventos pdf.* |
 | `make lint` | Verificar código |
 | `make format` | Formatear código |
 | `make clean` | Limpiar artefactos |

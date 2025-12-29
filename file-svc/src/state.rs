@@ -63,6 +63,18 @@ impl AppState {
         &self.nats_client
     }
 
+    pub fn event_publisher(&self) -> &EventPublisher {
+        &self.event_publisher
+    }
+
+    pub fn file_repo(&self) -> &Arc<FileServerRepository> {
+        &self.file_repo
+    }
+
+    pub fn queue_repo(&self) -> &Arc<RedisQueueRepository> {
+        &self.queue_repo
+    }
+
     // === Service factories ===
 
     pub fn health_service(&self) -> HealthService<FileServerRepository, RedisCacheRepository> {
@@ -78,10 +90,10 @@ impl AppState {
     }
 
     pub fn download_service(&self) -> DownloadService<FileServerRepository> {
-        DownloadService::new(Arc::clone(&self.file_repo), self.event_publisher.clone())
-    }
-
-    pub fn queue_repo(&self) -> &Arc<RedisQueueRepository> {
-        &self.queue_repo
+        DownloadService::new(
+            Arc::clone(&self.file_repo),
+            self.event_publisher.clone(),
+            self.settings.file_server.project_id.clone(), // <-- Tercer argumento
+        )
     }
 }
