@@ -1,0 +1,4 @@
+# Ignore all cached templates (they have 1-day TTL)
+*.pdf
+# Keep the directory
+!.gitkeep

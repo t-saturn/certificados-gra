@@ -1,0 +1,86 @@
+# =============================================================================
+# .dockerignore - Files to exclude from Docker build context
+# =============================================================================
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Logs and temp files
+logs/
+*.log
+tmp/
+*.tmp
+
+# Local configuration
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+build/
+dist/
+*.whl
+
+# Assets (will be mounted or configured)
+assets/*.png
+assets/*.jpg
+
+# Tests (not needed in production)
+tests/
+
+# Makefile (not needed in container)
+Makefile
+
+# Docker files (not needed in context)
+docker-compose*.yml
