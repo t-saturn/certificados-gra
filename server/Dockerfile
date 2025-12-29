@@ -1,42 +1,76 @@
-# ---------- Stage 1: Build ----------
-FROM golang:1.25-alpine AS builder
+# Build stage
+FROM golang:1.23-alpine AS builder
 
-# Instala dependencias básicas (opcional pero útil)
-RUN apk add --no-cache git ca-certificates
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Directorio de trabajo dentro del contenedor para el módulo Go
+# Set working directory
 WORKDIR /app
 
-# Copiamos solo los archivos de dependencias primero para aprovechar la cache
-COPY server/go.mod server/go.sum* ./
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
-# Ahora copiamos el resto del código
-COPY server/. .
+# Copy source code
+COPY . .
 
-# Construimos el binario
-# Ajusta el nombre "server" si quieres otro nombre de binario
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/server ./cmd/server
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /app/bin/server \
+    ./cmd/server
 
-# ---------- Stage 2: Runtime ----------
-FROM alpine:3.20
+# Build migration tool
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /app/bin/migrate \
+    ./cmd/migrate
 
-# Certificados para HTTPS si tu app los usa
-RUN apk add --no-cache ca-certificates
+# Build seed tool
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /app/bin/seed \
+    ./cmd/seed
 
-# Directorio de trabajo para la app
+# Runtime stage
+FROM alpine:3.19
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
+
+# Create non-root user
+RUN addgroup -g 1000 app && \
+    adduser -u 1000 -G app -s /bin/sh -D app
+
+# Set working directory
 WORKDIR /app
 
-# Copiamos el binario desde el stage de build
-COPY --from=builder /app/bin/server /usr/local/bin/server
+# Copy binaries from builder
+COPY --from=builder /app/bin/server /app/server
+COPY --from=builder /app/bin/migrate /app/migrate
+COPY --from=builder /app/bin/seed /app/seed
 
-# (Opcional) Crea directorios para logs, tmp, etc.
-# Si prefieres usar volúmenes, puedes omitir esto o ajustarlo
-RUN mkdir -p /app/logs /app/tmp
+# Copy seeds directory
+COPY --from=builder /app/seeds /app/seeds
 
-# Expón el puerto en el que escucha tu servidor
-# Cambia "8080" si tu app usa otro
+# Create logs directory
+RUN mkdir -p /app/logs && chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Expose port
 EXPOSE 8080
 
-# Comando por defecto
-ENTRYPOINT ["server"]
+# Set environment variables
+ENV SERVER_HOST=0.0.0.0
+ENV SERVER_PORT=8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Run the application
+CMD ["./server"]

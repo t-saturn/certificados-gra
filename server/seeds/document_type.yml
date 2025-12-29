@@ -1,0 +1,23 @@
+- code: "CERTIFICATE"
+  name: "Certificado"
+  description: "Documento que certifica la participación o cumplimiento de un evento o actividad."
+  is_active: true
+  categories:
+    - name: "trabajo"
+      code: "TRAB"
+      is_active: true
+    - name: "participacion"
+      code: "PART"
+      is_active: true
+
+- code: "CONSTANCY"
+  name: "Constancia"
+  description: "Documento que deja constancia de un hecho o situación específica."
+  is_active: true
+  categories: []
+
+- code: "RECOGNITION"
+  name: "Reconocimiento"
+  description: "Documento otorgado como reconocimiento a un logro o mérito."
+  is_active: true
+  categories: []

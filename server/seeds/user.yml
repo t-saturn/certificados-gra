@@ -1,0 +1,23 @@
+- id: "9a322e1b-c428-4ee8-9ac4-5b69168dcded"
+  email: "juan.perez@regionayacucho.gob.pe"
+  dni: "11111111"
+
+- id: "980014a4-7574-4b2d-b061-0660868b120a"
+  email: "maria.lopez@regionayacucho.gob.pe"
+  dni: "22222222"
+
+- id: "1d7899ba-7655-4a6a-ab8b-4e361a60115d"
+  email: "carlos.ramos@regionayacucho.gob.pe"
+  dni: "33333333"
+
+- id: "f3629131-4d9a-40e7-bd2d-7e0d029e3c28"
+  email: "luisa.garcia@regionayacucho.gob.pe"
+  dni: "44444444"
+
+- id: "040d4285-a1e3-4ae2-af4f-9696efd7fb7e"
+  email: "pedro.sanchez@regionayacucho.gob.pe"
+  dni: "55555555"
+
+- id: "bf8b1a90-6f0d-42f9-afd4-b34fd1d15358"
+  email: "nicola.testa@regionayacucho.gob.pe"
+  dni: "00000000"
