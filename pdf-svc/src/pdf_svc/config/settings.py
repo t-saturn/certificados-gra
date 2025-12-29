@@ -16,7 +16,7 @@ class RedisSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="REDIS_")
 
     host: str = Field(default="127.0.0.1")
-    port: int = Field(default=6380)
+    port: int = Field(default=6379)
     db: int = Field(default=0)
     password: str = Field(default="supersecret")
 
