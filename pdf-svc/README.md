@@ -1,213 +1,293 @@
 # pdf-svc
 
-Event-driven PDF generation microservice using FastStream, NATS, Redis, and PyMuPDF.
+Microservicio de generación de PDFs orientado a eventos usando NATS y Redis.
 
-## Features
+## Descripción
 
-- **Event-driven architecture**: Communicates via NATS events, no REST endpoints
-- **Template-based PDF generation**: Replace placeholders in PDF templates
-- **QR code insertion**: Generate and embed QR codes with optional logo overlay
-- **Auto-placement**: Smart QR positioning for landscape documents
-- **Job tracking**: Redis-based job persistence with status updates
-- **Structured logging**: JSON logs with daily rotation
+`pdf-svc` procesa lotes de PDFs de forma asíncrona:
 
-## Architecture
+1. Recibe solicitud de procesamiento batch via NATS
+2. Descarga plantilla desde `file-svc`
+3. Reemplaza placeholders en el PDF
+4. Genera código QR
+5. Inserta QR en el PDF
+6. Sube resultado a `file-svc`
+7. Publica eventos de resultado
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   file-svc      │◄────│    pdf-svc      │────►│     Redis       │
-│  (storage)      │     │  (processing)   │     │  (job state)    │
-└────────┬────────┘     └────────┬────────┘     └─────────────────┘
-         │                       │
-         │      ┌────────────────┘
-         │      │
-         ▼      ▼
-    ┌─────────────────┐
-    │      NATS       │
-    │   (messaging)   │
-    └─────────────────┘
-```
+## Requisitos
 
-## Pipeline
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (gestor de paquetes)
+- Redis (puerto 6379)
+- NATS (puerto 4222)
+- file-svc (puerto 8080)
 
-1. Receive `PdfProcessRequest` event
-2. Request template download from file-svc
-3. Render PDF with placeholder replacements
-4. Generate QR code PNG
-5. Insert QR into rendered PDF
-6. Upload final PDF via file-svc
-7. Publish `PdfProcessCompleted` event
+## Pasos de Instalación y Ejecución
 
-## Quick Start
-
-### Prerequisites
-
-- Docker & Docker Compose
-- Python 3.12+ (for local development)
-
-### Run with Docker
+### 1. Instalar uv (si no lo tienes)
 
 ```bash
-# Start all services
-make up
+# Linux/macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# View logs
-make logs
-
-# Stop services
-make down
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### Local Development
+### 2. Clonar/Descargar el proyecto
 
 ```bash
-# Install dependencies
-make dev
+cd pdf-svc
+```
 
-# Run tests
+### 3. Configurar variables de entorno
+
+```bash
+# Copiar ejemplo
+cp .env.example .env
+
+# Editar si es necesario (los valores por defecto funcionan con la config actual)
+# Redis: 127.0.0.1:6379 (password: supersecret)
+# NATS: 127.0.0.1:4222
+```
+
+### 4. Instalar dependencias
+
+```bash
+# Esto crea .venv e instala todo
+make setup
+
+# O directamente:
+uv sync --all-extras
+```
+
+### 5. Ejecutar el servicio
+
+```bash
+# Opción 1: make
+make run
+
+# Opción 2: directamente
+uv run python -m pdf_svc.main
+```
+
+### 6. Verificar que está funcionando
+
+Deberías ver logs como:
+
+```
+2025-12-29 02:30:00.123 [info] starting_service environment=development
+2025-12-29 02:30:00.234 [info] redis_connected host=127.0.0.1 port=6379
+2025-12-29 02:30:00.345 [info] nats_connected url=nats://127.0.0.1:4222
+2025-12-29 02:30:00.456 [info] service_started process_subject=pdf.batch.requested
+2025-12-29 02:30:00.567 [info] service_running message=Press Ctrl+C to stop
+```
+
+## Ejecutar Tests
+
+```bash
+# Todos los tests
 make test
 
-# Run with coverage
+# Solo unit tests
+make test-unit
+
+# Solo integration tests
+make test-int
+
+# Con coverage
 make test-cov
 ```
 
-## Configuration
-
-### Environment Variables
-
-| Variable                | Default               | Description               |
-| ----------------------- | --------------------- | ------------------------- |
-| `REDIS_HOST`            | localhost             | Redis host                |
-| `REDIS_PORT`            | 6379                  | Redis port                |
-| `REDIS_DB`              | 0                     | Redis database            |
-| `REDIS_PASSWORD`        | -                     | Redis password            |
-| `REDIS_JOB_TTL_SECONDS` | 3600                  | Job TTL in Redis          |
-| `NATS_URL`              | nats://localhost:4222 | NATS server URL           |
-| `LOG_LEVEL`             | INFO                  | Logging level             |
-| `LOG_FORMAT`            | json                  | Log format (json/console) |
-| `QR_LOGO_URL`           | -                     | URL for QR logo overlay   |
-| `QR_LOGO_PATH`          | -                     | Local path for QR logo    |
-
-See `.env.example` for full configuration.
-
-## API Events
-
-### Request
-
-**Subject**: `pdf.process.requested`
-
-```json
-{
-  "template": "uuid",
-  "user_id": "uuid",
-  "serial_code": "CERT-2025-000102",
-  "is_public": true,
-  "qr": [{ "base_url": "https://example.com/verify" }, { "verify_code": "CERT-2025-000102" }],
-  "qr_pdf": [
-    { "qr_size_cm": "2.5" },
-    { "qr_margin_y_cm": "1.0" },
-    { "qr_page": "0" },
-    { "qr_rect": "460,40,540,120" }
-  ],
-  "pdf": [
-    { "key": "nombre_participante", "value": "MARÍA LUQUE RIVERA" },
-    { "key": "fecha", "value": "16/12/2024" }
-  ]
-}
-```
-
-### Response
-
-**Subject**: `pdf.process.completed`
-
-```json
-{
-  "pdf_job_id": "uuid",
-  "file_id": "uuid",
-  "file_name": "CERT-2025-000102.pdf",
-  "file_hash": "sha256...",
-  "file_size_bytes": 123456,
-  "download_url": "https://...",
-  "created_at": "2025-12-28T...",
-  "processing_time_ms": 1234
-}
-```
-
-## Project Structure
+## Estructura del Proyecto
 
 ```
 pdf-svc/
 ├── src/pdf_svc/
-│   ├── config/           # Settings
+│   ├── config/           # Configuración
 │   ├── models/           # Job, Events
 │   ├── dto/              # Request/Response DTOs
-│   ├── services/         # Business logic
+│   ├── services/         # Lógica de negocio
 │   │   ├── qr_service.py
 │   │   ├── pdf_replace_service.py
 │   │   ├── pdf_qr_insert_service.py
 │   │   └── pdf_orchestrator.py
-│   ├── repositories/     # Data access
-│   │   ├── job_repository.py
-│   │   └── file_repository.py
-│   ├── events/           # NATS handlers
+│   ├── repositories/     # Acceso a datos
+│   ├── events/           # Handlers NATS
 │   ├── shared/           # Logger, utils
-│   └── main.py          # Entry point
-├── tests/               # Unit tests
-├── assets/              # Logo assets
-├── logs/                # Log files
+│   └── main.py           # Entry point
+├── tests/
+│   ├── test_unit_*.py         # Tests unitarios
+│   └── test_integration_*.py  # Tests de integración
 ├── Dockerfile
-├── docker-compose.yml
+├── Makefile
 └── pyproject.toml
 ```
 
-## Development
+## API de Eventos
 
-### Run Tests
+### Request: Batch Processing
 
-```bash
-# All tests
-make test
+**Subject:** `pdf.batch.requested`
 
-# With coverage
-make test-cov
-
-# Specific test file
-PYTHONPATH=src pytest tests/test_qr_service.py -v
+```json
+{
+  "event_type": "pdf.batch.requested",
+  "payload": {
+    "project_id": "uuid",
+    "items": [
+      {
+        "user_id": "uuid",
+        "template_id": "uuid",
+        "serial_code": "CERT-2025-000001",
+        "is_public": true,
+        "pdf": [
+          { "key": "nombre_participante", "value": "MARÍA LUQUE RIVERA" },
+          { "key": "fecha", "value": "28/12/2024" }
+        ],
+        "qr": [{ "base_url": "https://example.com/verify" }, { "verify_code": "CERT-2025-000001" }],
+        "qr_pdf": [{ "qr_size_cm": "2.5" }, { "qr_margin_y_cm": "1.0" }, { "qr_page": "0" }]
+      }
+    ]
+  }
+}
 ```
 
-### Linting & Formatting
+### Response: Batch Completed
 
-```bash
-make lint
-make format
-make typecheck
+**Subject:** `pdf.batch.completed`
+
+```json
+{
+  "event_type": "pdf.batch.completed",
+  "payload": {
+    "job_id": "uuid",
+    "status": "completed",
+    "total_items": 10,
+    "success_count": 9,
+    "failed_count": 1,
+    "items": [
+      {
+        "item_id": "uuid",
+        "user_id": "uuid",
+        "serial_code": "CERT-2025-000001",
+        "status": "completed",
+        "data": {
+          "file_id": "uuid",
+          "file_name": "CERT-2025-000001.pdf",
+          "file_size": 123456,
+          "file_hash": "sha256...",
+          "mime_type": "application/pdf",
+          "is_public": true,
+          "download_url": "https://...",
+          "processing_time_ms": 1234
+        },
+        "error": null
+      }
+    ],
+    "processing_time_ms": 5432
+  }
+}
 ```
 
-### Debugging
+## Debugging con NATS CLI
 
 ```bash
-# Open NATS CLI
-make nats-box
+# Instalar NATS CLI: https://github.com/nats-io/natscli
 
-# Subscribe to events
-make sub
+# Suscribirse a eventos de pdf-svc
+make nats-sub
+# o: nats sub 'pdf.>'
 
-# Publish test event
-make pub
+# Suscribirse a eventos de file-svc
+make nats-sub-files
+# o: nats sub 'files.>'
 
-# Open Redis CLI
-make redis-cli
+# Publicar evento de prueba
+make nats-pub
 ```
 
-## Production Deployment
+## Comandos Make Disponibles
+
+| Comando          | Descripción                        |
+| ---------------- | ---------------------------------- |
+| `make setup`     | Instalar dependencias (crea .venv) |
+| `make sync`      | Sincronizar dependencias           |
+| `make run`       | Ejecutar el servicio               |
+| `make dev`       | Ejecutar con auto-reload           |
+| `make test`      | Ejecutar todos los tests           |
+| `make test-unit` | Solo tests unitarios               |
+| `make test-int`  | Solo tests de integración          |
+| `make lint`      | Verificar código                   |
+| `make format`    | Formatear código                   |
+| `make clean`     | Limpiar artefactos                 |
+
+## Configuración
+
+### Variables de Entorno
 
 ```bash
-# Build production image
-make prod-build
+# Redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=supersecret
 
-# Deploy
-make prod-up
+# NATS
+NATS_URL=nats://127.0.0.1:4222
 
-# Or manually:
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Subjects
+PDF_SVC_PROCESS_SUBJECT=pdf.batch.requested
+PDF_SVC_COMPLETED_SUBJECT=pdf.batch.completed
+
+# Logging
+LOG_LEVEL=DEBUG
 ```
+
+Ver `.env.example` para todas las variables.
+
+## Arquitectura
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Caller       │────▶│    pdf-svc      │────▶│    file-svc     │
+│   (worker)      │     │  (processing)   │     │   (storage)     │
+└─────────────────┘     └────────┬────────┘     └─────────────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    ▼                     ▼
+              ┌─────────┐           ┌─────────┐
+              │  Redis  │           │  NATS   │
+              │  (jobs) │           │(events) │
+              └─────────┘           └─────────┘
+```
+
+## Estados de Item
+
+| Estado          | Progreso | Descripción               |
+| --------------- | -------- | ------------------------- |
+| `pending`       | 0%       | Pendiente                 |
+| `downloading`   | 10%      | Descargando plantilla     |
+| `downloaded`    | 20%      | Plantilla descargada      |
+| `rendering`     | 30%      | Reemplazando placeholders |
+| `rendered`      | 50%      | PDF renderizado           |
+| `generating_qr` | 60%      | Generando QR              |
+| `qr_generated`  | 70%      | QR generado               |
+| `inserting_qr`  | 80%      | Insertando QR             |
+| `qr_inserted`   | 85%      | QR insertado              |
+| `uploading`     | 90%      | Subiendo resultado        |
+| `completed`     | 100%     | Completado                |
+| `failed`        | -        | Error                     |
+
+## Docker
+
+```bash
+# Construir imagen
+make docker-build
+# o: docker build -t pdf-svc:latest .
+```
+
+La imagen se integra con el docker-compose del repositorio principal.
+
+## Licencia
+
+MIT

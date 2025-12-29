@@ -3,90 +3,84 @@
 # =============================================================================
 
 # Git
-.git
+.git/
 .gitignore
 .gitattributes
 
-# Python
-__pycache__
+# Python cache
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-.python-version
+*.egg
+*.egg-info/
+.eggs/
 
 # Virtual environments
-.venv
-venv
-env
-ENV
+.venv/
+venv/
+ENV/
+env/
 
 # IDE
-.idea
-.vscode
+.idea/
+.vscode/
 *.swp
 *.swo
 *~
+.project
+.pydevproject
+.settings/
 
 # Testing
-.pytest_cache
+.pytest_cache/
 .coverage
-htmlcov
-.tox
-.nox
+htmlcov/
+.tox/
+.nox/
 coverage.xml
 *.cover
-.hypothesis
+.hypothesis/
 
-# Build artifacts
-*.egg-info
-*.egg
-dist
-build
-.eggs
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
 
 # Documentation
-docs
+docs/
 *.md
 !README.md
 
-# Local development
+# Logs and temp files
+logs/
+*.log
+tmp/
+*.tmp
+
+# Local configuration
 .env
 .env.local
 .env.*.local
-*.local
 
-# Logs (we mount them as volumes)
-logs
-*.log
+# Build artifacts
+build/
+dist/
+*.whl
 
-# Temporary files
-tmp
-temp
-*.tmp
-*.bak
+# Assets (will be mounted or configured)
+assets/*.png
+assets/*.jpg
 
-# OS files
-.DS_Store
-Thumbs.db
+# Tests (not needed in production)
+tests/
 
-# Docker compose files (not needed in image)
-docker-compose*.yml
-Dockerfile*
-
-# CI/CD
-.github
-.gitlab-ci.yml
-.travis.yml
-Jenkinsfile
-
-# Tests (not needed in production image)
-tests
-pytest.ini
-conftest.py
-
-# Makefile
+# Makefile (not needed in container)
 Makefile
 
-# Scripts (development only)
-scripts
+# Docker files (not needed in context)
+docker-compose*.yml

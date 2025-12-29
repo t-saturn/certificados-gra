@@ -1,140 +1,164 @@
 """
-Pytest configuration and fixtures.
+Pytest fixtures and configuration.
 """
 
 from __future__ import annotations
 
-import os
-import sys
+import tempfile
 from pathlib import Path
-from typing import AsyncIterator, Iterator
-from unittest.mock import MagicMock, AsyncMock
+from uuid import uuid4
 
+import fitz
 import pytest
-from faker import Faker
-
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-# Set test environment variables before importing settings
-os.environ.setdefault("ENVIRONMENT", "development")
-os.environ.setdefault("REDIS_PASSWORD", "test")
-os.environ.setdefault("LOG_LEVEL", "debug")
 
 
-fake = Faker()
+# =============================================================================
+# PDF Fixtures
+# =============================================================================
 
 
 @pytest.fixture
-def temp_dir(tmp_path: Path) -> Path:
+def temp_dir():
     """Create a temporary directory for tests."""
-    return tmp_path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield Path(tmpdir)
 
 
 @pytest.fixture
-def sample_pdf_bytes() -> bytes:
-    """Create minimal valid PDF bytes for testing."""
-    # Minimal valid PDF structure
-    return b"""%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> >>
-endobj
-4 0 obj
-<< /Length 44 >>
-stream
-BT
-/F1 12 Tf
-100 700 Td
-({{nombre_participante}}) Tj
-ET
-endstream
-endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer
-<< /Size 5 /Root 1 0 R >>
-startxref
-306
-%%EOF"""
+def sample_pdf_with_placeholders() -> bytes:
+    """Create a sample PDF with placeholders for testing."""
+    doc = fitz.open()
+    page = doc.new_page(width=792, height=612)  # Landscape
+
+    # Add text with placeholders
+    page.insert_text((100, 100), "Certificate of Completion", fontsize=24)
+    page.insert_text((100, 200), "This certifies that {{nombre_participante}}", fontsize=14)
+    page.insert_text((100, 250), "has completed the course on {{fecha}}", fontsize=14)
+    page.insert_text((100, 300), "Course: {{curso}}", fontsize=12)
+
+    pdf_bytes = doc.write()
+    doc.close()
+    return pdf_bytes
 
 
 @pytest.fixture
-def sample_png_bytes() -> bytes:
-    """Create minimal valid PNG bytes for testing."""
-    # 1x1 white PNG
-    return bytes([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  # PNG signature
-        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,  # IHDR chunk
-        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,  # 1x1
-        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,  # IDAT chunk
-        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xFF, 0xFF, 0xFF,
-        0x00, 0x05, 0xFE, 0x02, 0xFE, 0xDC, 0xCC, 0x59,
-        0xE7, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,  # IEND chunk
-        0x44, 0xAE, 0x42, 0x60, 0x82,
-    ])
+def sample_landscape_pdf() -> bytes:
+    """Create a simple landscape PDF."""
+    doc = fitz.open()
+    page = doc.new_page(width=792, height=612)  # Landscape
+    page.insert_text((100, 100), "Test Document - Landscape", fontsize=12)
+    pdf_bytes = doc.write()
+    doc.close()
+    return pdf_bytes
+
+
+@pytest.fixture
+def sample_portrait_pdf() -> bytes:
+    """Create a simple portrait PDF."""
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)  # Portrait
+    page.insert_text((100, 100), "Test Document - Portrait", fontsize=12)
+    pdf_bytes = doc.write()
+    doc.close()
+    return pdf_bytes
+
+
+# =============================================================================
+# QR Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def qr_config() -> list[dict[str, str]]:
+    """Sample QR configuration."""
+    return [
+        {"base_url": "https://example.com/verify"},
+        {"verify_code": "TEST-2025-001"},
+    ]
+
+
+@pytest.fixture
+def qr_pdf_config() -> list[dict[str, str]]:
+    """Sample QR PDF insertion configuration."""
+    return [
+        {"qr_size_cm": "2.5"},
+        {"qr_margin_y_cm": "1.0"},
+        {"qr_page": "0"},
+    ]
+
+
+@pytest.fixture
+def qr_pdf_config_with_rect() -> list[dict[str, str]]:
+    """Sample QR PDF configuration with explicit rect."""
+    return [
+        {"qr_size_cm": "2.0"},
+        {"qr_page": "0"},
+        {"qr_rect": "460,40,540,120"},
+    ]
+
+
+# =============================================================================
+# PDF Items Fixtures
+# =============================================================================
 
 
 @pytest.fixture
 def pdf_items() -> list[dict[str, str]]:
     """Sample PDF placeholder items."""
     return [
-        {"key": "nombre_participante", "value": "JUAN PÉREZ GARCÍA"},
+        {"key": "nombre_participante", "value": "MARÍA LUQUE RIVERA"},
         {"key": "fecha", "value": "28/12/2024"},
-        {"key": "firma_1_nombre", "value": "Dr. Carlos Mendoza"},
-        {"key": "firma_1_cargo", "value": "Director General"},
+        {"key": "curso", "value": "Python Avanzado"},
     ]
 
 
+# =============================================================================
+# Batch Fixtures
+# =============================================================================
+
+
 @pytest.fixture
-def qr_config() -> dict[str, str]:
-    """Sample QR configuration."""
+def batch_item_data() -> dict:
+    """Sample batch item data."""
     return {
-        "base_url": "https://example.com/verify",
-        "verify_code": "CERT-2024-001234",
+        "user_id": str(uuid4()),
+        "template_id": str(uuid4()),
+        "serial_code": "CERT-2025-000001",
+        "is_public": True,
+        "pdf": [
+            {"key": "nombre_participante", "value": "Juan Pérez"},
+            {"key": "fecha", "value": "28/12/2024"},
+        ],
+        "qr": [
+            {"base_url": "https://example.com/verify"},
+            {"verify_code": "CERT-2025-000001"},
+        ],
+        "qr_pdf": [
+            {"qr_size_cm": "2.5"},
+            {"qr_margin_y_cm": "1.0"},
+            {"qr_page": "0"},
+        ],
     }
 
 
 @pytest.fixture
-def qr_pdf_config() -> dict[str, str]:
-    """Sample QR PDF insertion configuration."""
+def batch_request_data(batch_item_data: dict) -> dict:
+    """Sample batch request data."""
     return {
-        "qr_size_cm": "2.5",
-        "qr_margin_y_cm": "1.0",
-        "qr_margin_x_cm": "1.0",
-        "qr_page": "0",
-        "qr_rect": "460,40,540,120",
+        "project_id": str(uuid4()),
+        "items": [
+            batch_item_data,
+            {
+                **batch_item_data,
+                "serial_code": "CERT-2025-000002",
+                "pdf": [
+                    {"key": "nombre_participante", "value": "María García"},
+                    {"key": "fecha", "value": "28/12/2024"},
+                ],
+                "qr": [
+                    {"base_url": "https://example.com/verify"},
+                    {"verify_code": "CERT-2025-000002"},
+                ],
+            },
+        ],
     }
-
-
-@pytest.fixture
-def mock_redis() -> MagicMock:
-    """Create mock Redis client."""
-    mock = MagicMock()
-    mock.ping = AsyncMock(return_value=True)
-    mock.get = AsyncMock(return_value=None)
-    mock.setex = AsyncMock(return_value=True)
-    mock.delete = AsyncMock(return_value=1)
-    mock.exists = AsyncMock(return_value=0)
-    return mock
-
-
-@pytest.fixture
-def mock_nats() -> MagicMock:
-    """Create mock NATS client."""
-    mock = MagicMock()
-    mock.publish = AsyncMock(return_value=None)
-    mock.subscribe = AsyncMock(return_value=MagicMock())
-    mock.is_connected = True
-    return mock

@@ -5,10 +5,8 @@ SRP: Generates QR codes (PNG bytes) for verification URLs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
 from urllib.request import urlopen
 
 import segno
@@ -19,7 +17,6 @@ from pdf_svc.shared.logger import get_logger
 logger = get_logger(__name__)
 
 
-@dataclass(frozen=True)
 class QrService:
     """
     QR code generation service.
@@ -30,11 +27,25 @@ class QrService:
       - remote logo_url (downloaded & cached)
     """
 
-    logo_path: Optional[Path] = None
-    logo_url: Optional[str] = None
-    logo_cache_path: Optional[Path] = None
+    def __init__(
+        self,
+        logo_path: str | None = None,
+        logo_url: str | None = None,
+        logo_cache_path: str | None = None,
+    ) -> None:
+        """
+        Initialize QR service.
 
-    def _download_logo(self) -> Optional[bytes]:
+        Args:
+            logo_path: Local path to logo file
+            logo_url: URL to download logo from
+            logo_cache_path: Path to cache downloaded logo
+        """
+        self.logo_path = Path(logo_path) if logo_path else None
+        self.logo_url = logo_url
+        self.logo_cache_path = Path(logo_cache_path) if logo_cache_path else None
+
+    def _download_logo(self) -> bytes | None:
         """Download logo from URL."""
         if not self.logo_url:
             return None
@@ -48,7 +59,7 @@ class QrService:
             logger.warning("logo_download_failed", url=self.logo_url, error=str(e))
             return None
 
-    def _load_logo_image(self) -> Optional[Image.Image]:
+    def _load_logo_image(self) -> Image.Image | None:
         """Load logo image from various sources."""
         # 1) Local file
         if self.logo_path and self.logo_path.exists():
@@ -90,6 +101,10 @@ class QrService:
 
         return img
 
+    def _build_url(self, base_url: str, verify_code: str) -> str:
+        """Build the verification URL for QR content."""
+        return f"{base_url}?code={verify_code}"
+
     def generate_png(
         self,
         *,
@@ -125,7 +140,7 @@ class QrService:
         if not verify_code:
             raise ValueError("verify_code is required")
 
-        target = f"{base_url}?verify_code={verify_code}"
+        target = self._build_url(base_url, verify_code)
         logger.debug("generating_qr", target_url=target)
 
         # Generate QR code with high error correction (for logo overlay)

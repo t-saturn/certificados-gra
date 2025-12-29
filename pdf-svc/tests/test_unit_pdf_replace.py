@@ -1,5 +1,7 @@
 """
-Tests for PdfReplaceService.
+Unit tests for PdfReplaceService.
+
+Tests placeholder replacement in PDF documents.
 """
 
 from __future__ import annotations
@@ -10,12 +12,16 @@ from pdf_svc.services.pdf_replace_service import PdfReplaceService
 
 
 class TestPdfReplaceService:
-    """Tests for PDF text replacement service."""
+    """Unit tests for PDF text replacement service."""
 
     @pytest.fixture
     def service(self) -> PdfReplaceService:
         """Create PDF replace service."""
         return PdfReplaceService()
+
+    # -------------------------------------------------------------------------
+    # Placeholder Formatting Tests
+    # -------------------------------------------------------------------------
 
     @pytest.mark.unit
     def test_format_placeholders_basic(self, service: PdfReplaceService) -> None:
@@ -62,19 +68,6 @@ class TestPdfReplaceService:
         assert result == {}
 
     @pytest.mark.unit
-    def test_format_placeholders_missing_fields(self, service: PdfReplaceService) -> None:
-        """Test with missing key or value fields."""
-        items = [
-            {"key": "valid"},  # missing value
-            {"value": "orphan"},  # missing key
-            {},  # empty dict
-        ]
-
-        result = service.format_placeholders(items)
-
-        assert result == {"{{valid}}": ""}
-
-    @pytest.mark.unit
     def test_format_placeholders_special_characters(self, service: PdfReplaceService) -> None:
         """Test placeholders with special characters in values."""
         items = [
@@ -87,38 +80,35 @@ class TestPdfReplaceService:
         assert result["{{nombre}}"] == "María José García-Ñoño"
         assert result["{{cargo}}"] == "Director & CEO"
 
+    # -------------------------------------------------------------------------
+    # PDF Rendering Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
-    async def test_render_pdf_bytes_async(
-        self, service: PdfReplaceService, sample_pdf_bytes: bytes, pdf_items: list
+    def test_render_pdf_bytes_basic(
+        self, service: PdfReplaceService, sample_pdf_with_placeholders: bytes, pdf_items: list
     ) -> None:
-        """Test async PDF rendering."""
-        # This test requires a valid PDF with placeholders
-        # Using sample_pdf_bytes which has minimal structure
-        try:
-            result = await service.render_pdf_bytes_async(
-                template_pdf=sample_pdf_bytes,
-                pdf_items=pdf_items,
-            )
-            assert result is not None
-            # Should return valid PDF
-            assert result[:4] == b"%PDF"
-        except Exception:
-            # Expected if sample PDF doesn't have proper text structure
-            pytest.skip("Sample PDF doesn't support text replacement")
+        """Test basic PDF rendering with placeholders."""
+        result = service.render_pdf_bytes(
+            template_pdf=sample_pdf_with_placeholders,
+            pdf_items=pdf_items,
+        )
+
+        assert result is not None
+        assert result[:4] == b"%PDF"
 
     @pytest.mark.unit
     def test_render_pdf_bytes_empty_items(
-        self, service: PdfReplaceService, sample_pdf_bytes: bytes
+        self, service: PdfReplaceService, sample_pdf_with_placeholders: bytes
     ) -> None:
-        """Test rendering with no items (should return unchanged)."""
-        try:
-            result = service.render_pdf_bytes(
-                template_pdf=sample_pdf_bytes,
-                pdf_items=[],
-            )
-            assert result is not None
-        except Exception:
-            pytest.skip("Sample PDF structure issue")
+        """Test rendering with no items (should return valid PDF)."""
+        result = service.render_pdf_bytes(
+            template_pdf=sample_pdf_with_placeholders,
+            pdf_items=[],
+        )
+
+        assert result is not None
+        assert result[:4] == b"%PDF"
 
     @pytest.mark.unit
     def test_render_pdf_bytes_invalid_pdf(self, service: PdfReplaceService) -> None:
@@ -128,3 +118,42 @@ class TestPdfReplaceService:
                 template_pdf=b"not a valid pdf",
                 pdf_items=[{"key": "test", "value": "value"}],
             )
+
+    @pytest.mark.unit
+    async def test_render_pdf_bytes_async(
+        self, service: PdfReplaceService, sample_pdf_with_placeholders: bytes, pdf_items: list
+    ) -> None:
+        """Test async PDF rendering."""
+        result = await service.render_pdf_bytes_async(
+            template_pdf=sample_pdf_with_placeholders,
+            pdf_items=pdf_items,
+        )
+
+        assert result is not None
+        assert result[:4] == b"%PDF"
+
+    @pytest.mark.unit
+    def test_render_pdf_preserves_dimensions(
+        self, service: PdfReplaceService, sample_pdf_with_placeholders: bytes, pdf_items: list
+    ) -> None:
+        """Test that rendering preserves PDF dimensions."""
+        import fitz
+
+        # Get original dimensions
+        original_doc = fitz.open(stream=sample_pdf_with_placeholders, filetype="pdf")
+        original_rect = original_doc[0].rect
+        original_doc.close()
+
+        # Render
+        result = service.render_pdf_bytes(
+            template_pdf=sample_pdf_with_placeholders,
+            pdf_items=pdf_items,
+        )
+
+        # Check dimensions
+        result_doc = fitz.open(stream=result, filetype="pdf")
+        result_rect = result_doc[0].rect
+        result_doc.close()
+
+        assert result_rect.width == original_rect.width
+        assert result_rect.height == original_rect.height

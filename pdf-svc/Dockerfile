@@ -1,87 +1,67 @@
 # =============================================================================
-# pdf-svc Dockerfile
-# Event-driven PDF generation microservice
+# Dockerfile - pdf-svc
+# Multi-stage build using uv for package management
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # Stage 1: Builder
 # -----------------------------------------------------------------------------
-FROM python:3.12-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv for faster package management
-RUN pip install --no-cache-dir uv
-
 # Copy dependency files
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock* ./
 
-# Create virtual environment and install dependencies
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Install dependencies (creates .venv in /app)
+RUN uv sync --frozen --no-dev --no-install-project
 
-RUN uv pip install --no-cache .
+# Copy source code
+COPY src/ src/
+
+# Install the project itself
+RUN uv sync --frozen --no-dev
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
 # -----------------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 
-LABEL maintainer="Inteligente"
-LABEL description="Event-driven PDF generation microservice"
-LABEL version="1.0.0"
-
-# Create non-root user for security
-RUN groupadd --gid 1000 pdfuser \
-    && useradd --uid 1000 --gid pdfuser --shell /bin/bash --create-home pdfuser
-
-WORKDIR /app
-
-# Install runtime dependencies
+# Install runtime dependencies for PDF processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1 \
     libfreetype6 \
     libjpeg62-turbo \
     libpng16-16 \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd --gid 1000 pdfuser \
+    && useradd --uid 1000 --gid pdfuser --shell /bin/bash --create-home pdfuser
+
+WORKDIR /app
 
 # Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+COPY --from=builder /app/.venv /app/.venv
 
-# Copy application code
-COPY --chown=pdfuser:pdfuser src/ ./src/
-COPY --chown=pdfuser:pdfuser assets/ ./assets/
+# Copy source code
+COPY --from=builder /app/src /app/src
 
-# Create necessary directories
+# Create directories
 RUN mkdir -p /app/logs /app/tmp /app/assets \
     && chown -R pdfuser:pdfuser /app
-
-# Set environment variables
-ENV PYTHONPATH=/app/src \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    LOG_DIR=/app/logs \
-    TEMP_DIR=/app/tmp \
-    ENVIRONMENT=production
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)" || exit 1
 
 # Switch to non-root user
 USER pdfuser
 
-# Expose no ports (NATS communication only)
-# Service communicates via NATS events, no HTTP endpoints
+# Set environment
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import pdf_svc; print('healthy')" || exit 1
 
 # Run the service
 CMD ["python", "-m", "pdf_svc.main"]

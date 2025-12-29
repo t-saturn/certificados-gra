@@ -1,129 +1,131 @@
 # =============================================================================
-# Makefile - Common development commands
+# Makefile - pdf-svc development commands
+# Uses uv for package management (uv sync, not pip)
 # =============================================================================
 
-.PHONY: help install dev test lint format build up down logs clean
+.PHONY: help setup dev test test-unit test-integration lint format run clean
 
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  install   - Install dependencies"
-	@echo "  dev       - Install development dependencies"
-	@echo "  test      - Run tests"
-	@echo "  lint      - Run linting checks"
-	@echo "  format    - Format code"
-	@echo "  build     - Build Docker image"
-	@echo "  up        - Start all services"
-	@echo "  down      - Stop all services"
-	@echo "  logs      - View service logs"
-	@echo "  clean     - Clean up Docker resources"
-	@echo "  shell     - Open shell in pdf-svc container"
-	@echo "  nats-box  - Start NATS CLI debugging tools"
-	@echo "  redis-cli - Open Redis CLI"
-	@echo "  pub       - Publish test event to NATS"
+	@echo ""
+	@echo "  Setup:"
+	@echo "    setup        - Create venv and install all dependencies"
+	@echo "    sync         - Sync dependencies (after changing pyproject.toml)"
+	@echo ""
+	@echo "  Development:"
+	@echo "    run          - Run the service"
+	@echo "    dev          - Run with auto-reload (using watchfiles)"
+	@echo ""
+	@echo "  Testing:"
+	@echo "    test         - Run all tests"
+	@echo "    test-unit    - Run unit tests only"
+	@echo "    test-int     - Run integration tests only"
+	@echo "    test-cov     - Run tests with coverage"
+	@echo ""
+	@echo "  Code Quality:"
+	@echo "    lint         - Run linting checks"
+	@echo "    format       - Format code"
+	@echo "    typecheck    - Run type checking"
+	@echo ""
+	@echo "  NATS Debugging:"
+	@echo "    nats-sub     - Subscribe to pdf events"
+	@echo "    nats-pub     - Publish test event"
+	@echo ""
+	@echo "  Cleanup:"
+	@echo "    clean        - Clean up artifacts"
+
+# -----------------------------------------------------------------------------
+# Setup
+# -----------------------------------------------------------------------------
+
+# Initial setup - creates venv and installs all dependencies
+setup:
+	uv sync --all-extras
+
+# Sync dependencies (use after modifying pyproject.toml)
+sync:
+	uv sync --all-extras
 
 # -----------------------------------------------------------------------------
 # Development
 # -----------------------------------------------------------------------------
 
-install:
-	pip install -e . --break-system-packages
+# Run the service
+run:
+	uv run python -m pdf_svc.main
 
+# Run with auto-reload (requires watchfiles)
 dev:
-	pip install -e ".[dev]" --break-system-packages
+	uv run watchfiles "python -m pdf_svc.main" src
 
+# -----------------------------------------------------------------------------
+# Testing
+# -----------------------------------------------------------------------------
+
+# Run all tests
 test:
-	PYTHONPATH=src pytest tests/ -v --tb=short
+	uv run pytest tests/ -v --tb=short
 
+# Run only unit tests
+test-unit:
+	uv run pytest tests/ -v --tb=short -m unit
+
+# Run only integration tests
+test-int:
+	uv run pytest tests/ -v --tb=short -m integration
+
+# Run with coverage
 test-cov:
-	PYTHONPATH=src pytest tests/ -v --cov=pdf_svc --cov-report=html --cov-report=term
+	uv run pytest tests/ -v --cov=pdf_svc --cov-report=html --cov-report=term
+
+# -----------------------------------------------------------------------------
+# Code Quality
+# -----------------------------------------------------------------------------
 
 lint:
-	ruff check src tests
+	uv run ruff check src tests
 
 format:
-	ruff format src tests
-	ruff check --fix src tests
+	uv run ruff format src tests
+	uv run ruff check --fix src tests
 
 typecheck:
-	mypy src
+	uv run mypy src
+
+# -----------------------------------------------------------------------------
+# NATS Debugging
+# -----------------------------------------------------------------------------
+
+nats-sub:
+	@echo "Subscribing to all pdf events..."
+	nats sub 'pdf.>'
+
+nats-pub:
+	@echo "Publishing test batch request..."
+	nats pub pdf.batch.requested '{"event_type":"pdf.batch.requested","payload":{"project_id":"11111111-1111-1111-1111-111111111111","items":[{"user_id":"22222222-2222-2222-2222-222222222222","template_id":"33333333-3333-3333-3333-333333333333","serial_code":"TEST-001","is_public":true,"pdf":[{"key":"nombre","value":"Test User"}],"qr":[{"base_url":"https://example.com/verify"},{"verify_code":"TEST-001"}],"qr_pdf":[{"qr_size_cm":"2.5"},{"qr_page":"0"}]}]}}'
+
+# Monitor file-svc events
+nats-sub-files:
+	@echo "Subscribing to file-svc events..."
+	nats sub 'files.>'
 
 # -----------------------------------------------------------------------------
 # Docker
 # -----------------------------------------------------------------------------
 
-build:
-	docker compose build
-
-up:
-	docker compose up -d
-	@echo "Services started. View logs with: make logs"
-
-up-build:
-	docker compose up -d --build
-
-down:
-	docker compose down
-
-down-v:
-	docker compose down -v
-
-logs:
-	docker compose logs -f pdf-svc
-
-logs-all:
-	docker compose logs -f
-
-restart:
-	docker compose restart pdf-svc
-
-# -----------------------------------------------------------------------------
-# Production
-# -----------------------------------------------------------------------------
-
-prod-build:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml build
-
-prod-up:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-prod-down:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-
-# -----------------------------------------------------------------------------
-# Debugging
-# -----------------------------------------------------------------------------
-
-shell:
-	docker compose exec pdf-svc /bin/bash
-
-nats-box:
-	docker compose --profile debug up -d nats-box
-	docker compose exec nats-box /bin/sh
-
-redis-cli:
-	docker compose exec redis redis-cli
-
-# Publish test event to NATS
-pub:
-	@echo "Publishing test event..."
-	docker compose exec nats-box nats pub pdf.process.requested '{"template_id":"test-123","user_id":"user-456","serial_code":"CERT-2025-001"}'
-
-# Subscribe to events for debugging
-sub:
-	docker compose exec nats-box nats sub "pdf.>"
+docker-build:
+	docker build -t pdf-svc:latest .
 
 # -----------------------------------------------------------------------------
 # Cleanup
 # -----------------------------------------------------------------------------
 
 clean:
-	docker compose down -v --remove-orphans
-	docker image prune -f
 	rm -rf logs/*.log
-	rm -rf __pycache__ .pytest_cache .coverage htmlcov
+	rm -rf tmp/*
+	rm -rf .venv
+	rm -rf __pycache__ .pytest_cache .coverage htmlcov .mypy_cache .ruff_cache
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-
-clean-all: clean
-	docker system prune -af
+	find . -type f -name "*.pyo" -delete 2>/dev/null || true

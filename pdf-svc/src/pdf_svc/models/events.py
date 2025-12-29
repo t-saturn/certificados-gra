@@ -1,18 +1,23 @@
 """
-Event models for NATS communication.
+NATS event models for pdf-svc and file-svc communication.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 
+# =============================================================================
+# Base Event
+# =============================================================================
+
+
 class BaseEvent(BaseModel):
-    """Base event model with common fields."""
+    """Base event structure matching file-svc format."""
 
     event_id: UUID = Field(default_factory=uuid4)
     event_type: str
@@ -20,233 +25,252 @@ class BaseEvent(BaseModel):
     source: str = "pdf-svc"
 
 
-# ============================================
-# File Service Events (communication with file-svc)
-# ============================================
+# =============================================================================
+# File-svc Events (Inbound)
+# =============================================================================
 
 
-class FileDownloadRequestPayload(BaseModel):
-    """Payload for file download request."""
-
-    job_id: UUID
-    file_id: UUID
-    destination_path: str
-
-
-class FileDownloadRequest(BaseEvent):
-    """Request to download a file from file-svc."""
-
-    event_type: Literal["files.download.requested"] = "files.download.requested"
-    payload: FileDownloadRequestPayload
-
-
-class FileDownloadCompletedPayload(BaseModel):
-    """Payload for file download completed event."""
+class FileDownloadPayload(BaseModel):
+    """Payload for file download events."""
 
     job_id: UUID
     file_id: UUID
-    file_path: str
-    file_name: str
-    file_size: int
-    mime_type: str
+    project_id: UUID | None = None
+    user_id: UUID | None = None
+    file_name: str | None = None
+    file_path: str | None = None  # Local path where file was downloaded
+    file_size: int | None = None
+    mime_type: str | None = None
+    error: str | None = None
 
 
 class FileDownloadCompleted(BaseEvent):
-    """Event received when file download is completed."""
+    """Event received when file-svc completes a download."""
 
-    event_type: Literal["files.download.completed"] = "files.download.completed"
-    source: str = "file-svc"
-    payload: FileDownloadCompletedPayload
-
-
-class FileDownloadFailedPayload(BaseModel):
-    """Payload for file download failed event."""
-
-    job_id: UUID
-    file_id: UUID
-    error: str
-    error_code: Optional[str] = None
+    event_type: str = "files.download.completed"
+    payload: FileDownloadPayload
 
 
 class FileDownloadFailed(BaseEvent):
-    """Event received when file download fails."""
+    """Event received when file-svc fails a download."""
 
-    event_type: Literal["files.download.failed"] = "files.download.failed"
-    source: str = "file-svc"
-    payload: FileDownloadFailedPayload
+    event_type: str = "files.download.failed"
+    payload: FileDownloadPayload
+
+
+class FileUploadPayload(BaseModel):
+    """Payload for file upload events."""
+
+    job_id: UUID
+    file_id: UUID | None = None
+    project_id: UUID | None = None
+    user_id: UUID | None = None
+    file_name: str | None = None
+    file_size: int | None = None
+    file_hash: str | None = None
+    mime_type: str | None = None
+    is_public: bool = True
+    download_url: str | None = None
+    created_at: datetime | None = None
+    error: str | None = None
+
+
+class FileUploadCompleted(BaseEvent):
+    """Event received when file-svc completes an upload."""
+
+    event_type: str = "files.upload.completed"
+    payload: FileUploadPayload
+
+
+class FileUploadFailed(BaseEvent):
+    """Event received when file-svc fails an upload."""
+
+    event_type: str = "files.upload.failed"
+    payload: FileUploadPayload
+
+
+# =============================================================================
+# File-svc Events (Outbound - Requests)
+# =============================================================================
+
+
+class FileDownloadRequestPayload(BaseModel):
+    """Payload for requesting file download."""
+
+    job_id: UUID
+    file_id: UUID
+    project_id: UUID | None = None
+    user_id: UUID | None = None
+    destination_path: str  # Where to save the file
+
+
+class FileDownloadRequest(BaseEvent):
+    """Event to request file download from file-svc."""
+
+    event_type: str = "files.download.requested"
+    payload: FileDownloadRequestPayload
 
 
 class FileUploadRequestPayload(BaseModel):
-    """Payload for file upload request."""
+    """Payload for requesting file upload."""
 
     job_id: UUID
+    project_id: UUID | None = None
     user_id: UUID
-    file_path: str
+    file_path: str  # Local path of file to upload
     file_name: str
     is_public: bool = True
     mime_type: str = "application/pdf"
 
 
 class FileUploadRequest(BaseEvent):
-    """Request to upload a file to file-svc."""
+    """Event to request file upload to file-svc."""
 
-    event_type: Literal["files.upload.requested"] = "files.upload.requested"
+    event_type: str = "files.upload.requested"
     payload: FileUploadRequestPayload
 
 
-class FileUploadCompletedPayload(BaseModel):
-    """Payload for file upload completed event."""
-
-    job_id: UUID
-    file_id: UUID
-    file_name: str
-    file_size: int
-    file_hash: Optional[str] = None
-    mime_type: str
-    is_public: bool
-    download_url: Optional[str] = None
-    created_at: datetime
+# =============================================================================
+# PDF-svc Events (Inbound - Requests)
+# =============================================================================
 
 
-class FileUploadCompleted(BaseEvent):
-    """Event received when file upload is completed."""
+class PdfItemRequest(BaseModel):
+    """Single item in a batch processing request."""
 
-    event_type: Literal["files.upload.completed"] = "files.upload.completed"
-    source: str = "file-svc"
-    payload: FileUploadCompletedPayload
-
-
-class FileUploadFailedPayload(BaseModel):
-    """Payload for file upload failed event."""
-
-    job_id: UUID
-    error: str
-    error_code: Optional[str] = None
-
-
-class FileUploadFailed(BaseEvent):
-    """Event received when file upload fails."""
-
-    event_type: Literal["files.upload.failed"] = "files.upload.failed"
-    source: str = "file-svc"
-    payload: FileUploadFailedPayload
-
-
-# ============================================
-# PDF Service Events (this service)
-# ============================================
-
-
-class QrConfigItem(BaseModel):
-    """QR configuration item."""
-
-    base_url: Optional[str] = None
-    verify_code: Optional[str] = None
-
-
-class QrPdfConfigItem(BaseModel):
-    """QR PDF insertion configuration item."""
-
-    qr_size_cm: Optional[str] = None
-    qr_margin_y_cm: Optional[str] = None
-    qr_margin_x_cm: Optional[str] = None
-    qr_page: Optional[str] = None
-    qr_rect: Optional[str] = None
-
-
-class PdfItem(BaseModel):
-    """PDF placeholder replacement item."""
-
-    key: str
-    value: str
-
-
-class PdfProcessRequestPayload(BaseModel):
-    """Payload for PDF process request - single document."""
-
-    template: UUID
     user_id: UUID
+    template_id: UUID
     serial_code: str
     is_public: bool = True
+    pdf: list[dict[str, str]] = Field(default_factory=list)
     qr: list[dict[str, str]] = Field(default_factory=list)
     qr_pdf: list[dict[str, str]] = Field(default_factory=list)
-    pdf: list[dict[str, str]] = Field(default_factory=list)
 
 
-class PdfProcessRequest(BaseEvent):
-    """Request to process a PDF document."""
+class PdfBatchRequestPayload(BaseModel):
+    """Payload for batch PDF processing request."""
 
-    event_type: Literal["pdf.process.requested"] = "pdf.process.requested"
-    payload: PdfProcessRequestPayload
-
-
-class PdfBatchProcessRequest(BaseEvent):
-    """Request to process multiple PDF documents."""
-
-    event_type: Literal["pdf.batch.requested"] = "pdf.batch.requested"
-    payload: list[PdfProcessRequestPayload]
+    project_id: UUID | None = None
+    items: list[PdfItemRequest]
 
 
-class PdfProcessCompletedPayload(BaseModel):
-    """Payload for PDF process completed event."""
+class PdfBatchRequest(BaseEvent):
+    """Event to request batch PDF processing."""
 
-    pdf_job_id: UUID
-    file_id: UUID
-    file_name: str
-    file_hash: Optional[str] = None
-    file_size_bytes: int
-    download_url: Optional[str] = None
-    created_at: datetime
-    processing_time_ms: int
+    event_type: str = "pdf.batch.requested"
+    payload: PdfBatchRequestPayload
 
 
-class PdfProcessCompleted(BaseEvent):
-    """Event emitted when PDF processing is completed."""
-
-    event_type: Literal["pdf.process.completed"] = "pdf.process.completed"
-    payload: PdfProcessCompletedPayload
+# =============================================================================
+# PDF-svc Events (Outbound - Responses)
+# =============================================================================
 
 
-class PdfProcessFailedPayload(BaseModel):
-    """Payload for PDF process failed event."""
+class PdfItemResult(BaseModel):
+    """Result of a single item processing."""
 
-    pdf_job_id: UUID
-    stage: str
-    error: str
-    error_code: Optional[str] = None
-    details: Optional[dict[str, Any]] = None
-
-
-class PdfProcessFailed(BaseEvent):
-    """Event emitted when PDF processing fails."""
-
-    event_type: Literal["pdf.process.failed"] = "pdf.process.failed"
-    payload: PdfProcessFailedPayload
+    item_id: UUID
+    user_id: UUID
+    serial_code: str
+    status: str  # completed | failed
+    data: dict[str, Any] | None = None  # ItemData as dict
+    error: dict[str, Any] | None = None  # ItemError as dict
 
 
-class PdfJobStatusPayload(BaseModel):
-    """Payload for job status query response."""
+class PdfBatchResultPayload(BaseModel):
+    """Payload for batch processing result."""
 
-    pdf_job_id: UUID
+    job_id: UUID
+    status: str  # completed | partial | failed
+    total_items: int
+    success_count: int
+    failed_count: int
+    items: list[PdfItemResult]
+    processing_time_ms: int | None = None
+
+
+class PdfBatchCompleted(BaseEvent):
+    """Event published when batch processing completes."""
+
+    event_type: str = "pdf.batch.completed"
+    payload: PdfBatchResultPayload
+
+
+class PdfBatchFailed(BaseEvent):
+    """Event published when entire batch fails (e.g., validation error)."""
+
+    event_type: str = "pdf.batch.failed"
+    payload: dict[str, Any]
+
+
+class PdfItemCompletedPayload(BaseModel):
+    """Payload for individual item completion."""
+
+    job_id: UUID
+    item_id: UUID
+    user_id: UUID
+    serial_code: str
+    data: dict[str, Any]
+
+
+class PdfItemCompleted(BaseEvent):
+    """Event published when a single item completes (for real-time tracking)."""
+
+    event_type: str = "pdf.item.completed"
+    payload: PdfItemCompletedPayload
+
+
+class PdfItemFailedPayload(BaseModel):
+    """Payload for individual item failure."""
+
+    job_id: UUID
+    item_id: UUID
+    user_id: UUID
+    serial_code: str
+    error: dict[str, Any]
+
+
+class PdfItemFailed(BaseEvent):
+    """Event published when a single item fails."""
+
+    event_type: str = "pdf.item.failed"
+    payload: PdfItemFailedPayload
+
+
+# =============================================================================
+# Job Status Query Events
+# =============================================================================
+
+
+class JobStatusRequestPayload(BaseModel):
+    """Payload for job status request."""
+
+    job_id: UUID
+
+
+class JobStatusRequest(BaseEvent):
+    """Event to request job status."""
+
+    event_type: str = "pdf.job.status.requested"
+    payload: JobStatusRequestPayload
+
+
+class JobStatusResponsePayload(BaseModel):
+    """Payload for job status response."""
+
+    job_id: UUID
     status: str
-    stage: Optional[str] = None
-    progress_pct: int
-    created_at: datetime
-    updated_at: datetime
-    completed_at: Optional[datetime] = None
-    result: Optional[PdfProcessCompletedPayload] = None
-    error: Optional[PdfProcessFailedPayload] = None
+    total_items: int
+    success_count: int
+    failed_count: int
+    items: list[dict[str, Any]]
+    created_at: str
+    completed_at: str | None = None
+    processing_time_ms: int | None = None
 
 
-class PdfJobStatusRequest(BaseEvent):
-    """Request for job status."""
+class JobStatusResponse(BaseEvent):
+    """Event response with job status."""
 
-    event_type: Literal["pdf.job.status.requested"] = "pdf.job.status.requested"
-    payload: dict[str, UUID]  # {"pdf_job_id": UUID}
-
-
-class PdfJobStatusResponse(BaseEvent):
-    """Response with job status."""
-
-    event_type: Literal["pdf.job.status.response"] = "pdf.job.status.response"
-    payload: PdfJobStatusPayload
+    event_type: str = "pdf.job.status.response"
+    payload: JobStatusResponsePayload

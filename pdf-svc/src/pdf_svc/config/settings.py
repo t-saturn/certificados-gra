@@ -1,101 +1,93 @@
 """
-Configuration module using pydantic-settings.
-Loads environment variables with validation.
+Configuration settings for pdf-svc.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
-from typing import Literal, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class RedisSettings(BaseSettings):
-    """Redis connection settings."""
+    """Redis configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="REDIS_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="REDIS_")
 
     host: str = Field(default="127.0.0.1")
-    port: int = Field(default=6379)
+    port: int = Field(default=6380)
     db: int = Field(default=0)
-    password: Optional[str] = Field(default=None)
+    password: str = Field(default="supersecret")
+
+    queue_pdf_jobs: str = Field(default="queue:pdf:jobs")
     job_ttl_seconds: int = Field(default=3600)
     key_prefix: str = Field(default="pdfsvc")
 
-    # Queue names
-    queue_pdf_download: str = Field(default="queue:pdf:download")
-    queue_pdf_render: str = Field(default="queue:pdf:render")
-    queue_pdf_qr: str = Field(default="queue:pdf:qr")
-    queue_pdf_insert: str = Field(default="queue:pdf:insert")
-    queue_pdf_upload: str = Field(default="queue:pdf:upload")
-
     @property
     def url(self) -> str:
-        """Build Redis URL from components."""
-        auth = f":{self.password}@" if self.password else ""
-        return f"redis://{auth}{self.host}:{self.port}/{self.db}"
+        """Build Redis URL."""
+        if self.password:
+            return f"redis://:{self.password}@{self.host}:{self.port}/{self.db}"
+        return f"redis://{self.host}:{self.port}/{self.db}"
 
 
 class NatsSettings(BaseSettings):
-    """NATS connection settings."""
+    """NATS configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="NATS_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="NATS_")
 
     url: str = Field(default="nats://127.0.0.1:4222")
 
 
 class FileSvcSettings(BaseSettings):
-    """File service event subjects."""
+    """File service subjects configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="FILE_SVC_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="FILE_SVC_")
 
     download_subject: str = Field(default="files.download.requested")
     upload_subject: str = Field(default="files.upload.requested")
-    download_completed: str = Field(default="files.download.completed")
-    upload_completed: str = Field(default="files.upload.completed")
+    download_completed_subject: str = Field(default="files.download.completed")
+    download_failed_subject: str = Field(default="files.download.failed")
+    upload_completed_subject: str = Field(default="files.upload.completed")
+    upload_failed_subject: str = Field(default="files.upload.failed")
 
 
 class PdfSvcSettings(BaseSettings):
-    """PDF service event subjects."""
+    """PDF service subjects configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="PDF_SVC_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="PDF_SVC_")
 
-    process_subject: str = Field(default="pdf.process.requested")
-    completed_subject: str = Field(default="pdf.process.completed")
-    failed_subject: str = Field(default="pdf.process.failed")
+    process_subject: str = Field(default="pdf.batch.requested")
+    completed_subject: str = Field(default="pdf.batch.completed")
+    failed_subject: str = Field(default="pdf.batch.failed")
+    item_completed_subject: str = Field(default="pdf.item.completed")
+    item_failed_subject: str = Field(default="pdf.item.failed")
 
 
 class QrSettings(BaseSettings):
-    """QR code generation settings."""
+    """QR code configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="QR_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="QR_")
 
-    logo_url: Optional[str] = Field(default=None)
-    logo_path: Optional[Path] = Field(default=None)
-    logo_cache_path: Optional[Path] = Field(default=Path("./assets/cached_logo.png"))
+    logo_url: str | None = Field(default=None)
+    logo_path: str | None = Field(default="./assets/logo.png")
+    logo_cache_path: str = Field(default="./assets/cached_logo.png")
 
 
 class LogSettings(BaseSettings):
-    """Logging settings."""
+    """Logging configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="LOG_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="LOG_")
 
-    dir: Path = Field(default=Path("./logs"))
-    file: str = Field(default="pdf-service.log")
-    level: Literal["debug", "info", "warning", "error", "critical"] = Field(default="info")
-    format: Literal["console", "json"] = Field(default="console")
-
-    @field_validator("dir", mode="before")
-    @classmethod
-    def ensure_path(cls, v: str | Path) -> Path:
-        return Path(v) if isinstance(v, str) else v
+    dir: str = Field(default="./logs")
+    file: str = Field(default="pdf-svc.log")
+    level: str = Field(default="DEBUG")
+    format: str = Field(default="json")
 
 
 class Settings(BaseSettings):
-    """Main application settings aggregating all sub-settings."""
+    """Main application settings."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -103,10 +95,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    environment: Literal["development", "staging", "production"] = Field(default="development")
-    temp_dir: Path = Field(default=Path("/tmp/pdf-svc"))
+    # General
+    environment: str = Field(default="development")
+    temp_dir: str = Field(default="./tmp")
 
-    # Sub-settings (loaded separately)
+    # Sub-settings
     redis: RedisSettings = Field(default_factory=RedisSettings)
     nats: NatsSettings = Field(default_factory=NatsSettings)
     file_svc: FileSvcSettings = Field(default_factory=FileSvcSettings)
@@ -114,23 +107,8 @@ class Settings(BaseSettings):
     qr: QrSettings = Field(default_factory=QrSettings)
     log: LogSettings = Field(default_factory=LogSettings)
 
-    @field_validator("temp_dir", mode="before")
-    @classmethod
-    def ensure_temp_path(cls, v: str | Path) -> Path:
-        path = Path(v) if isinstance(v, str) else v
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    @property
-    def is_development(self) -> bool:
-        return self.environment == "development"
-
-    @property
-    def is_production(self) -> bool:
-        return self.environment == "production"
-
 
 @lru_cache
 def get_settings() -> Settings:
-    """Get cached settings instance (singleton)."""
+    """Get cached settings instance."""
     return Settings()

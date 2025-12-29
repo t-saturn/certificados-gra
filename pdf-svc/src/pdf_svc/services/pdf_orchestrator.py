@@ -1,222 +1,372 @@
 """
-PDF processing orchestrator service.
-Coordinates the pipeline: download -> render -> qr -> insert -> upload
+PDF Orchestrator Service.
+
+Coordinates the full PDF processing pipeline for batch items:
+1. Download template from file-svc
+2. Render PDF with placeholder replacements
+3. Generate QR code
+4. Insert QR into PDF
+5. Upload result to file-svc
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
-from dataclasses import dataclass, field
+import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from pdf_svc.dto.pdf_request import PdfProcessDTO, QrConfig, QrPdfConfig
-from pdf_svc.models.job import Job, JobResult, JobStage, JobStatus
+import structlog
+
+from pdf_svc.dto.pdf_request import BatchItemRequest, QrConfig, QrPdfConfig
+from pdf_svc.models.job import BatchItem, BatchJob, ItemData, ItemStatus
 from pdf_svc.services.pdf_qr_insert_service import PdfQrInsertService
 from pdf_svc.services.pdf_replace_service import PdfReplaceService
 from pdf_svc.services.qr_service import QrService
-from pdf_svc.shared.logger import get_logger
 
-logger = get_logger(__name__)
+if TYPE_CHECKING:
+    from pdf_svc.repositories.file_repository import FileRepository
+    from pdf_svc.repositories.job_repository import RedisJobRepository
+
+logger = structlog.get_logger()
 
 
-@dataclass
 class PdfOrchestrator:
-    """
-    Orchestrates the PDF processing pipeline.
+    """Orchestrates the full PDF processing pipeline."""
 
-    Pipeline stages:
-    1. Download template from file-svc
-    2. Render PDF with placeholder replacements
-    3. Generate QR code
-    4. Insert QR into PDF
-    5. Upload final PDF to file-svc
-    """
-
-    temp_dir: Path
-    qr_service: QrService = field(default_factory=QrService)
-    pdf_replace_service: PdfReplaceService = field(default_factory=PdfReplaceService)
-    pdf_qr_insert_service: PdfQrInsertService = field(default_factory=PdfQrInsertService)
-
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        qr_service: QrService,
+        pdf_replace_service: PdfReplaceService,
+        pdf_qr_insert_service: PdfQrInsertService,
+        file_repository: "FileRepository",
+        job_repository: "RedisJobRepository",
+        temp_dir: str = "./tmp",
+    ) -> None:
+        """Initialize orchestrator with services."""
+        self.qr_service = qr_service
+        self.pdf_replace_service = pdf_replace_service
+        self.pdf_qr_insert_service = pdf_qr_insert_service
+        self.file_repository = file_repository
+        self.job_repository = job_repository
+        self.temp_dir = Path(temp_dir)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    def _get_temp_path(self, job_id: UUID, suffix: str) -> Path:
-        """Get temp file path for job."""
-        return self.temp_dir / f"{job_id}_{suffix}"
-
-    def _calculate_hash(self, data: bytes) -> str:
-        """Calculate SHA256 hash of data."""
-        return hashlib.sha256(data).hexdigest()
-
-    async def render_pdf(self, job: Job, template_bytes: bytes) -> bytes:
+    async def process_batch(self, job: BatchJob) -> BatchJob:
         """
-        Stage: Render PDF with placeholder replacements.
+        Process a batch of PDF items.
 
         Args:
-            job: Job instance with pdf_items
-            template_bytes: Template PDF bytes
+            job: BatchJob containing items to process
 
         Returns:
-            Rendered PDF bytes
+            Updated BatchJob with results
         """
-        job.update_status(JobStatus.RENDERING, JobStage.RENDER)
-        logger.info("rendering_pdf", job_id=str(job.id), items=len(job.pdf_items))
+        log = logger.bind(job_id=str(job.job_id), total_items=job.total_items)
+        log.info("starting_batch_processing")
 
-        rendered = await self.pdf_replace_service.render_pdf_bytes_async(
-            template_pdf=template_bytes,
-            pdf_items=job.pdf_items,
+        job.start_processing()
+        await self.job_repository.save(job)
+
+        # Process each item
+        for item in job.items:
+            try:
+                await self._process_item(job, item)
+            except Exception as e:
+                log.error("item_processing_error", item_id=str(item.item_id), error=str(e))
+                item.set_failed("orchestration", str(e))
+
+            # Save job state after each item
+            job.update_counts()
+            await self.job_repository.save(job)
+
+        # Finalize job
+        job.finalize()
+        await self.job_repository.save(job)
+
+        log.info(
+            "batch_processing_completed",
+            status=job.status.value,
+            success_count=job.success_count,
+            failed_count=job.failed_count,
+            processing_time_ms=job.processing_time_ms,
         )
 
-        job.update_status(JobStatus.RENDERED, JobStage.RENDER)
-        logger.info("pdf_rendered", job_id=str(job.id), size=len(rendered))
-        return rendered
+        return job
 
-    async def generate_qr(self, job: Job, qr_config: QrConfig) -> bytes:
+    async def _process_item(self, job: BatchJob, item: BatchItem) -> None:
         """
-        Stage: Generate QR code.
+        Process a single item in the batch.
 
         Args:
-            job: Job instance
-            qr_config: QR configuration
-
-        Returns:
-            QR code PNG bytes
+            job: Parent batch job
+            item: Item to process
         """
-        job.update_status(JobStatus.GENERATING_QR, JobStage.QR)
-        logger.info(
-            "generating_qr",
-            job_id=str(job.id),
-            base_url=qr_config.base_url,
-            verify_code=qr_config.verify_code,
+        log = logger.bind(
+            job_id=str(job.job_id),
+            item_id=str(item.item_id),
+            serial_code=item.serial_code,
         )
+        log.info("processing_item")
 
-        qr_png = await self.qr_service.generate_png_async(
-            base_url=qr_config.base_url,
-            verify_code=qr_config.verify_code,
-        )
+        start_time = datetime.now(timezone.utc)
+        item_temp_dir = self.temp_dir / str(item.item_id)
+        item_temp_dir.mkdir(parents=True, exist_ok=True)
 
-        job.update_status(JobStatus.QR_GENERATED, JobStage.QR)
-        logger.info("qr_generated", job_id=str(job.id), size=len(qr_png))
-        return qr_png
+        try:
+            # Paths for this item
+            template_path = item_temp_dir / "template.pdf"
+            rendered_path = item_temp_dir / "rendered.pdf"
+            qr_path = item_temp_dir / "qr.png"
+            output_path = item_temp_dir / f"{item.serial_code}.pdf"
 
-    async def insert_qr(
-        self, job: Job, pdf_bytes: bytes, qr_png: bytes, qr_pdf_config: QrPdfConfig
+            # Step 1: Download template
+            item.update_status(ItemStatus.DOWNLOADING, 10)
+            template_bytes = await self._download_template(item, template_path)
+            item.update_status(ItemStatus.DOWNLOADED, 20)
+            log.debug("template_downloaded", size=len(template_bytes))
+
+            # Step 2: Render PDF with placeholders
+            item.update_status(ItemStatus.RENDERING, 30)
+            rendered_bytes = await self._render_pdf(item, template_bytes)
+            item.update_status(ItemStatus.RENDERED, 50)
+            log.debug("pdf_rendered", size=len(rendered_bytes))
+
+            # Step 3: Generate QR code
+            item.update_status(ItemStatus.GENERATING_QR, 60)
+            qr_bytes = await self._generate_qr(item, qr_path)
+            item.update_status(ItemStatus.QR_GENERATED, 70)
+            log.debug("qr_generated", size=len(qr_bytes))
+
+            # Step 4: Insert QR into PDF
+            item.update_status(ItemStatus.INSERTING_QR, 80)
+            final_bytes = await self._insert_qr(item, rendered_bytes, qr_bytes)
+            item.update_status(ItemStatus.QR_INSERTED, 85)
+            log.debug("qr_inserted", size=len(final_bytes))
+
+            # Save final PDF
+            output_path.write_bytes(final_bytes)
+
+            # Step 5: Upload result
+            item.update_status(ItemStatus.UPLOADING, 90)
+            upload_result = await self._upload_result(job, item, output_path)
+
+            # Calculate processing time
+            end_time = datetime.now(timezone.utc)
+            processing_time_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            # Calculate file hash
+            file_hash = hashlib.sha256(final_bytes).hexdigest()
+
+            # Set completed with data
+            item_data = ItemData(
+                file_id=upload_result.get("file_id"),
+                original_name=f"{item.serial_code}.pdf",
+                file_name=upload_result.get("file_name", f"{item.serial_code}.pdf"),
+                file_size=len(final_bytes),
+                file_hash=file_hash,
+                mime_type="application/pdf",
+                is_public=item.is_public,
+                download_url=upload_result.get("download_url"),
+                created_at=datetime.now(timezone.utc),
+                processing_time_ms=processing_time_ms,
+            )
+            item.set_completed(item_data)
+            log.info("item_completed", processing_time_ms=processing_time_ms)
+
+        except Exception as e:
+            log.error("item_failed", error=str(e))
+            raise
+
+        finally:
+            # Cleanup temp files
+            self._cleanup_temp_dir(item_temp_dir)
+
+    async def _download_template(
+        self, item: BatchItem, dest_path: Path
+    ) -> bytes:
+        """Download template PDF from file-svc."""
+        log = logger.bind(item_id=str(item.item_id), template_id=str(item.template_id))
+
+        try:
+            # Request download from file-svc
+            result = await self.file_repository.download_and_wait(
+                file_id=item.template_id,
+                user_id=item.user_id,
+                destination_path=str(dest_path),
+            )
+
+            if not result.get("success"):
+                raise RuntimeError(f"Download failed: {result.get('error', 'Unknown error')}")
+
+            # Read downloaded file
+            if dest_path.exists():
+                return dest_path.read_bytes()
+            else:
+                raise FileNotFoundError(f"Template not found at {dest_path}")
+
+        except Exception as e:
+            log.error("download_failed", error=str(e))
+            item.set_failed("download", str(e))
+            raise
+
+    async def _render_pdf(self, item: BatchItem, template_bytes: bytes) -> bytes:
+        """Render PDF with placeholder replacements."""
+        try:
+            # Get placeholders from item configuration
+            placeholders = {}
+            for pdf_item in item.pdf_items:
+                key = pdf_item.get("key", "").strip()
+                value = pdf_item.get("value", "").strip()
+                if key:
+                    placeholders[f"{{{{{key}}}}}"] = value
+
+            if not placeholders:
+                # No replacements needed, return original
+                return template_bytes
+
+            result = await self.pdf_replace_service.render_pdf_bytes_async(
+                template_pdf=template_bytes,
+                pdf_items=item.pdf_items,
+            )
+            return result
+
+        except Exception as e:
+            logger.error("render_failed", item_id=str(item.item_id), error=str(e))
+            item.set_failed("render", str(e))
+            raise
+
+    async def _generate_qr(self, item: BatchItem, dest_path: Path) -> bytes:
+        """Generate QR code PNG."""
+        try:
+            # Parse QR config
+            qr_config = QrConfig.from_list(item.qr_config)
+
+            if not qr_config.base_url or not qr_config.verify_code:
+                raise ValueError("QR config requires base_url and verify_code")
+
+            qr_bytes = await self.qr_service.generate_png_async(
+                base_url=qr_config.base_url,
+                verify_code=qr_config.verify_code,
+            )
+
+            # Save to file for reference
+            dest_path.write_bytes(qr_bytes)
+
+            return qr_bytes
+
+        except Exception as e:
+            logger.error("qr_generation_failed", item_id=str(item.item_id), error=str(e))
+            item.set_failed("qr_generation", str(e))
+            raise
+
+    async def _insert_qr(
+        self, item: BatchItem, pdf_bytes: bytes, qr_bytes: bytes
+    ) -> bytes:
+        """Insert QR code into PDF."""
+        try:
+            # Parse QR PDF config
+            qr_pdf_config = QrPdfConfig.from_list(item.qr_pdf_config)
+
+            result = await self.pdf_qr_insert_service.insert_qr_bytes_async(
+                input_pdf=pdf_bytes,
+                qr_png=qr_bytes,
+                qr_page=qr_pdf_config.qr_page,
+                qr_size_cm=qr_pdf_config.qr_size_cm,
+                qr_margin_y_cm=qr_pdf_config.qr_margin_y_cm,
+                qr_rect=qr_pdf_config.qr_rect,
+            )
+            return result
+
+        except Exception as e:
+            logger.error("qr_insertion_failed", item_id=str(item.item_id), error=str(e))
+            item.set_failed("qr_insertion", str(e))
+            raise
+
+    async def _upload_result(
+        self, job: BatchJob, item: BatchItem, file_path: Path
+    ) -> dict:
+        """Upload result PDF to file-svc."""
+        log = logger.bind(item_id=str(item.item_id))
+
+        try:
+            result = await self.file_repository.upload_and_wait(
+                user_id=item.user_id,
+                project_id=job.project_id,
+                file_path=str(file_path),
+                file_name=f"{item.serial_code}.pdf",
+                is_public=item.is_public,
+            )
+
+            if not result.get("success"):
+                raise RuntimeError(f"Upload failed: {result.get('error', 'Unknown error')}")
+
+            log.debug("upload_completed", file_id=result.get("file_id"))
+            return result
+
+        except Exception as e:
+            log.error("upload_failed", error=str(e))
+            item.set_failed("upload", str(e))
+            raise
+
+    def _cleanup_temp_dir(self, temp_dir: Path) -> None:
+        """Clean up temporary directory."""
+        try:
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+        except Exception as e:
+            logger.warning("cleanup_failed", path=str(temp_dir), error=str(e))
+
+    async def process_item_local(
+        self,
+        template_bytes: bytes,
+        pdf_items: list[dict[str, str]],
+        qr_config: list[dict[str, str]],
+        qr_pdf_config: list[dict[str, str]],
     ) -> bytes:
         """
-        Stage: Insert QR code into PDF.
+        Process a single PDF locally (without file-svc events).
+
+        Used for testing and direct processing.
 
         Args:
-            job: Job instance
-            pdf_bytes: PDF bytes to modify
-            qr_png: QR code PNG bytes
+            template_bytes: PDF template as bytes
+            pdf_items: Placeholder replacements
+            qr_config: QR code configuration
             qr_pdf_config: QR insertion configuration
 
         Returns:
-            Final PDF bytes with QR inserted
+            Processed PDF as bytes
         """
-        job.update_status(JobStatus.INSERTING_QR, JobStage.INSERT)
-        logger.info(
-            "inserting_qr",
-            job_id=str(job.id),
-            page=qr_pdf_config.qr_page,
-            rect=qr_pdf_config.qr_rect,
+        # Step 1: Render
+        rendered = await self.pdf_replace_service.render_pdf_bytes_async(
+            template_pdf=template_bytes,
+            pdf_items=pdf_items,
         )
 
+        # Step 2: Generate QR
+        qr_cfg = QrConfig.from_list(qr_config)
+        if not qr_cfg.base_url or not qr_cfg.verify_code:
+            raise ValueError("QR config requires base_url and verify_code")
+
+        qr_bytes = await self.qr_service.generate_png_async(
+            base_url=qr_cfg.base_url,
+            verify_code=qr_cfg.verify_code,
+        )
+
+        # Step 3: Insert QR
+        qr_pdf_cfg = QrPdfConfig.from_list(qr_pdf_config)
         final_pdf = await self.pdf_qr_insert_service.insert_qr_bytes_async(
-            input_pdf=pdf_bytes,
-            qr_png=qr_png,
-            qr_page=qr_pdf_config.qr_page,
-            qr_rect=qr_pdf_config.qr_rect,
-            qr_size_cm=qr_pdf_config.qr_size_cm,
-            qr_margin_y_cm=qr_pdf_config.qr_margin_y_cm,
-            qr_margin_x_cm=qr_pdf_config.qr_margin_x_cm,
+            input_pdf=rendered,
+            qr_png=qr_bytes,
+            qr_page=qr_pdf_cfg.qr_page,
+            qr_size_cm=qr_pdf_cfg.qr_size_cm,
+            qr_margin_y_cm=qr_pdf_cfg.qr_margin_y_cm,
+            qr_rect=qr_pdf_cfg.qr_rect,
         )
 
-        job.update_status(JobStatus.QR_INSERTED, JobStage.INSERT)
-        logger.info("qr_inserted", job_id=str(job.id), size=len(final_pdf))
         return final_pdf
-
-    async def process_local(
-        self,
-        job: Job,
-        template_bytes: bytes,
-        qr_config: QrConfig,
-        qr_pdf_config: QrPdfConfig,
-    ) -> tuple[bytes, str]:
-        """
-        Process PDF locally (without file-svc events).
-
-        Useful for testing or when template is already available.
-
-        Args:
-            job: Job instance
-            template_bytes: Template PDF bytes
-            qr_config: QR configuration
-            qr_pdf_config: QR insertion configuration
-
-        Returns:
-            Tuple of (final PDF bytes, file hash)
-        """
-        # Stage 1: Render PDF
-        rendered_pdf = await self.render_pdf(job, template_bytes)
-
-        # Stage 2: Generate QR
-        qr_png = await self.generate_qr(job, qr_config)
-
-        # Stage 3: Insert QR
-        final_pdf = await self.insert_qr(job, rendered_pdf, qr_png, qr_pdf_config)
-
-        # Calculate hash
-        file_hash = self._calculate_hash(final_pdf)
-
-        # Save to temp file
-        output_path = self._get_temp_path(job.id, f"{job.serial_code}.pdf")
-        output_path.write_bytes(final_pdf)
-        job.output_path = str(output_path)
-
-        logger.info(
-            "local_processing_complete",
-            job_id=str(job.id),
-            output_path=str(output_path),
-            size=len(final_pdf),
-            hash=file_hash[:16],
-        )
-
-        return final_pdf, file_hash
-
-    def create_job_result(
-        self,
-        job: Job,
-        file_id: UUID,
-        file_name: str,
-        file_size: int,
-        file_hash: Optional[str] = None,
-        download_url: Optional[str] = None,
-    ) -> JobResult:
-        """Create job result after successful upload."""
-        result = JobResult(
-            file_id=file_id,
-            file_name=file_name,
-            file_hash=file_hash,
-            file_size_bytes=file_size,
-            download_url=download_url,
-            created_at=datetime.now(timezone.utc),
-        )
-        job.set_result(result)
-        return result
-
-    def cleanup_temp_files(self, job: Job) -> None:
-        """Clean up temporary files for a job."""
-        paths = [job.template_path, job.output_path, job.qr_path]
-        for path_str in paths:
-            if path_str:
-                path = Path(path_str)
-                if path.exists():
-                    try:
-                        path.unlink()
-                        logger.debug("temp_file_removed", path=path_str)
-                    except Exception as e:
-                        logger.warning("temp_file_removal_failed", path=path_str, error=str(e))

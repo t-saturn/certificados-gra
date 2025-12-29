@@ -89,7 +89,7 @@ class DailyFileHandler(logging.FileHandler):
 def configure_logging(
     level: Literal["debug", "info", "warning", "error", "critical"] = "info",
     log_format: Literal["console", "json"] = "console",
-    log_dir: Path | None = None,
+    log_dir: Path | str | None = None,
 ) -> None:
     """
     Configure structlog with colored console output and file logging.
@@ -100,7 +100,10 @@ def configure_logging(
         log_dir: Directory for log files (creates daily files)
     """
     settings = get_settings()
-    log_dir = log_dir or settings.log.dir
+    if log_dir is None:
+        log_dir = Path(settings.log.dir)
+    elif isinstance(log_dir, str):
+        log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # Map string level to logging constant
@@ -203,3 +206,17 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
 
 # Convenience alias
 logger = get_logger("pdf_svc")
+
+
+def setup_logging(settings: Any) -> None:
+    """
+    Setup logging from settings.
+
+    Args:
+        settings: Application settings
+    """
+    configure_logging(
+        level=settings.log.level.lower(),
+        log_format="console" if settings.environment == "development" else "json",
+        log_dir=settings.log.dir,
+    )

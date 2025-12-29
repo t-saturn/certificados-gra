@@ -1,231 +1,191 @@
 """
-PDF Service - Event-driven PDF generator.
+pdf-svc - Event-driven PDF generation microservice.
 
-Main entry point using FastStream for NATS/Redis communication.
+Entry point for the service.
 """
 
 from __future__ import annotations
 
 import asyncio
+import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator
 
-from faststream import FastStream
-from faststream.nats import NatsBroker
+import nats
+import structlog
 from redis.asyncio import Redis
 
-from pdf_svc.config.settings import Settings, get_settings
+from pdf_svc.config.settings import get_settings
 from pdf_svc.events.publishers import PdfEventPublisher
 from pdf_svc.events.subscribers import PdfEventHandler
-from pdf_svc.models.events import (
-    FileDownloadCompleted,
-    FileDownloadFailed,
-    FileUploadCompleted,
-    FileUploadFailed,
-    PdfJobStatusRequest,
-    PdfProcessRequest,
-)
 from pdf_svc.repositories.file_repository import FileRepository
 from pdf_svc.repositories.job_repository import RedisJobRepository
 from pdf_svc.services.pdf_orchestrator import PdfOrchestrator
+from pdf_svc.services.pdf_qr_insert_service import PdfQrInsertService
+from pdf_svc.services.pdf_replace_service import PdfReplaceService
 from pdf_svc.services.qr_service import QrService
-from pdf_svc.shared.logger import configure_logging, get_logger
+from pdf_svc.shared.logger import setup_logging
 
-logger = get_logger(__name__)
-
-# Global state
-_redis: Redis | None = None
-_handler: PdfEventHandler | None = None
+logger = structlog.get_logger()
 
 
-def create_qr_service(settings: Settings) -> QrService:
-    """Create QR service with configuration."""
-    return QrService(
-        logo_path=settings.qr.logo_path,
-        logo_url=settings.qr.logo_url,
-        logo_cache_path=settings.qr.logo_cache_path,
-    )
+class PdfService:
+    """Main PDF service application."""
 
+    def __init__(self) -> None:
+        """Initialize service."""
+        self.settings = get_settings()
+        self._running = False
+        self._shutdown_event = asyncio.Event()
 
-def create_orchestrator(settings: Settings, qr_service: QrService) -> PdfOrchestrator:
-    """Create PDF orchestrator."""
-    return PdfOrchestrator(
-        temp_dir=settings.temp_dir,
-        qr_service=qr_service,
-    )
+        # Connections
+        self._redis: Redis | None = None
+        self._nats: nats.aio.client.Client | None = None
 
+        # Components
+        self._job_repository: RedisJobRepository | None = None
+        self._file_repository: FileRepository | None = None
+        self._orchestrator: PdfOrchestrator | None = None
+        self._publisher: PdfEventPublisher | None = None
+        self._handler: PdfEventHandler | None = None
 
-@asynccontextmanager
-async def lifespan(app: FastStream) -> AsyncIterator[None]:
-    """Application lifespan - setup and teardown."""
-    global _redis, _handler
+    async def start(self) -> None:
+        """Start the service."""
+        log = logger.bind(component="pdf_service")
+        log.info("starting_service", environment=self.settings.environment)
 
-    settings = get_settings()
+        # Setup logging
+        setup_logging(self.settings)
 
-    # Configure logging
-    configure_logging(
-        level=settings.log.level,
-        log_format=settings.log.format,
-        log_dir=settings.log.dir,
-    )
+        # Ensure temp directory exists
+        Path(self.settings.temp_dir).mkdir(parents=True, exist_ok=True)
 
-    logger.info(
-        "starting_pdf_svc",
-        environment=settings.environment,
-        nats_url=settings.nats.url,
-        redis_url=settings.redis.url,
-    )
+        # Connect to Redis
+        self._redis = Redis(
+            host=self.settings.redis.host,
+            port=self.settings.redis.port,
+            db=self.settings.redis.db,
+            password=self.settings.redis.password or None,
+            decode_responses=False,
+        )
+        await self._redis.ping()
+        log.info("redis_connected", host=self.settings.redis.host, port=self.settings.redis.port)
 
-    # Connect to Redis
-    _redis = Redis.from_url(settings.redis.url, decode_responses=False)
-    await _redis.ping()
-    logger.info("redis_connected")
+        # Connect to NATS
+        self._nats = await nats.connect(self.settings.nats.url)
+        log.info("nats_connected", url=self.settings.nats.url)
 
-    # Create repositories
-    job_repo = RedisJobRepository(
-        redis=_redis,
-        prefix=settings.redis.key_prefix,
-        ttl_seconds=settings.redis.job_ttl_seconds,
-    )
+        # Initialize repositories
+        self._job_repository = RedisJobRepository(
+            redis_client=self._redis,
+            settings=self.settings,
+        )
 
-    # Get NATS client from broker
-    nats_client = broker._connection
+        self._file_repository = FileRepository(
+            nats_client=self._nats,
+            settings=self.settings,
+        )
+        await self._file_repository.start()
 
-    file_repo = FileRepository(
-        nats_client=nats_client,
-        download_subject=settings.file_svc.download_subject,
-        upload_subject=settings.file_svc.upload_subject,
-    )
+        # Initialize services
+        qr_service = QrService(
+            logo_url=self.settings.qr.logo_url,
+            logo_path=self.settings.qr.logo_path,
+            logo_cache_path=self.settings.qr.logo_cache_path,
+        )
+        pdf_replace_service = PdfReplaceService()
+        pdf_qr_insert_service = PdfQrInsertService()
 
-    # Create services
-    qr_service = create_qr_service(settings)
-    orchestrator = create_orchestrator(settings, qr_service)
+        self._orchestrator = PdfOrchestrator(
+            qr_service=qr_service,
+            pdf_replace_service=pdf_replace_service,
+            pdf_qr_insert_service=pdf_qr_insert_service,
+            file_repository=self._file_repository,
+            job_repository=self._job_repository,
+            temp_dir=self.settings.temp_dir,
+        )
 
-    # Create publisher
-    publisher = PdfEventPublisher(
-        nats_client=nats_client,
-        completed_subject=settings.pdf_svc.completed_subject,
-        failed_subject=settings.pdf_svc.failed_subject,
-    )
+        # Initialize event publisher and handler
+        self._publisher = PdfEventPublisher(
+            nats_client=self._nats,
+            settings=self.settings,
+        )
 
-    # Create event handler
-    _handler = PdfEventHandler(
-        job_repository=job_repo,
-        file_repository=file_repo,
-        orchestrator=orchestrator,
-        publisher=publisher,
-    )
+        self._handler = PdfEventHandler(
+            nats_client=self._nats,
+            settings=self.settings,
+            job_repository=self._job_repository,
+            orchestrator=self._orchestrator,
+            publisher=self._publisher,
+        )
+        await self._handler.start()
 
-    logger.info("pdf_svc_ready")
+        self._running = True
+        log.info("service_started", process_subject=self.settings.pdf_svc.process_subject)
 
-    yield
+    async def stop(self) -> None:
+        """Stop the service."""
+        log = logger.bind(component="pdf_service")
+        log.info("stopping_service")
 
-    # Cleanup
-    if _redis:
-        await _redis.close()
-        logger.info("redis_disconnected")
+        self._running = False
 
-    logger.info("pdf_svc_stopped")
+        # Stop event handler
+        if self._handler:
+            await self._handler.stop()
 
+        # Stop file repository
+        if self._file_repository:
+            await self._file_repository.stop()
 
-# Create broker and app
-settings = get_settings()
-broker = NatsBroker(settings.nats.url)
-app = FastStream(broker, lifespan=lifespan)
+        # Close NATS
+        if self._nats and self._nats.is_connected:
+            await self._nats.close()
+            log.info("nats_disconnected")
 
+        # Close Redis
+        if self._redis:
+            await self._redis.close()
+            log.info("redis_disconnected")
 
-# ============================================
-# Event Handlers
-# ============================================
+        log.info("service_stopped")
 
+    async def run(self) -> None:
+        """Run the service until shutdown."""
+        await self.start()
 
-@broker.subscriber(settings.pdf_svc.process_subject)
-async def on_process_request(data: dict[str, Any]) -> None:
-    """Handle PDF process request."""
-    if _handler is None:
-        logger.error("handler_not_initialized")
-        return
+        # Setup signal handlers
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(
+                sig,
+                lambda s=sig: asyncio.create_task(self._handle_signal(s)),
+            )
 
-    try:
-        event = PdfProcessRequest.model_validate(data)
-        await _handler.handle_process_request(event)
-    except Exception as e:
-        logger.exception("process_request_error", error=str(e))
+        logger.info("service_running", message="Press Ctrl+C to stop")
 
+        # Wait for shutdown
+        await self._shutdown_event.wait()
+        await self.stop()
 
-@broker.subscriber(settings.file_svc.download_completed)
-async def on_download_completed(data: dict[str, Any]) -> None:
-    """Handle file download completed."""
-    if _handler is None:
-        return
-
-    try:
-        event = FileDownloadCompleted.model_validate(data)
-        await _handler.handle_download_completed(event)
-    except Exception as e:
-        logger.exception("download_completed_error", error=str(e))
-
-
-@broker.subscriber("files.download.failed")
-async def on_download_failed(data: dict[str, Any]) -> None:
-    """Handle file download failed."""
-    if _handler is None:
-        return
-
-    try:
-        event = FileDownloadFailed.model_validate(data)
-        await _handler.handle_download_failed(event)
-    except Exception as e:
-        logger.exception("download_failed_error", error=str(e))
-
-
-@broker.subscriber(settings.file_svc.upload_completed)
-async def on_upload_completed(data: dict[str, Any]) -> None:
-    """Handle file upload completed."""
-    if _handler is None:
-        return
-
-    try:
-        event = FileUploadCompleted.model_validate(data)
-        await _handler.handle_upload_completed(event)
-    except Exception as e:
-        logger.exception("upload_completed_error", error=str(e))
-
-
-@broker.subscriber("files.upload.failed")
-async def on_upload_failed(data: dict[str, Any]) -> None:
-    """Handle file upload failed."""
-    if _handler is None:
-        return
-
-    try:
-        event = FileUploadFailed.model_validate(data)
-        await _handler.handle_upload_failed(event)
-    except Exception as e:
-        logger.exception("upload_failed_error", error=str(e))
-
-
-@broker.subscriber("pdf.job.status.requested")
-async def on_status_request(data: dict[str, Any]) -> None:
-    """Handle job status request."""
-    if _handler is None:
-        return
-
-    try:
-        event = PdfJobStatusRequest.model_validate(data)
-        await _handler.handle_status_request(event)
-    except Exception as e:
-        logger.exception("status_request_error", error=str(e))
+    async def _handle_signal(self, sig: signal.Signals) -> None:
+        """Handle shutdown signal."""
+        logger.info("shutdown_signal_received", signal=sig.name)
+        self._shutdown_event.set()
 
 
 def main() -> None:
     """Main entry point."""
-    import uvloop
+    service = PdfService()
 
-    uvloop.install()
-    app.run()
+    try:
+        asyncio.run(service.run())
+    except KeyboardInterrupt:
+        logger.info("keyboard_interrupt")
+    except Exception as e:
+        logger.error("service_error", error=str(e))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

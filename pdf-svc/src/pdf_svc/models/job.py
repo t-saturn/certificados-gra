@@ -1,19 +1,19 @@
 """
-Job model for tracking PDF processing pipeline status.
+Job and Item models for batch PDF processing.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 
-class JobStatus(str, Enum):
-    """Job status enum for pipeline stages."""
+class ItemStatus(str, Enum):
+    """Status of individual item in batch."""
 
     PENDING = "pending"
     DOWNLOADING = "downloading"
@@ -29,130 +29,204 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
-class JobStage(str, Enum):
-    """Pipeline stages for job processing."""
+class JobStatus(str, Enum):
+    """Status of the batch job."""
 
-    DOWNLOAD = "download"
-    RENDER = "render"
-    QR = "qr"
-    INSERT = "insert"
-    UPLOAD = "upload"
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    PARTIAL = "partial"  # Some items failed
+    FAILED = "failed"  # All items failed
 
 
-class JobError(BaseModel):
-    """Error details for failed jobs."""
+class ItemData(BaseModel):
+    """Data returned for each processed item (from file-svc response)."""
 
-    stage: JobStage
+    file_id: UUID | None = None
+    original_name: str | None = None
+    file_name: str | None = None
+    file_size: int | None = None
+    file_hash: str | None = None
+    mime_type: str | None = None
+    is_public: bool = True
+    download_url: str | None = None
+    created_at: datetime | None = None
+    processing_time_ms: int | None = None
+
+
+class ItemError(BaseModel):
+    """Error information for failed items."""
+
+    stage: str
     message: str
-    details: Optional[dict[str, Any]] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    code: str | None = None
+    details: dict[str, Any] | None = None
 
 
-class JobResult(BaseModel):
-    """Result details for completed jobs."""
+class BatchItem(BaseModel):
+    """Individual item in a batch processing job."""
 
-    file_id: UUID
-    file_name: str
-    file_hash: Optional[str] = None
-    file_size_bytes: int
-    download_url: Optional[str] = None
-    created_at: datetime
-
-
-class Job(BaseModel):
-    """
-    Job model representing a PDF processing task.
-
-    Tracks the entire pipeline from download to upload.
-    """
-
-    id: UUID = Field(default_factory=uuid4)
-    status: JobStatus = JobStatus.PENDING
-    stage: Optional[JobStage] = None
-
-    # Request data
-    template_id: UUID
+    item_id: UUID = Field(default_factory=uuid4)
     user_id: UUID
+    template_id: UUID
     serial_code: str
     is_public: bool = True
 
-    # Processing data
+    # Processing configuration
     pdf_items: list[dict[str, str]] = Field(default_factory=list)
-    qr_config: dict[str, str] = Field(default_factory=dict)
-    qr_pdf_config: dict[str, str] = Field(default_factory=dict)
+    qr_config: list[dict[str, str]] = Field(default_factory=list)
+    qr_pdf_config: list[dict[str, str]] = Field(default_factory=list)
 
-    # Temp file paths
-    template_path: Optional[str] = None
-    output_path: Optional[str] = None
-    qr_path: Optional[str] = None
+    # Status tracking
+    status: ItemStatus = ItemStatus.PENDING
+    progress_pct: int = 0
 
-    # Result
-    result: Optional[JobResult] = None
-    error: Optional[JobError] = None
+    # Result data (populated on completion)
+    data: ItemData | None = None
+
+    # Error info (populated on failure)
+    error: ItemError | None = None
+
+    # Timestamps
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+    # Internal paths (not serialized to response)
+    _template_path: str | None = None
+    _output_path: str | None = None
+    _qr_path: str | None = None
+
+    def update_status(self, status: ItemStatus, progress: int | None = None) -> None:
+        """Update item status and progress."""
+        self.status = status
+        if progress is not None:
+            self.progress_pct = progress
+
+        # Auto-set timestamps
+        if status == ItemStatus.DOWNLOADING and self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
+        elif status in (ItemStatus.COMPLETED, ItemStatus.FAILED):
+            self.completed_at = datetime.now(timezone.utc)
+
+    def set_completed(self, data: ItemData) -> None:
+        """Mark item as completed with result data."""
+        self.status = ItemStatus.COMPLETED
+        self.progress_pct = 100
+        self.data = data
+        self.completed_at = datetime.now(timezone.utc)
+
+    def set_failed(self, stage: str, message: str, code: str | None = None) -> None:
+        """Mark item as failed with error info."""
+        self.status = ItemStatus.FAILED
+        self.error = ItemError(stage=stage, message=message, code=code)
+        self.completed_at = datetime.now(timezone.utc)
+
+    def get_progress_for_status(self, status: ItemStatus) -> int:
+        """Get progress percentage for a given status."""
+        progress_map = {
+            ItemStatus.PENDING: 0,
+            ItemStatus.DOWNLOADING: 10,
+            ItemStatus.DOWNLOADED: 20,
+            ItemStatus.RENDERING: 30,
+            ItemStatus.RENDERED: 50,
+            ItemStatus.GENERATING_QR: 60,
+            ItemStatus.QR_GENERATED: 70,
+            ItemStatus.INSERTING_QR: 80,
+            ItemStatus.QR_INSERTED: 85,
+            ItemStatus.UPLOADING: 90,
+            ItemStatus.COMPLETED: 100,
+            ItemStatus.FAILED: self.progress_pct,  # Keep current
+        }
+        return progress_map.get(status, 0)
+
+
+class BatchJob(BaseModel):
+    """Batch job containing multiple PDF processing items."""
+
+    job_id: UUID = Field(default_factory=uuid4)
+    project_id: UUID | None = None
+
+    # Items to process
+    items: list[BatchItem] = Field(default_factory=list)
+
+    # Job status
+    status: JobStatus = JobStatus.PENDING
+    total_items: int = 0
+    success_count: int = 0
+    failed_count: int = 0
 
     # Timestamps
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
-    # Progress tracking
-    progress_pct: int = 0
+    # Processing time
+    processing_time_ms: int | None = None
 
-    def update_status(self, status: JobStatus, stage: Optional[JobStage] = None) -> None:
-        """Update job status and timestamp."""
-        self.status = status
-        if stage:
-            self.stage = stage
-        self.updated_at = datetime.now(timezone.utc)
+    def add_item(self, item: BatchItem) -> None:
+        """Add an item to the batch."""
+        self.items.append(item)
+        self.total_items = len(self.items)
 
-        # Update progress based on status
-        progress_map = {
-            JobStatus.PENDING: 0,
-            JobStatus.DOWNLOADING: 10,
-            JobStatus.DOWNLOADED: 20,
-            JobStatus.RENDERING: 30,
-            JobStatus.RENDERED: 50,
-            JobStatus.GENERATING_QR: 60,
-            JobStatus.QR_GENERATED: 70,
-            JobStatus.INSERTING_QR: 80,
-            JobStatus.QR_INSERTED: 85,
-            JobStatus.UPLOADING: 90,
-            JobStatus.COMPLETED: 100,
-            JobStatus.FAILED: self.progress_pct,  # Keep current progress
-        }
-        self.progress_pct = progress_map.get(status, self.progress_pct)
+    def start_processing(self) -> None:
+        """Mark job as started."""
+        self.status = JobStatus.PROCESSING
+        self.started_at = datetime.now(timezone.utc)
 
-        if status == JobStatus.COMPLETED:
-            self.completed_at = datetime.now(timezone.utc)
+    def update_counts(self) -> None:
+        """Update success/failed counts based on item statuses."""
+        self.success_count = sum(
+            1 for item in self.items if item.status == ItemStatus.COMPLETED
+        )
+        self.failed_count = sum(
+            1 for item in self.items if item.status == ItemStatus.FAILED
+        )
 
-    def set_error(self, stage: JobStage, message: str, details: Optional[dict] = None) -> None:
-        """Set error details and mark job as failed."""
-        self.error = JobError(stage=stage, message=message, details=details)
-        self.update_status(JobStatus.FAILED, stage)
+    def finalize(self) -> None:
+        """Finalize the job after all items are processed."""
+        self.update_counts()
+        self.completed_at = datetime.now(timezone.utc)
 
-    def set_result(self, result: JobResult) -> None:
-        """Set job result and mark as completed."""
-        self.result = result
-        self.update_status(JobStatus.COMPLETED)
+        # Calculate processing time
+        if self.started_at:
+            delta = self.completed_at - self.started_at
+            self.processing_time_ms = int(delta.total_seconds() * 1000)
 
-    @property
-    def is_complete(self) -> bool:
-        return self.status == JobStatus.COMPLETED
+        # Determine final status
+        if self.failed_count == 0:
+            self.status = JobStatus.COMPLETED
+        elif self.success_count == 0:
+            self.status = JobStatus.FAILED
+        else:
+            self.status = JobStatus.PARTIAL
 
-    @property
-    def is_failed(self) -> bool:
-        return self.status == JobStatus.FAILED
-
-    @property
-    def is_processing(self) -> bool:
-        return self.status not in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.PENDING)
-
-    @property
-    def duration_seconds(self) -> Optional[float]:
-        """Calculate job duration in seconds."""
-        if self.completed_at:
-            return (self.completed_at - self.created_at).total_seconds()
+    def get_item(self, item_id: UUID) -> BatchItem | None:
+        """Get an item by ID."""
+        for item in self.items:
+            if item.item_id == item_id:
+                return item
         return None
 
-    class Config:
-        use_enum_values = True
+    def to_response(self) -> dict[str, Any]:
+        """Convert to API response format."""
+        return {
+            "job_id": str(self.job_id),
+            "status": self.status.value,
+            "total_items": self.total_items,
+            "success_count": self.success_count,
+            "failed_count": self.failed_count,
+            "items": [
+                {
+                    "item_id": str(item.item_id),
+                    "user_id": str(item.user_id),
+                    "serial_code": item.serial_code,
+                    "status": item.status.value,
+                    "data": item.data.model_dump() if item.data else None,
+                    "error": item.error.model_dump() if item.error else None,
+                }
+                for item in self.items
+            ],
+            "created_at": self.created_at.isoformat(),
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "processing_time_ms": self.processing_time_ms,
+        }
