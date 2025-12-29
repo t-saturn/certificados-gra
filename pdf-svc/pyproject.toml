@@ -60,6 +60,10 @@ markers = [
     "unit: Unit tests",
     "integration: Integration tests",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning:nats.*:",
+    "ignore::DeprecationWarning:asyncio.*:",
+]
 
 [tool.ruff]
 line-length = 100

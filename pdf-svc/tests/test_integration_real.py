@@ -25,27 +25,20 @@ import nats
 from nats.aio.client import Client as NatsClient
 
 
-# =============================================================================
 # Configuration
-# =============================================================================
 
 NATS_URL = "nats://127.0.0.1:4222"
 
 # Template IDs from file-svc
-VALID_TEMPLATE_ID = "8748db65-9d84-4fdf-b47f-938cfa96366b"
-INVALID_TEMPLATE_ID = "25a14031-1bc5-4c6f-910e-c86cc9378336"
+VALID_TEMPLATE_ID = "4d8f77f6-e454-40f1-b441-320922a0c9cd"
+INVALID_TEMPLATE_ID = "00000000-0000-0000-0000-000000000000"
 
 # NATS Subjects
 REQUEST_SUBJECT = "pdf.batch.requested"
 COMPLETED_SUBJECT = "pdf.batch.completed"
-FAILED_SUBJECT = "pdf.batch.failed"
-ITEM_COMPLETED_SUBJECT = "pdf.item.completed"
-ITEM_FAILED_SUBJECT = "pdf.item.failed"
 
 
-# =============================================================================
 # Fixtures
-# =============================================================================
 
 
 @pytest.fixture
@@ -56,9 +49,7 @@ async def nats_client() -> NatsClient:
     await nc.close()
 
 
-# =============================================================================
 # Helper Functions
-# =============================================================================
 
 
 def print_separator(title: str, char: str = "=") -> None:
@@ -72,6 +63,37 @@ def print_json(label: str, data: dict) -> None:
     """Print formatted JSON."""
     print(f"\n{label}:")
     print(json.dumps(data, indent=2, ensure_ascii=False, default=str))
+
+
+def create_item(
+    serial_code: str,
+    template_id: str = VALID_TEMPLATE_ID,
+    nombre_participante: str = "JUAN CARLOS PÉREZ GARCÍA",
+    firma_1_nombre: str = "Dr. Carlos Rodríguez Mendoza",
+    firma_1_cargo: str = "Director General de Capacitación",
+    fecha: str = "29 de diciembre de 2024",
+) -> dict:
+    """Create a test item with the correct PDF fields."""
+    return {
+        "user_id": str(uuid4()),
+        "template_id": template_id,
+        "serial_code": serial_code,
+        "is_public": True,
+        "pdf": [
+            {"key": "nombre_participante", "value": nombre_participante},
+            {"key": "firma_1_nombre", "value": firma_1_nombre},
+            {"key": "firma_1_cargo", "value": firma_1_cargo},
+            {"key": "fecha", "value": fecha},
+        ],
+        "qr": [
+            {"base_url": "https://verify.gob.pe"},
+            {"verify_code": serial_code},
+        ],
+        "qr_pdf": [
+            {"qr_size_cm": "2.5"},
+            {"qr_page": "0"},
+        ],
+    }
 
 
 async def wait_for_response(
@@ -107,9 +129,7 @@ async def wait_for_response(
     return result
 
 
-# =============================================================================
 # Integration Tests
-# =============================================================================
 
 
 @pytest.mark.integration
@@ -127,32 +147,18 @@ class TestRealPipeline:
         Expected: status=completed, file_id returned.
         """
         pdf_job_id = str(uuid4())
-        user_id = str(uuid4())
 
         request = {
             "event_type": "pdf.batch.requested",
             "payload": {
                 "pdf_job_id": pdf_job_id,
                 "items": [
-                    {
-                        "user_id": user_id,
-                        "template_id": VALID_TEMPLATE_ID,
-                        "serial_code": "CERT-INT-001",
-                        "is_public": True,
-                        "pdf": [
-                            {"key": "nombre", "value": "USUARIO DE PRUEBA"},
-                            {"key": "curso", "value": "Test de Integración"},
-                            {"key": "fecha", "value": "29/12/2024"},
-                        ],
-                        "qr": [
-                            {"base_url": "https://verify.gob.pe"},
-                            {"verify_code": "CERT-INT-001"},
-                        ],
-                        "qr_pdf": [
-                            {"qr_size_cm": "2.5"},
-                            {"qr_page": "0"},
-                        ],
-                    }
+                    create_item(
+                        serial_code="CERT-INT-001",
+                        nombre_participante="USUARIO DE PRUEBA INTEGRACIÓN",
+                        firma_1_nombre="Ing. María López Sánchez",
+                        firma_1_cargo="Coordinadora de Certificación",
+                    )
                 ],
             },
         }
@@ -192,8 +198,9 @@ class TestRealPipeline:
             assert item.get("data", {}).get("file_id") is not None
 
             file_id = item["data"]["file_id"]
+            download_url = item["data"].get("download_url", "")
             print(f"\n🎉 SUCCESS! file_id: {file_id}")
-            print(f"   Download: http://localhost:8080/download?file_id={file_id}")
+            print(f"   Download: {download_url}")
         else:
             pytest.fail("No response received - is the service running?")
 
@@ -203,30 +210,17 @@ class TestRealPipeline:
         Expected: status=failed, error message.
         """
         pdf_job_id = str(uuid4())
-        user_id = str(uuid4())
 
         request = {
             "event_type": "pdf.batch.requested",
             "payload": {
                 "pdf_job_id": pdf_job_id,
                 "items": [
-                    {
-                        "user_id": user_id,
-                        "template_id": INVALID_TEMPLATE_ID,
-                        "serial_code": "CERT-FAIL-001",
-                        "is_public": True,
-                        "pdf": [
-                            {"key": "nombre", "value": "USUARIO FALLIDO"},
-                        ],
-                        "qr": [
-                            {"base_url": "https://verify.gob.pe"},
-                            {"verify_code": "CERT-FAIL-001"},
-                        ],
-                        "qr_pdf": [
-                            {"qr_size_cm": "2.5"},
-                            {"qr_page": "0"},
-                        ],
-                    }
+                    create_item(
+                        serial_code="CERT-FAIL-001",
+                        template_id=INVALID_TEMPLATE_ID,
+                        nombre_participante="USUARIO FALLIDO",
+                    )
                 ],
             },
         }
@@ -234,7 +228,7 @@ class TestRealPipeline:
         print_separator("TEST: Single Item - Invalid Template")
         print_json("📤 REQUEST", request)
 
-        # Start listening
+        # Listen
         response_task = asyncio.create_task(
             wait_for_response(nats_client, COMPLETED_SUBJECT, pdf_job_id)
         )
@@ -254,16 +248,20 @@ class TestRealPipeline:
             print_json("📥 RESPONSE", response)
 
             payload = response.get("payload", {})
-            # Could be "failed" or "partial" depending on implementation
-            assert payload.get("status") in ("failed", "partial", "completed")
+            assert payload.get("status") == "failed"
+            assert payload.get("failed_count") == 1
             
             items = payload.get("items", [])
-            if items:
-                item = items[0]
-                if item.get("status") == "failed":
-                    print(f"\n✅ Expected failure detected!")
-                    print(f"   user_id: {item.get('error', {}).get('user_id')}")
-                    print(f"   message: {item.get('error', {}).get('message')}")
+            assert len(items) == 1
+
+            item = items[0]
+            assert item.get("status") == "failed"
+            assert item.get("error") is not None
+
+            error = item["error"]
+            print(f"\n✅ Expected failure detected!")
+            print(f"   user_id: {error.get('user_id')}")
+            print(f"   message: {error.get('message')}")
         else:
             pytest.fail("No response received - is the service running?")
 
@@ -280,52 +278,25 @@ class TestRealPipeline:
                 "pdf_job_id": pdf_job_id,
                 "items": [
                     # Item 1: VALID
-                    {
-                        "user_id": str(uuid4()),
-                        "template_id": VALID_TEMPLATE_ID,
-                        "serial_code": "CERT-MIX-001",
-                        "is_public": True,
-                        "pdf": [
-                            {"key": "nombre", "value": "USUARIO VÁLIDO 1"},
-                            {"key": "curso", "value": "Curso de Prueba"},
-                            {"key": "fecha", "value": "29/12/2024"},
-                        ],
-                        "qr": [
-                            {"base_url": "https://verify.gob.pe"},
-                            {"verify_code": "CERT-MIX-001"},
-                        ],
-                        "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
-                    },
+                    create_item(
+                        serial_code="CERT-MIX-001",
+                        nombre_participante="USUARIO VÁLIDO 1",
+                        firma_1_nombre="Lic. Ana García Torres",
+                        firma_1_cargo="Secretaria Técnica",
+                    ),
                     # Item 2: INVALID
-                    {
-                        "user_id": str(uuid4()),
-                        "template_id": INVALID_TEMPLATE_ID,
-                        "serial_code": "CERT-MIX-002",
-                        "is_public": True,
-                        "pdf": [{"key": "nombre", "value": "USUARIO INVÁLIDO"}],
-                        "qr": [
-                            {"base_url": "https://verify.gob.pe"},
-                            {"verify_code": "CERT-MIX-002"},
-                        ],
-                        "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
-                    },
+                    create_item(
+                        serial_code="CERT-MIX-002",
+                        template_id=INVALID_TEMPLATE_ID,
+                        nombre_participante="USUARIO INVÁLIDO",
+                    ),
                     # Item 3: VALID
-                    {
-                        "user_id": str(uuid4()),
-                        "template_id": VALID_TEMPLATE_ID,
-                        "serial_code": "CERT-MIX-003",
-                        "is_public": True,
-                        "pdf": [
-                            {"key": "nombre", "value": "USUARIO VÁLIDO 2"},
-                            {"key": "curso", "value": "Otro Curso"},
-                            {"key": "fecha", "value": "29/12/2024"},
-                        ],
-                        "qr": [
-                            {"base_url": "https://verify.gob.pe"},
-                            {"verify_code": "CERT-MIX-003"},
-                        ],
-                        "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
-                    },
+                    create_item(
+                        serial_code="CERT-MIX-003",
+                        nombre_participante="USUARIO VÁLIDO 2",
+                        firma_1_nombre="Dr. Pedro Sánchez Ríos",
+                        firma_1_cargo="Director Académico",
+                    ),
                 ],
             },
         }
@@ -370,18 +341,19 @@ class TestRealPipeline:
                 
                 if item_status == "completed":
                     file_id = item.get("data", {}).get("file_id")
+                    download_url = item.get("data", {}).get("download_url", "")
                     print(f"   [{i+1}] ✅ {serial}: completed")
                     print(f"       file_id: {file_id}")
-                    print(f"       download: http://localhost:8080/download?file_id={file_id}")
+                    print(f"       download: {download_url}")
                 else:
                     error = item.get("error", {})
                     print(f"   [{i+1}] ❌ {serial}: failed")
                     print(f"       message: {error.get('message')}")
 
             # Assertions
-            assert status in ("partial", "completed", "failed")
-            assert success_count >= 0
-            assert failed_count >= 0
+            assert status == "partial"
+            assert success_count == 2
+            assert failed_count == 1
         else:
             pytest.fail("No response received - is the service running?")
 
@@ -392,30 +364,30 @@ class TestRealPipeline:
         """
         pdf_job_id = str(uuid4())
 
-        items = []
-        for i in range(3):
-            items.append({
-                "user_id": str(uuid4()),
-                "template_id": VALID_TEMPLATE_ID,
-                "serial_code": f"CERT-BATCH-{i+1:03d}",
-                "is_public": True,
-                "pdf": [
-                    {"key": "nombre", "value": f"USUARIO BATCH {i+1}"},
-                    {"key": "curso", "value": "Curso en Lote"},
-                    {"key": "fecha", "value": "29/12/2024"},
-                ],
-                "qr": [
-                    {"base_url": "https://verify.gob.pe"},
-                    {"verify_code": f"CERT-BATCH-{i+1:03d}"},
-                ],
-                "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
-            })
-
         request = {
             "event_type": "pdf.batch.requested",
             "payload": {
                 "pdf_job_id": pdf_job_id,
-                "items": items,
+                "items": [
+                    create_item(
+                        serial_code="CERT-BATCH-001",
+                        nombre_participante="PARTICIPANTE LOTE 1",
+                        firma_1_nombre="Mg. Roberto Díaz Luna",
+                        firma_1_cargo="Jefe de Capacitación",
+                    ),
+                    create_item(
+                        serial_code="CERT-BATCH-002",
+                        nombre_participante="PARTICIPANTE LOTE 2",
+                        firma_1_nombre="Mg. Roberto Díaz Luna",
+                        firma_1_cargo="Jefe de Capacitación",
+                    ),
+                    create_item(
+                        serial_code="CERT-BATCH-003",
+                        nombre_participante="PARTICIPANTE LOTE 3",
+                        firma_1_nombre="Mg. Roberto Díaz Luna",
+                        firma_1_cargo="Jefe de Capacitación",
+                    ),
+                ],
             },
         }
 

@@ -93,6 +93,7 @@ make test-unit
 
 Estos tests corren localmente sin necesidad de Redis, NATS, o file-svc.
 Prueban los servicios de forma aislada:
+
 - `test_unit_qr_service.py` - Generación de QR
 - `test_unit_pdf_replace.py` - Reemplazo de placeholders
 - `test_unit_qr_insert.py` - Inserción de QR en PDF
@@ -110,17 +111,20 @@ make test-int
 ```
 
 Estos tests se conectan a NATS real y envían eventos al servicio:
+
 - Publican `pdf.batch.requested`
 - Esperan respuesta en `pdf.batch.completed`
 - Verifican que el `file_id` sea válido
 
 **Requisitos:**
+
 - Redis corriendo en `localhost:6379`
 - NATS corriendo en `localhost:4222`
 - file-svc corriendo en `localhost:8080`
 - pdf-svc corriendo (`make run` o `make dev`)
 
 **Template IDs de prueba:**
+
 - Válido: `8748db65-9d84-4fdf-b47f-938cfa96366b`
 - Inválido: `25a14031-1bc5-4c6f-910e-c86cc9378336`
 
@@ -177,18 +181,11 @@ pdf-svc/
         "serial_code": "CERT-2025-000001",
         "is_public": true,
         "pdf": [
-          {"key": "nombre_participante", "value": "MARÍA LUQUE RIVERA"},
-          {"key": "fecha", "value": "28/12/2024"}
+          { "key": "nombre_participante", "value": "MARÍA LUQUE RIVERA" },
+          { "key": "fecha", "value": "28/12/2024" }
         ],
-        "qr": [
-          {"base_url": "https://example.com/verify"},
-          {"verify_code": "CERT-2025-000001"}
-        ],
-        "qr_pdf": [
-          {"qr_size_cm": "2.5"},
-          {"qr_margin_y_cm": "1.0"},
-          {"qr_page": "0"}
-        ]
+        "qr": [{ "base_url": "https://example.com/verify" }, { "verify_code": "CERT-2025-000001" }],
+        "qr_pdf": [{ "qr_size_cm": "2.5" }, { "qr_margin_y_cm": "1.0" }, { "qr_page": "0" }]
       }
     ]
   }
@@ -302,20 +299,20 @@ make nats-pub
 
 ## Comandos Make Disponibles
 
-| Comando | Descripción |
-|---------|-------------|
-| `make setup` | Instalar dependencias (crea .venv) |
-| `make run` | Ejecutar el servicio |
-| `make dev` | Ejecutar con auto-reload |
-| `make test` | Ejecutar tests unitarios |
-| `make test-unit` | Solo tests unitarios (NO requiere servicio) |
-| `make test-int` | Tests de integración (REQUIERE servicio) |
-| `make nats-pub` | Publicar evento de prueba (template válido) |
-| `make nats-pub-fail` | Publicar evento con template inválido |
-| `make nats-sub` | Suscribirse a eventos pdf.* |
-| `make lint` | Verificar código |
-| `make format` | Formatear código |
-| `make clean` | Limpiar artefactos |
+| Comando              | Descripción                                 |
+| -------------------- | ------------------------------------------- |
+| `make setup`         | Instalar dependencias (crea .venv)          |
+| `make run`           | Ejecutar el servicio                        |
+| `make dev`           | Ejecutar con auto-reload                    |
+| `make test`          | Ejecutar tests unitarios                    |
+| `make test-unit`     | Solo tests unitarios (NO requiere servicio) |
+| `make test-int`      | Tests de integración (REQUIERE servicio)    |
+| `make nats-pub`      | Publicar evento de prueba (template válido) |
+| `make nats-pub-fail` | Publicar evento con template inválido       |
+| `make nats-sub`      | Suscribirse a eventos pdf.\*                |
+| `make lint`          | Verificar código                            |
+| `make format`        | Formatear código                            |
+| `make clean`         | Limpiar artefactos                          |
 
 ## Configuración
 
@@ -364,20 +361,20 @@ Comunicación con file-svc:
 
 ## Estados de Item
 
-| Estado | Progreso | Descripción |
-|--------|----------|-------------|
-| `pending` | 0% | Pendiente |
-| `downloading` | 10% | Descargando plantilla |
-| `downloaded` | 20% | Plantilla descargada |
-| `rendering` | 30% | Reemplazando placeholders |
-| `rendered` | 50% | PDF renderizado |
-| `generating_qr` | 60% | Generando QR |
-| `qr_generated` | 70% | QR generado |
-| `inserting_qr` | 80% | Insertando QR |
-| `qr_inserted` | 85% | QR insertado |
-| `uploading` | 90% | Subiendo resultado |
-| `completed` | 100% | Completado |
-| `failed` | - | Error |
+| Estado          | Progreso | Descripción               |
+| --------------- | -------- | ------------------------- |
+| `pending`       | 0%       | Pendiente                 |
+| `downloading`   | 10%      | Descargando plantilla     |
+| `downloaded`    | 20%      | Plantilla descargada      |
+| `rendering`     | 30%      | Reemplazando placeholders |
+| `rendered`      | 50%      | PDF renderizado           |
+| `generating_qr` | 60%      | Generando QR              |
+| `qr_generated`  | 70%      | QR generado               |
+| `inserting_qr`  | 80%      | Insertando QR             |
+| `qr_inserted`   | 85%      | QR insertado              |
+| `uploading`     | 90%      | Subiendo resultado        |
+| `completed`     | 100%     | Completado                |
+| `failed`        | -        | Error                     |
 
 ## Docker
 
@@ -388,7 +385,3 @@ make docker-build
 ```
 
 La imagen se integra con el docker-compose del repositorio principal.
-
-## Licencia
-
-MIT
