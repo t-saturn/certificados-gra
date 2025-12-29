@@ -1,0 +1,96 @@
+# =============================================================================
+# docker-compose.prod.yml - Production environment
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PDF Service - Production settings
+  # ---------------------------------------------------------------------------
+  pdf-svc:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-pdf-svc}:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - ENVIRONMENT=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /app/tmp:mode=1777,size=100M
+      - /app/logs:mode=1777,size=50M
+
+  # ---------------------------------------------------------------------------
+  # Redis - Production settings
+  # ---------------------------------------------------------------------------
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+      --tcp-backlog 511
+      --timeout 0
+      --tcp-keepalive 300
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    ports: []  # No external access
+
+  # ---------------------------------------------------------------------------
+  # NATS - Production settings
+  # ---------------------------------------------------------------------------
+  nats:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    command:
+      - "--jetstream"
+      - "--store_dir=/data"
+      - "--max_payload=4MB"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    ports: []  # No external access
+
+  # ---------------------------------------------------------------------------
+  # Remove debug tools in production
+  # ---------------------------------------------------------------------------
+  nats-box:
+    deploy:
+      replicas: 0
