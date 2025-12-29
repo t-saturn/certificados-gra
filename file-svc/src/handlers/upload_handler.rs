@@ -75,7 +75,7 @@ pub async fn upload(
         return Err(AppError::MissingFile);
     }
 
-    // Get project_id from config (not from request!)
+    // Get project_id from server config (not from request!)
     let project_id = state.settings().file_server.project_id.clone();
 
     let params = UploadParams {

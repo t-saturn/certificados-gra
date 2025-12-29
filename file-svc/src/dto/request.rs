@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-/// Upload request parameters (from multipart form)
+/// Upload request parameters (internal use)
 /// NOTE: project_id comes from server config, not from request
 #[derive(Debug, Clone, Deserialize)]
 pub struct UploadParams {
