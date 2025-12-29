@@ -134,7 +134,7 @@ pdf-svc/
 {
   "event_type": "pdf.batch.requested",
   "payload": {
-    "project_id": "uuid",
+    "pdf_job_id": "uuid",
     "items": [
       {
         "user_id": "uuid",
@@ -142,11 +142,18 @@ pdf-svc/
         "serial_code": "CERT-2025-000001",
         "is_public": true,
         "pdf": [
-          { "key": "nombre_participante", "value": "MARÍA LUQUE RIVERA" },
-          { "key": "fecha", "value": "28/12/2024" }
+          {"key": "nombre_participante", "value": "MARÍA LUQUE RIVERA"},
+          {"key": "fecha", "value": "28/12/2024"}
         ],
-        "qr": [{ "base_url": "https://example.com/verify" }, { "verify_code": "CERT-2025-000001" }],
-        "qr_pdf": [{ "qr_size_cm": "2.5" }, { "qr_margin_y_cm": "1.0" }, { "qr_page": "0" }]
+        "qr": [
+          {"base_url": "https://example.com/verify"},
+          {"verify_code": "CERT-2025-000001"}
+        ],
+        "qr_pdf": [
+          {"qr_size_cm": "2.5"},
+          {"qr_margin_y_cm": "1.0"},
+          {"qr_page": "0"}
+        ]
       }
     ]
   }
@@ -161,6 +168,7 @@ pdf-svc/
 {
   "event_type": "pdf.batch.completed",
   "payload": {
+    "pdf_job_id": "uuid",
     "job_id": "uuid",
     "status": "completed",
     "total_items": 10,
@@ -181,11 +189,61 @@ pdf-svc/
           "is_public": true,
           "download_url": "https://...",
           "processing_time_ms": 1234
-        },
-        "error": null
+        }
+      },
+      {
+        "item_id": "uuid",
+        "user_id": "uuid",
+        "serial_code": "CERT-2025-000002",
+        "status": "failed",
+        "error": {
+          "user_id": "uuid",
+          "status": "failed",
+          "message": "Template not found",
+          "stage": "download",
+          "code": "NOT_FOUND"
+        }
       }
     ],
     "processing_time_ms": 5432
+  }
+}
+```
+
+### Response: Batch Failed
+
+**Subject:** `pdf.batch.failed`
+
+```json
+{
+  "event_type": "pdf.batch.failed",
+  "payload": {
+    "pdf_job_id": "uuid",
+    "job_id": null,
+    "status": "failed",
+    "message": "Validation error: missing pdf_job_id",
+    "code": "VALIDATION_ERROR"
+  }
+}
+```
+
+### Real-time Item Events
+
+**Subject:** `pdf.item.completed` / `pdf.item.failed`
+
+```json
+{
+  "event_type": "pdf.item.failed",
+  "payload": {
+    "pdf_job_id": "uuid",
+    "job_id": "uuid",
+    "item_id": "uuid",
+    "user_id": "uuid",
+    "serial_code": "CERT-2025-000001",
+    "status": "failed",
+    "message": "Template not found in storage",
+    "stage": "download",
+    "code": "NOT_FOUND"
   }
 }
 ```
@@ -209,18 +267,18 @@ make nats-pub
 
 ## Comandos Make Disponibles
 
-| Comando          | Descripción                        |
-| ---------------- | ---------------------------------- |
-| `make setup`     | Instalar dependencias (crea .venv) |
-| `make sync`      | Sincronizar dependencias           |
-| `make run`       | Ejecutar el servicio               |
-| `make dev`       | Ejecutar con auto-reload           |
-| `make test`      | Ejecutar todos los tests           |
-| `make test-unit` | Solo tests unitarios               |
-| `make test-int`  | Solo tests de integración          |
-| `make lint`      | Verificar código                   |
-| `make format`    | Formatear código                   |
-| `make clean`     | Limpiar artefactos                 |
+| Comando | Descripción |
+|---------|-------------|
+| `make setup` | Instalar dependencias (crea .venv) |
+| `make sync` | Sincronizar dependencias |
+| `make run` | Ejecutar el servicio |
+| `make dev` | Ejecutar con auto-reload |
+| `make test` | Ejecutar todos los tests |
+| `make test-unit` | Solo tests unitarios |
+| `make test-int` | Solo tests de integración |
+| `make lint` | Verificar código |
+| `make format` | Formatear código |
+| `make clean` | Limpiar artefactos |
 
 ## Configuración
 
@@ -263,20 +321,20 @@ Ver `.env.example` para todas las variables.
 
 ## Estados de Item
 
-| Estado          | Progreso | Descripción               |
-| --------------- | -------- | ------------------------- |
-| `pending`       | 0%       | Pendiente                 |
-| `downloading`   | 10%      | Descargando plantilla     |
-| `downloaded`    | 20%      | Plantilla descargada      |
-| `rendering`     | 30%      | Reemplazando placeholders |
-| `rendered`      | 50%      | PDF renderizado           |
-| `generating_qr` | 60%      | Generando QR              |
-| `qr_generated`  | 70%      | QR generado               |
-| `inserting_qr`  | 80%      | Insertando QR             |
-| `qr_inserted`   | 85%      | QR insertado              |
-| `uploading`     | 90%      | Subiendo resultado        |
-| `completed`     | 100%     | Completado                |
-| `failed`        | -        | Error                     |
+| Estado | Progreso | Descripción |
+|--------|----------|-------------|
+| `pending` | 0% | Pendiente |
+| `downloading` | 10% | Descargando plantilla |
+| `downloaded` | 20% | Plantilla descargada |
+| `rendering` | 30% | Reemplazando placeholders |
+| `rendered` | 50% | PDF renderizado |
+| `generating_qr` | 60% | Generando QR |
+| `qr_generated` | 70% | QR generado |
+| `inserting_qr` | 80% | Insertando QR |
+| `qr_inserted` | 85% | QR insertado |
+| `uploading` | 90% | Subiendo resultado |
+| `completed` | 100% | Completado |
+| `failed` | - | Error |
 
 ## Docker
 
@@ -288,3 +346,6 @@ make docker-build
 
 La imagen se integra con el docker-compose del repositorio principal.
 
+## Licencia
+
+MIT

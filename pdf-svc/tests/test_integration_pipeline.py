@@ -34,7 +34,10 @@ class TestPipelineIntegration:
             temp_dir=str(temp_dir),
         )
 
-    # -- Full Pipeline Tests
+    # -------------------------------------------------------------------------
+    # Full Pipeline Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.integration
     async def test_full_pipeline_landscape(
         self,
@@ -107,7 +110,10 @@ class TestPipelineIntegration:
         assert len(result_doc) == original_pages
         result_doc.close()
 
-    # -- Error Handling Tests
+    # -------------------------------------------------------------------------
+    # Error Handling Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.integration
     async def test_pipeline_invalid_qr_config(
         self,
@@ -164,7 +170,10 @@ class TestPipelineIntegration:
                 qr_pdf_config=qr_pdf_config,
             )
 
-    # -- Edge Cases
+    # -------------------------------------------------------------------------
+    # Edge Cases
+    # -------------------------------------------------------------------------
+
     @pytest.mark.integration
     async def test_pipeline_no_placeholders(
         self,

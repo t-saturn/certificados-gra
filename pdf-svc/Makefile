@@ -103,7 +103,7 @@ nats-sub:
 
 nats-pub:
 	@echo "Publishing test batch request..."
-	nats pub pdf.batch.requested '{"event_type":"pdf.batch.requested","payload":{"project_id":"11111111-1111-1111-1111-111111111111","items":[{"user_id":"22222222-2222-2222-2222-222222222222","template_id":"33333333-3333-3333-3333-333333333333","serial_code":"TEST-001","is_public":true,"pdf":[{"key":"nombre","value":"Test User"}],"qr":[{"base_url":"https://example.com/verify"},{"verify_code":"TEST-001"}],"qr_pdf":[{"qr_size_cm":"2.5"},{"qr_page":"0"}]}]}}'
+	nats pub pdf.batch.requested '{"event_type":"pdf.batch.requested","payload":{"pdf_job_id":"11111111-1111-1111-1111-111111111111","items":[{"user_id":"22222222-2222-2222-2222-222222222222","template_id":"33333333-3333-3333-3333-333333333333","serial_code":"TEST-001","is_public":true,"pdf":[{"key":"nombre","value":"Test User"}],"qr":[{"base_url":"https://example.com/verify"},{"verify_code":"TEST-001"}],"qr_pdf":[{"qr_size_cm":"2.5"},{"qr_page":"0"}]}]}}'
 
 # Monitor file-svc events
 nats-sub-files:

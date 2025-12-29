@@ -55,12 +55,13 @@ class ItemData(BaseModel):
 
 
 class ItemError(BaseModel):
-    """Error information for failed items."""
+    """Error information for failed items - includes user_id, status, message."""
 
-    stage: str
+    user_id: UUID
+    status: str = "failed"
     message: str
+    stage: str | None = None
     code: str | None = None
-    details: dict[str, Any] | None = None
 
 
 class BatchItem(BaseModel):
@@ -116,9 +117,15 @@ class BatchItem(BaseModel):
         self.completed_at = datetime.now(timezone.utc)
 
     def set_failed(self, stage: str, message: str, code: str | None = None) -> None:
-        """Mark item as failed with error info."""
+        """Mark item as failed with error info including user_id."""
         self.status = ItemStatus.FAILED
-        self.error = ItemError(stage=stage, message=message, code=code)
+        self.error = ItemError(
+            user_id=self.user_id,
+            status="failed",
+            message=message,
+            stage=stage,
+            code=code,
+        )
         self.completed_at = datetime.now(timezone.utc)
 
     def get_progress_for_status(self, status: ItemStatus) -> int:
@@ -139,12 +146,44 @@ class BatchItem(BaseModel):
         }
         return progress_map.get(status, 0)
 
+    def to_response(self) -> dict[str, Any]:
+        """Convert item to response format."""
+        result: dict[str, Any] = {
+            "item_id": str(self.item_id),
+            "user_id": str(self.user_id),
+            "serial_code": self.serial_code,
+            "status": self.status.value,
+        }
+
+        if self.status == ItemStatus.COMPLETED and self.data:
+            result["data"] = {
+                "file_id": str(self.data.file_id) if self.data.file_id else None,
+                "file_name": self.data.file_name,
+                "file_size": self.data.file_size,
+                "file_hash": self.data.file_hash,
+                "mime_type": self.data.mime_type,
+                "is_public": self.data.is_public,
+                "download_url": self.data.download_url,
+                "created_at": self.data.created_at.isoformat() if self.data.created_at else None,
+                "processing_time_ms": self.data.processing_time_ms,
+            }
+        elif self.status == ItemStatus.FAILED and self.error:
+            result["error"] = {
+                "user_id": str(self.error.user_id),
+                "status": self.error.status,
+                "message": self.error.message,
+                "stage": self.error.stage,
+                "code": self.error.code,
+            }
+
+        return result
+
 
 class BatchJob(BaseModel):
     """Batch job containing multiple PDF processing items."""
 
     job_id: UUID = Field(default_factory=uuid4)
-    project_id: UUID | None = None
+    pdf_job_id: UUID  # External job ID provided by caller
 
     # Items to process
     items: list[BatchItem] = Field(default_factory=list)
@@ -210,22 +249,13 @@ class BatchJob(BaseModel):
     def to_response(self) -> dict[str, Any]:
         """Convert to API response format."""
         return {
+            "pdf_job_id": str(self.pdf_job_id),
             "job_id": str(self.job_id),
             "status": self.status.value,
             "total_items": self.total_items,
             "success_count": self.success_count,
             "failed_count": self.failed_count,
-            "items": [
-                {
-                    "item_id": str(item.item_id),
-                    "user_id": str(item.user_id),
-                    "serial_code": item.serial_code,
-                    "status": item.status.value,
-                    "data": item.data.model_dump() if item.data else None,
-                    "error": item.error.model_dump() if item.error else None,
-                }
-                for item in self.items
-            ],
+            "items": [item.to_response() for item in self.items],
             "created_at": self.created_at.isoformat(),
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "processing_time_ms": self.processing_time_ms,

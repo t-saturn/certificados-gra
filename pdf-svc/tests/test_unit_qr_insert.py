@@ -31,7 +31,10 @@ class TestPdfQrInsertService:
             scale=10,
         )
 
-    # -- Landscape Auto-Placement Tests
+    # -------------------------------------------------------------------------
+    # Landscape Auto-Placement Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_insert_qr_landscape_auto_placement(
         self, service: PdfQrInsertService, sample_landscape_pdf: bytes, qr_png: bytes
@@ -77,7 +80,10 @@ class TestPdfQrInsertService:
         assert result_small[:4] == b"%PDF"
         assert result_large[:4] == b"%PDF"
 
-    # -- Portrait with Rect Tests
+    # -------------------------------------------------------------------------
+    # Portrait with Rect Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_insert_qr_portrait_with_rect(
         self, service: PdfQrInsertService, sample_portrait_pdf: bytes, qr_png: bytes
@@ -106,7 +112,10 @@ class TestPdfQrInsertService:
                 # No qr_rect provided
             )
 
-    # -- Validation Tests
+    # -------------------------------------------------------------------------
+    # Validation Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_insert_qr_invalid_page_raises(
         self, service: PdfQrInsertService, sample_portrait_pdf: bytes, qr_png: bytes
@@ -144,7 +153,10 @@ class TestPdfQrInsertService:
                 qr_page=0,
             )
 
-    # -- Content Preservation Tests
+    # -------------------------------------------------------------------------
+    # Content Preservation Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_insert_qr_preserves_content(
         self, service: PdfQrInsertService, sample_landscape_pdf: bytes, qr_png: bytes
@@ -185,7 +197,10 @@ class TestPdfQrInsertService:
         assert result_rect.width == original_rect.width
         assert result_rect.height == original_rect.height
 
-    # -- Multi-Page Tests
+    # -------------------------------------------------------------------------
+    # Multi-Page Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_insert_qr_multi_page(
         self, service: PdfQrInsertService, qr_png: bytes
@@ -211,7 +226,10 @@ class TestPdfQrInsertService:
         assert len(result_doc) == 3
         result_doc.close()
 
-    # -- Async Tests
+    # -------------------------------------------------------------------------
+    # Async Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     async def test_insert_qr_bytes_async(
         self, service: PdfQrInsertService, sample_landscape_pdf: bytes, qr_png: bytes

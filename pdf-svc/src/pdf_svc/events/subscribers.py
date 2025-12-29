@@ -5,7 +5,7 @@ NATS Event Subscribers for pdf-svc.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import orjson
 import structlog
@@ -86,17 +86,23 @@ class PdfEventHandler:
     async def _handle_batch_request(self, msg) -> None:
         """Handle incoming batch processing request."""
         log = logger.bind(subject=msg.subject)
+        pdf_job_id: UUID | None = None
 
         try:
             data = orjson.loads(msg.data)
             payload = data.get("payload", {})
 
-            log.info("batch_request_received", item_count=len(payload.get("items", [])))
+            # Get pdf_job_id from request (required)
+            pdf_job_id = UUID(payload["pdf_job_id"])
+
+            log.info(
+                "batch_request_received",
+                pdf_job_id=str(pdf_job_id),
+                item_count=len(payload.get("items", [])),
+            )
 
             # Create batch job
-            job = BatchJob(
-                project_id=UUID(payload["project_id"]) if payload.get("project_id") else None,
-            )
+            job = BatchJob(pdf_job_id=pdf_job_id)
 
             # Add items to job
             for item_data in payload.get("items", []):
@@ -113,7 +119,12 @@ class PdfEventHandler:
                 )
                 job.add_item(batch_item)
 
-            log.info("job_created", job_id=str(job.job_id), total_items=job.total_items)
+            log.info(
+                "job_created",
+                pdf_job_id=str(job.pdf_job_id),
+                job_id=str(job.job_id),
+                total_items=job.total_items,
+            )
 
             # Process the batch
             processed_job = await self.orchestrator.process_batch(job)
@@ -122,37 +133,41 @@ class PdfEventHandler:
             for item in processed_job.items:
                 if item.status == ItemStatus.COMPLETED and item.data:
                     await self.publisher.publish_item_completed(
+                        pdf_job_id=processed_job.pdf_job_id,
                         job_id=processed_job.job_id,
                         item_id=item.item_id,
                         user_id=item.user_id,
                         serial_code=item.serial_code,
-                        data=item.data.model_dump(mode="json"),
+                        data=item.data,
                     )
                 elif item.status == ItemStatus.FAILED and item.error:
                     await self.publisher.publish_item_failed(
+                        pdf_job_id=processed_job.pdf_job_id,
                         job_id=processed_job.job_id,
                         item_id=item.item_id,
                         user_id=item.user_id,
                         serial_code=item.serial_code,
-                        error=item.error.model_dump(mode="json"),
+                        error=item.error,
                     )
 
             # Publish batch completed event
             await self.publisher.publish_batch_completed(processed_job)
 
+        except KeyError as e:
+            log.error("batch_request_missing_field", error=str(e))
+            await self.publisher.publish_batch_failed(
+                pdf_job_id=pdf_job_id,
+                job_id=None,
+                message=f"Missing required field: {e}",
+                code="VALIDATION_ERROR",
+            )
+
         except Exception as e:
             log.error("batch_request_error", error=str(e))
-
-            # Try to publish failure event
-            try:
-                job_id = UUID(data.get("payload", {}).get("job_id", ""))
-            except Exception:
-                from uuid import uuid4
-                job_id = uuid4()
-
             await self.publisher.publish_batch_failed(
-                job_id=job_id,
-                error=str(e),
+                pdf_job_id=pdf_job_id,
+                job_id=None,
+                message=str(e),
                 code="PROCESSING_ERROR",
             )
 
@@ -179,7 +194,8 @@ class PdfEventHandler:
                     "event_type": "pdf.job.status.response",
                     "payload": {
                         "job_id": str(job_id),
-                        "error": "Job not found",
+                        "status": "not_found",
+                        "message": "Job not found",
                     },
                 }
 

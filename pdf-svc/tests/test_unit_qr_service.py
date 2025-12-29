@@ -33,7 +33,10 @@ class TestQrService:
 
         return QrService(logo_path=str(logo_path))
 
-    # -- Basic Generation Tests
+    # -------------------------------------------------------------------------
+    # Basic Generation Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_generate_png_basic(self, service: QrService) -> None:
         """Test basic QR code generation."""
@@ -87,7 +90,10 @@ class TestQrService:
         assert result is not None
         assert result[:8] == b"\x89PNG\r\n\x1a\n"
 
-    # -- Validation Tests
+    # -------------------------------------------------------------------------
+    # Validation Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_generate_png_empty_base_url(self, service: QrService) -> None:
         """Test with empty base_url."""
@@ -115,7 +121,10 @@ class TestQrService:
                 verify_code="   ",
             )
 
-    # -- URL Building Tests
+    # -------------------------------------------------------------------------
+    # URL Building Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_build_qr_url(self, service: QrService) -> None:
         """Test URL building for QR content."""
@@ -136,7 +145,10 @@ class TestQrService:
 
         assert url == "https://example.com/verify/?code=TEST-001"
 
-    # -- Special Characters Tests
+    # -------------------------------------------------------------------------
+    # Special Characters Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_generate_png_special_characters(self, service: QrService) -> None:
         """Test QR with special characters in verify code."""
@@ -159,7 +171,10 @@ class TestQrService:
         assert result is not None
         assert result[:8] == b"\x89PNG\r\n\x1a\n"
 
-    # -- Logo Handling Tests
+    # -------------------------------------------------------------------------
+    # Logo Handling Tests
+    # -------------------------------------------------------------------------
+
     @pytest.mark.unit
     def test_logo_not_found_fallback(self, temp_dir: Path) -> None:
         """Test that missing logo falls back to QR without logo."""

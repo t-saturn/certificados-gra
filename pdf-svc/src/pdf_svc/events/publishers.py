@@ -4,7 +4,6 @@ NATS Event Publishers for pdf-svc.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -14,17 +13,17 @@ from pdf_svc.config.settings import Settings
 from pdf_svc.models.events import (
     PdfBatchCompleted,
     PdfBatchFailed,
+    PdfBatchFailedPayload,
     PdfBatchResultPayload,
     PdfItemCompleted,
     PdfItemCompletedPayload,
     PdfItemFailed,
     PdfItemFailedPayload,
     PdfItemResult,
+    PdfItemResultData,
+    PdfItemResultError,
 )
-from pdf_svc.models.job import BatchJob
-
-if TYPE_CHECKING:
-    pass
+from pdf_svc.models.job import BatchJob, ItemData, ItemError, ItemStatus
 
 logger = structlog.get_logger()
 
@@ -54,23 +53,53 @@ class PdfEventPublisher:
         Args:
             job: Completed BatchJob
         """
-        log = logger.bind(job_id=str(job.job_id))
+        log = logger.bind(pdf_job_id=str(job.pdf_job_id), job_id=str(job.job_id))
 
         # Build item results
-        items = [
-            PdfItemResult(
-                item_id=item.item_id,
-                user_id=item.user_id,
-                serial_code=item.serial_code,
-                status=item.status.value,
-                data=item.data.model_dump(mode="json") if item.data else None,
-                error=item.error.model_dump(mode="json") if item.error else None,
-            )
-            for item in job.items
-        ]
+        items = []
+        for item in job.items:
+            if item.status == ItemStatus.COMPLETED and item.data:
+                items.append(
+                    PdfItemResult(
+                        item_id=item.item_id,
+                        user_id=item.user_id,
+                        serial_code=item.serial_code,
+                        status="completed",
+                        data=PdfItemResultData(
+                            file_id=item.data.file_id,
+                            file_name=item.data.file_name,
+                            file_size=item.data.file_size,
+                            file_hash=item.data.file_hash,
+                            mime_type=item.data.mime_type or "application/pdf",
+                            is_public=item.data.is_public,
+                            download_url=item.data.download_url,
+                            created_at=item.data.created_at,
+                            processing_time_ms=item.data.processing_time_ms,
+                        ),
+                        error=None,
+                    )
+                )
+            elif item.status == ItemStatus.FAILED and item.error:
+                items.append(
+                    PdfItemResult(
+                        item_id=item.item_id,
+                        user_id=item.user_id,
+                        serial_code=item.serial_code,
+                        status="failed",
+                        data=None,
+                        error=PdfItemResultError(
+                            user_id=item.user_id,
+                            status="failed",
+                            message=item.error.message,
+                            stage=item.error.stage,
+                            code=item.error.code,
+                        ),
+                    )
+                )
 
         event = PdfBatchCompleted(
             payload=PdfBatchResultPayload(
+                pdf_job_id=job.pdf_job_id,
                 job_id=job.job_id,
                 status=job.status.value,
                 total_items=job.total_items,
@@ -89,32 +118,37 @@ class PdfEventPublisher:
         log.info(
             "batch_completed_published",
             subject=self.settings.pdf_svc.completed_subject,
+            status=job.status.value,
             success_count=job.success_count,
             failed_count=job.failed_count,
         )
 
     async def publish_batch_failed(
         self,
-        job_id: UUID,
-        error: str,
+        pdf_job_id: UUID | None,
+        job_id: UUID | None,
+        message: str,
         code: str | None = None,
     ) -> None:
         """
         Publish batch processing failed event (entire batch failed).
 
         Args:
-            job_id: Job UUID
-            error: Error message
+            pdf_job_id: External job UUID (from caller)
+            job_id: Internal job UUID (if created)
+            message: Error message
             code: Optional error code
         """
-        log = logger.bind(job_id=str(job_id))
+        log = logger.bind(pdf_job_id=str(pdf_job_id) if pdf_job_id else None)
 
         event = PdfBatchFailed(
-            payload={
-                "job_id": str(job_id),
-                "error": error,
-                "code": code,
-            }
+            payload=PdfBatchFailedPayload(
+                pdf_job_id=pdf_job_id,
+                job_id=job_id,
+                status="failed",
+                message=message,
+                code=code,
+            )
         )
 
         await self.nats.publish(
@@ -125,22 +159,25 @@ class PdfEventPublisher:
         log.error(
             "batch_failed_published",
             subject=self.settings.pdf_svc.failed_subject,
-            error=error,
+            message=message,
+            code=code,
         )
 
     async def publish_item_completed(
         self,
+        pdf_job_id: UUID,
         job_id: UUID,
         item_id: UUID,
         user_id: UUID,
         serial_code: str,
-        data: dict,
+        data: ItemData,
     ) -> None:
         """
         Publish individual item completed event (for real-time tracking).
 
         Args:
-            job_id: Parent job UUID
+            pdf_job_id: External job UUID
+            job_id: Internal job UUID
             item_id: Item UUID
             user_id: User UUID
             serial_code: Item serial code
@@ -148,11 +185,23 @@ class PdfEventPublisher:
         """
         event = PdfItemCompleted(
             payload=PdfItemCompletedPayload(
+                pdf_job_id=pdf_job_id,
                 job_id=job_id,
                 item_id=item_id,
                 user_id=user_id,
                 serial_code=serial_code,
-                data=data,
+                status="completed",
+                data=PdfItemResultData(
+                    file_id=data.file_id,
+                    file_name=data.file_name,
+                    file_size=data.file_size,
+                    file_hash=data.file_hash,
+                    mime_type=data.mime_type or "application/pdf",
+                    is_public=data.is_public,
+                    download_url=data.download_url,
+                    created_at=data.created_at,
+                    processing_time_ms=data.processing_time_ms,
+                ),
             )
         )
 
@@ -163,24 +212,28 @@ class PdfEventPublisher:
 
         logger.debug(
             "item_completed_published",
+            pdf_job_id=str(pdf_job_id),
             job_id=str(job_id),
             item_id=str(item_id),
+            user_id=str(user_id),
             serial_code=serial_code,
         )
 
     async def publish_item_failed(
         self,
+        pdf_job_id: UUID,
         job_id: UUID,
         item_id: UUID,
         user_id: UUID,
         serial_code: str,
-        error: dict,
+        error: ItemError,
     ) -> None:
         """
         Publish individual item failed event.
 
         Args:
-            job_id: Parent job UUID
+            pdf_job_id: External job UUID
+            job_id: Internal job UUID
             item_id: Item UUID
             user_id: User UUID
             serial_code: Item serial code
@@ -188,11 +241,15 @@ class PdfEventPublisher:
         """
         event = PdfItemFailed(
             payload=PdfItemFailedPayload(
+                pdf_job_id=pdf_job_id,
                 job_id=job_id,
                 item_id=item_id,
                 user_id=user_id,
                 serial_code=serial_code,
-                error=error,
+                status="failed",
+                message=error.message,
+                stage=error.stage,
+                code=error.code,
             )
         )
 
@@ -203,7 +260,10 @@ class PdfEventPublisher:
 
         logger.debug(
             "item_failed_published",
+            pdf_job_id=str(pdf_job_id),
             job_id=str(job_id),
             item_id=str(item_id),
+            user_id=str(user_id),
             serial_code=serial_code,
+            message=error.message,
         )

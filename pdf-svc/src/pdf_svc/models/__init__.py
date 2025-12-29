@@ -18,6 +18,7 @@ from pdf_svc.models.events import (
     JobStatusResponsePayload,
     PdfBatchCompleted,
     PdfBatchFailed,
+    PdfBatchFailedPayload,
     PdfBatchRequest,
     PdfBatchRequestPayload,
     PdfBatchResultPayload,
@@ -27,6 +28,8 @@ from pdf_svc.models.events import (
     PdfItemFailedPayload,
     PdfItemRequest,
     PdfItemResult,
+    PdfItemResultData,
+    PdfItemResultError,
 )
 from pdf_svc.models.job import (
     BatchItem,
@@ -65,9 +68,12 @@ __all__ = [
     "PdfBatchRequest",
     # PDF-svc events (outbound)
     "PdfItemResult",
+    "PdfItemResultData",
+    "PdfItemResultError",
     "PdfBatchResultPayload",
     "PdfBatchCompleted",
     "PdfBatchFailed",
+    "PdfBatchFailedPayload",
     "PdfItemCompletedPayload",
     "PdfItemCompleted",
     "PdfItemFailedPayload",

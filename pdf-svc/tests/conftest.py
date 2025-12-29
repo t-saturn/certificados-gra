@@ -12,7 +12,11 @@ import fitz
 import pytest
 
 
-# -- PDF Fixtures
+# =============================================================================
+# PDF Fixtures
+# =============================================================================
+
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for tests."""
@@ -59,7 +63,11 @@ def sample_portrait_pdf() -> bytes:
     return pdf_bytes
 
 
-# -- QR Fixtures
+# =============================================================================
+# QR Fixtures
+# =============================================================================
+
+
 @pytest.fixture
 def qr_config() -> list[dict[str, str]]:
     """Sample QR configuration."""
@@ -89,7 +97,11 @@ def qr_pdf_config_with_rect() -> list[dict[str, str]]:
     ]
 
 
-# -- PDF Items Fixtures
+# =============================================================================
+# PDF Items Fixtures
+# =============================================================================
+
+
 @pytest.fixture
 def pdf_items() -> list[dict[str, str]]:
     """Sample PDF placeholder items."""
@@ -100,7 +112,11 @@ def pdf_items() -> list[dict[str, str]]:
     ]
 
 
-# -- Batch Fixtures
+# =============================================================================
+# Batch Fixtures
+# =============================================================================
+
+
 @pytest.fixture
 def batch_item_data() -> dict:
     """Sample batch item data."""
@@ -129,11 +145,12 @@ def batch_item_data() -> dict:
 def batch_request_data(batch_item_data: dict) -> dict:
     """Sample batch request data."""
     return {
-        "project_id": str(uuid4()),
+        "pdf_job_id": str(uuid4()),
         "items": [
             batch_item_data,
             {
                 **batch_item_data,
+                "user_id": str(uuid4()),
                 "serial_code": "CERT-2025-000002",
                 "pdf": [
                     {"key": "nombre_participante", "value": "María García"},
