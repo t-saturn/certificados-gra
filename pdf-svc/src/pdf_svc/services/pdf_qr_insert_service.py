@@ -49,21 +49,21 @@ class PdfQrInsertService:
         """
         Insert QR code image into PDF page.
 
-        For landscape pages, auto-calculates center-bottom position.
-        For portrait pages, requires explicit qr_rect.
+        Auto-placement positions:
+        - Landscape: center-bottom
+        - Portrait: bottom-right corner
 
         Args:
             doc: PyMuPDF Document object
             qr_png: QR code PNG image bytes
             qr_page: Page index (0-based)
-            qr_rect: Explicit position (x0, y0, x1, y1) in points
+            qr_rect: Explicit position (x0, y0, x1, y1) in points (overrides auto)
             qr_size_cm: QR code size in centimeters (for auto-placement)
             qr_margin_y_cm: Bottom margin in centimeters
-            qr_margin_x_cm: Side margin in centimeters (unused in center placement)
+            qr_margin_x_cm: Right margin in centimeters (for portrait)
             overlay: If True, place QR over existing content
 
         Raises:
-            ValueError: If portrait page and no qr_rect provided
             IndexError: If qr_page is out of range
         """
         if qr_page >= len(doc):
@@ -71,36 +71,50 @@ class PdfQrInsertService:
 
         page = doc[qr_page]
         pr = page.rect
+        is_landscape = _is_landscape_page(page)
 
         logger.debug(
             "inserting_qr",
             page=qr_page,
             page_size=(pr.width, pr.height),
-            is_landscape=_is_landscape_page(page),
+            is_landscape=is_landscape,
         )
 
-        # Landscape auto-placement (center-bottom)
-        if _is_landscape_page(page):
-            size_pt = _cm_to_pt(qr_size_cm)
-            my = _cm_to_pt(qr_margin_y_cm)
+        # If explicit rect provided, use it
+        if qr_rect:
+            rect = fitz.Rect(*qr_rect)
+            page.insert_image(rect, stream=qr_png, keep_proportion=True, overlay=overlay)
+            logger.info("qr_inserted_explicit", page=qr_page, rect=qr_rect)
+            return
 
+        # Auto-placement based on orientation
+        size_pt = _cm_to_pt(qr_size_cm)
+        my = _cm_to_pt(qr_margin_y_cm)
+        mx = _cm_to_pt(qr_margin_x_cm)
+
+        if is_landscape:
+            # Landscape: center-bottom
             cx = (pr.x0 + pr.x1) / 2
             x0, x1 = cx - size_pt / 2, cx + size_pt / 2
             y1 = pr.y1 - my
             y0 = y1 - size_pt
+        else:
+            # Portrait: bottom-right corner
+            x1 = pr.x1 - mx
+            x0 = x1 - size_pt
+            y1 = pr.y1 - my
+            y0 = y1 - size_pt
 
-            rect = fitz.Rect(x0, y0, x1, y1)
-            page.insert_image(rect, stream=qr_png, keep_proportion=True, overlay=overlay)
-            logger.info("qr_inserted_landscape", page=qr_page, rect=(x0, y0, x1, y1))
-            return
-
-        # Portrait requires explicit rect
-        if not qr_rect:
-            raise ValueError("qr_rect is required for PORTRAIT pages")
-
-        rect = fitz.Rect(*qr_rect)
+        rect = fitz.Rect(x0, y0, x1, y1)
         page.insert_image(rect, stream=qr_png, keep_proportion=True, overlay=overlay)
-        logger.info("qr_inserted_portrait", page=qr_page, rect=qr_rect)
+        
+        placement = "center_bottom" if is_landscape else "bottom_right"
+        logger.info(
+            "qr_inserted_auto",
+            page=qr_page,
+            placement=placement,
+            rect=(x0, y0, x1, y1),
+        )
 
     def insert_qr_bytes(
         self,

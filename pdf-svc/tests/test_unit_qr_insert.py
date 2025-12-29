@@ -111,6 +111,43 @@ class TestPdfQrInsertService:
         
         assert len(images) >= 1
 
+    def test_insert_qr_portrait_auto(self, portrait_pdf: bytes, qr_png: bytes) -> None:
+        """Test QR insertion in portrait PDF with auto-placement (bottom-right)."""
+        service = PdfQrInsertService()
+        
+        qr_size_cm = 2.5
+        
+        print("\n" + "=" * 70)
+        print("TEST: QR Insert - Portrait PDF Auto-placement")
+        print("=" * 70)
+        print(f"INPUT:")
+        print(f"  PDF size:    {len(portrait_pdf):,} bytes (portrait 612x792)")
+        print(f"  QR PNG:      {len(qr_png):,} bytes")
+        print(f"  QR size:     {qr_size_cm} cm")
+        print(f"  QR rect:     None (auto: bottom-right)")
+        print("-" * 70)
+        
+        result = service.insert_qr_bytes(
+            input_pdf=portrait_pdf,
+            qr_png=qr_png,
+            qr_size_cm=qr_size_cm,
+            qr_page=0,
+            # No qr_rect - should auto-place bottom-right
+        )
+        
+        doc = fitz.open(stream=result, filetype="pdf")
+        images = doc[0].get_images()
+        doc.close()
+        
+        print(f"OUTPUT:")
+        print(f"  PDF size:    {len(result):,} bytes")
+        print(f"  Images:      {len(images)} (QR inserted)")
+        print(f"  Position:    Bottom-right (auto)")
+        print("=" * 70)
+        
+        assert len(result) > len(portrait_pdf)
+        assert len(images) >= 1
+
     def test_insert_qr_multi_page(self, qr_png: bytes) -> None:
         """Test QR insertion on specific page of multi-page PDF."""
         service = PdfQrInsertService()
