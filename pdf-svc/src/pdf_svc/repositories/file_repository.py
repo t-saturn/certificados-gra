@@ -1,13 +1,18 @@
 """
-File Repository - Communication with file-svc via NATS events.
+File Repository - Communication with file-svc via NATS events and HTTP.
+
+Download: via NATS events (files.download.requested/completed)
+Upload: via HTTP REST API (POST /upload)
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 from typing import Any
 from uuid import UUID, uuid4
 
+import httpx
 import structlog
 from nats.aio.client import Client as NatsClient
 
@@ -15,15 +20,13 @@ from pdf_svc.config.settings import Settings
 from pdf_svc.models.events import (
     FileDownloadRequest,
     FileDownloadRequestPayload,
-    FileUploadRequest,
-    FileUploadRequestPayload,
 )
 
 logger = structlog.get_logger()
 
 
 class FileRepository:
-    """Repository for file operations via file-svc events."""
+    """Repository for file operations via file-svc."""
 
     def __init__(
         self,
@@ -43,19 +46,22 @@ class FileRepository:
         self.settings = settings
         self.timeout = timeout
 
-        # Pending operations tracking
+        # HTTP client for uploads
+        self._http_client: httpx.AsyncClient | None = None
+
+        # Pending download operations tracking
         self._pending_downloads: dict[UUID, asyncio.Future] = {}
-        self._pending_uploads: dict[UUID, asyncio.Future] = {}
 
         # Subscriptions
         self._download_completed_sub = None
         self._download_failed_sub = None
-        self._upload_completed_sub = None
-        self._upload_failed_sub = None
 
     async def start(self) -> None:
         """Start listening for file-svc events."""
         log = logger.bind(component="file_repository")
+
+        # Initialize HTTP client
+        self._http_client = httpx.AsyncClient(timeout=self.timeout)
 
         # Subscribe to download events
         self._download_completed_sub = await self.nats.subscribe(
@@ -67,29 +73,22 @@ class FileRepository:
             cb=self._handle_download_failed,
         )
 
-        # Subscribe to upload events
-        self._upload_completed_sub = await self.nats.subscribe(
-            self.settings.file_svc.upload_completed_subject,
-            cb=self._handle_upload_completed,
-        )
-        self._upload_failed_sub = await self.nats.subscribe(
-            self.settings.file_svc.upload_failed_subject,
-            cb=self._handle_upload_failed,
-        )
-
         log.info(
             "file_repository_started",
             download_subject=self.settings.file_svc.download_completed_subject,
-            upload_subject=self.settings.file_svc.upload_completed_subject,
+            upload_url=self.settings.file_svc.upload_url,
         )
 
     async def stop(self) -> None:
-        """Stop listening for events."""
+        """Stop listening for events and close connections."""
+        # Close HTTP client
+        if self._http_client:
+            await self._http_client.aclose()
+
+        # Unsubscribe from NATS
         for sub in [
             self._download_completed_sub,
             self._download_failed_sub,
-            self._upload_completed_sub,
-            self._upload_failed_sub,
         ]:
             if sub:
                 await sub.unsubscribe()
@@ -98,72 +97,34 @@ class FileRepository:
         for future in list(self._pending_downloads.values()):
             if not future.done():
                 future.cancel()
-        for future in list(self._pending_uploads.values()):
-            if not future.done():
-                future.cancel()
 
         logger.info("file_repository_stopped")
 
-    async def request_download(
+    async def download_file(
         self,
         file_id: UUID,
         user_id: UUID,
-        destination_path: str,
-        project_id: UUID | None = None,
-    ) -> UUID:
-        """
-        Request file download from file-svc.
-
-        Args:
-            file_id: ID of file to download
-            user_id: User requesting download
-            destination_path: Where to save the file
-            project_id: Optional project ID
-
-        Returns:
-            Job ID for tracking
-        """
-        job_id = uuid4()
-        log = logger.bind(job_id=str(job_id), file_id=str(file_id))
-
-        event = FileDownloadRequest(
-            payload=FileDownloadRequestPayload(
-                job_id=job_id,
-                file_id=file_id,
-                user_id=user_id,
-                project_id=project_id,
-                destination_path=destination_path,
-            )
-        )
-
-        await self.nats.publish(
-            self.settings.file_svc.download_subject,
-            event.model_dump_json().encode(),
-        )
-
-        log.debug("download_requested", subject=self.settings.file_svc.download_subject)
-        return job_id
-
-    async def download_and_wait(
-        self,
-        file_id: UUID,
-        user_id: UUID,
-        destination_path: str,
-        project_id: UUID | None = None,
         timeout: float | None = None,
     ) -> dict[str, Any]:
         """
-        Request download and wait for completion.
+        Download file from file-svc via NATS events.
+
+        Sends: files.download.requested
+        Receives: files.download.completed (with content_base64)
 
         Args:
             file_id: ID of file to download
             user_id: User requesting download
-            destination_path: Where to save the file
-            project_id: Optional project ID
             timeout: Override default timeout
 
         Returns:
-            Result dict with success status and data
+            Result dict with:
+                - success: bool
+                - data: bytes (the file content)
+                - file_name: str
+                - file_size: int
+                - mime_type: str
+                - error: str (if failed)
         """
         job_id = uuid4()
         log = logger.bind(job_id=str(job_id), file_id=str(file_id))
@@ -179,8 +140,6 @@ class FileRepository:
                     job_id=job_id,
                     file_id=file_id,
                     user_id=user_id,
-                    project_id=project_id,
-                    destination_path=destination_path,
                 )
             )
 
@@ -189,7 +148,7 @@ class FileRepository:
                 event.model_dump_json().encode(),
             )
 
-            log.debug("download_requested_waiting")
+            log.debug("download_requested")
 
             # Wait for result
             result = await asyncio.wait_for(
@@ -210,114 +169,92 @@ class FileRepository:
         finally:
             self._pending_downloads.pop(job_id, None)
 
-    async def request_upload(
+    async def upload_file(
         self,
         user_id: UUID,
-        file_path: str,
+        file_data: bytes,
         file_name: str,
         is_public: bool = True,
-        project_id: UUID | None = None,
-        mime_type: str = "application/pdf",
-    ) -> UUID:
-        """
-        Request file upload to file-svc.
-
-        Args:
-            user_id: User uploading file
-            file_path: Local path of file to upload
-            file_name: Name for uploaded file
-            is_public: Whether file is public
-            project_id: Optional project ID
-            mime_type: File MIME type
-
-        Returns:
-            Job ID for tracking
-        """
-        job_id = uuid4()
-        log = logger.bind(job_id=str(job_id), file_name=file_name)
-
-        event = FileUploadRequest(
-            payload=FileUploadRequestPayload(
-                job_id=job_id,
-                user_id=user_id,
-                project_id=project_id,
-                file_path=file_path,
-                file_name=file_name,
-                is_public=is_public,
-                mime_type=mime_type,
-            )
-        )
-
-        await self.nats.publish(
-            self.settings.file_svc.upload_subject,
-            event.model_dump_json().encode(),
-        )
-
-        log.debug("upload_requested", subject=self.settings.file_svc.upload_subject)
-        return job_id
-
-    async def upload_and_wait(
-        self,
-        user_id: UUID,
-        file_path: str,
-        file_name: str,
-        is_public: bool = True,
-        project_id: UUID | None = None,
-        mime_type: str = "application/pdf",
         timeout: float | None = None,
     ) -> dict[str, Any]:
         """
-        Request upload and wait for completion.
+        Upload file to file-svc via HTTP REST API.
+
+        POST /upload (multipart/form-data)
 
         Args:
             user_id: User uploading file
-            file_path: Local path of file to upload
+            file_data: File content as bytes
             file_name: Name for uploaded file
             is_public: Whether file is public
-            project_id: Optional project ID
-            mime_type: File MIME type
             timeout: Override default timeout
 
         Returns:
-            Result dict with success status and data
+            Result dict with:
+                - success: bool
+                - file_id: UUID
+                - file_name: str
+                - file_size: int
+                - download_url: str
+                - error: str (if failed)
         """
-        job_id = uuid4()
-        log = logger.bind(job_id=str(job_id), file_name=file_name)
+        log = logger.bind(file_name=file_name, user_id=str(user_id))
 
-        # Create future for result
-        future: asyncio.Future = asyncio.get_event_loop().create_future()
-        self._pending_uploads[job_id] = future
+        if not self._http_client:
+            return {"success": False, "error": "HTTP client not initialized"}
 
         try:
-            # Publish request
-            event = FileUploadRequest(
-                payload=FileUploadRequestPayload(
-                    job_id=job_id,
-                    user_id=user_id,
-                    project_id=project_id,
-                    file_path=file_path,
-                    file_name=file_name,
-                    is_public=is_public,
-                    mime_type=mime_type,
-                )
-            )
+            # Prepare multipart form data
+            files = {
+                "file": (file_name, file_data, "application/pdf"),
+            }
+            data = {
+                "user_id": str(user_id),
+                "is_public": str(is_public).lower(),
+            }
 
-            await self.nats.publish(
-                self.settings.file_svc.upload_subject,
-                event.model_dump_json().encode(),
-            )
+            log.debug("upload_started", size=len(file_data))
 
-            log.debug("upload_requested_waiting")
-
-            # Wait for result
-            result = await asyncio.wait_for(
-                future,
+            # POST to file-svc upload endpoint
+            response = await self._http_client.post(
+                self.settings.file_svc.upload_url,
+                files=files,
+                data=data,
                 timeout=timeout or self.timeout,
             )
 
-            return result
+            if response.status_code == 200:
+                result = response.json()
+                file_data_response = result.get("data", {})
 
-        except asyncio.TimeoutError:
+                log.info(
+                    "upload_completed",
+                    file_id=file_data_response.get("id"),
+                    size=file_data_response.get("size"),
+                )
+
+                return {
+                    "success": True,
+                    "file_id": UUID(file_data_response.get("id")) if file_data_response.get("id") else None,
+                    "file_name": file_data_response.get("original_name"),
+                    "file_size": file_data_response.get("size"),
+                    "mime_type": file_data_response.get("mime_type"),
+                    "is_public": file_data_response.get("is_public"),
+                    "download_url": f"{self.settings.file_svc.base_url}/download?file_id={file_data_response.get('id')}",
+                    "created_at": file_data_response.get("created_at"),
+                }
+            else:
+                error_msg = f"Upload failed with status {response.status_code}"
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("message", error_msg)
+                except Exception:
+                    pass
+
+                log.error("upload_failed", status=response.status_code, error=error_msg)
+                return {"success": False, "error": error_msg}
+
+        except httpx.TimeoutException:
             log.error("upload_timeout")
             return {"success": False, "error": "Upload timeout"}
 
@@ -325,11 +262,8 @@ class FileRepository:
             log.error("upload_error", error=str(e))
             return {"success": False, "error": str(e)}
 
-        finally:
-            self._pending_uploads.pop(job_id, None)
-
     async def _handle_download_completed(self, msg) -> None:
-        """Handle download completed event."""
+        """Handle download completed event from file-svc."""
         import orjson
 
         try:
@@ -340,20 +274,34 @@ class FileRepository:
             if job_id in self._pending_downloads:
                 future = self._pending_downloads[job_id]
                 if not future.done():
+                    # Decode base64 content
+                    file_data = None
+                    content_base64 = payload.get("content_base64")
+                    if content_base64:
+                        file_data = base64.b64decode(content_base64)
+
                     future.set_result({
                         "success": True,
+                        "data": file_data,
                         "file_id": payload.get("file_id"),
-                        "file_path": payload.get("file_path"),
                         "file_name": payload.get("file_name"),
                         "file_size": payload.get("file_size"),
                         "mime_type": payload.get("mime_type"),
+                        "download_url": payload.get("download_url"),
                     })
+
+                    logger.debug(
+                        "download_completed",
+                        job_id=str(job_id),
+                        file_name=payload.get("file_name"),
+                        size=payload.get("file_size"),
+                    )
 
         except Exception as e:
             logger.error("handle_download_completed_error", error=str(e))
 
     async def _handle_download_failed(self, msg) -> None:
-        """Handle download failed event."""
+        """Handle download failed event from file-svc."""
         import orjson
 
         try:
@@ -364,56 +312,21 @@ class FileRepository:
             if job_id in self._pending_downloads:
                 future = self._pending_downloads[job_id]
                 if not future.done():
+                    error_msg = payload.get("error_message") or payload.get("error", "Download failed")
                     future.set_result({
                         "success": False,
-                        "error": payload.get("error", "Download failed"),
+                        "error": error_msg,
+                        "error_code": payload.get("error_code"),
                     })
+
+                    logger.warning(
+                        "download_failed",
+                        job_id=str(job_id),
+                        error=error_msg,
+                    )
 
         except Exception as e:
             logger.error("handle_download_failed_error", error=str(e))
-
-    async def _handle_upload_completed(self, msg) -> None:
-        """Handle upload completed event."""
-        import orjson
-
-        try:
-            data = orjson.loads(msg.data)
-            payload = data.get("payload", {})
-            job_id = UUID(payload.get("job_id"))
-
-            if job_id in self._pending_uploads:
-                future = self._pending_uploads[job_id]
-                if not future.done():
-                    future.set_result({
-                        "success": True,
-                        "file_id": UUID(payload.get("file_id")) if payload.get("file_id") else None,
-                        "file_name": payload.get("file_name"),
-                        "file_size": payload.get("file_size"),
-                        "file_hash": payload.get("file_hash"),
-                        "mime_type": payload.get("mime_type"),
-                        "download_url": payload.get("download_url"),
-                        "created_at": payload.get("created_at"),
-                    })
-
-        except Exception as e:
-            logger.error("handle_upload_completed_error", error=str(e))
-
-    async def _handle_upload_failed(self, msg) -> None:
-        """Handle upload failed event."""
-        import orjson
-
-        try:
-            data = orjson.loads(msg.data)
-            payload = data.get("payload", {})
-            job_id = UUID(payload.get("job_id"))
-
-            if job_id in self._pending_uploads:
-                future = self._pending_uploads[job_id]
-                if not future.done():
-                    future.set_result({
-                        "success": False,
-                        "error": payload.get("error", "Upload failed"),
-                    })
 
         except Exception as e:
             logger.error("handle_upload_failed_error", error=str(e))

@@ -23,6 +23,7 @@ from pdf_svc.services.pdf_orchestrator import PdfOrchestrator
 from pdf_svc.services.pdf_qr_insert_service import PdfQrInsertService
 from pdf_svc.services.pdf_replace_service import PdfReplaceService
 from pdf_svc.services.qr_service import QrService
+from pdf_svc.services.template_cache import TemplateCache
 from pdf_svc.shared.logger import setup_logging
 
 logger = structlog.get_logger()
@@ -43,6 +44,7 @@ class PdfService:
         # Components
         self._job_repository: RedisJobRepository | None = None
         self._file_repository: FileRepository | None = None
+        self._template_cache: TemplateCache | None = None
         self._orchestrator: PdfOrchestrator | None = None
         self._publisher: PdfEventPublisher | None = None
         self._handler: PdfEventHandler | None = None
@@ -54,9 +56,6 @@ class PdfService:
 
         # Setup logging
         setup_logging(self.settings)
-
-        # Ensure temp directory exists
-        Path(self.settings.temp_dir).mkdir(parents=True, exist_ok=True)
 
         # Connect to Redis
         self._redis = Redis(
@@ -85,6 +84,12 @@ class PdfService:
         )
         await self._file_repository.start()
 
+        # Initialize template cache
+        self._template_cache = TemplateCache(
+            file_repository=self._file_repository,
+            cache_dir=self.settings.cache_dir,
+        )
+
         # Initialize services
         qr_service = QrService(
             logo_url=self.settings.qr.logo_url,
@@ -100,7 +105,7 @@ class PdfService:
             pdf_qr_insert_service=pdf_qr_insert_service,
             file_repository=self._file_repository,
             job_repository=self._job_repository,
-            temp_dir=self.settings.temp_dir,
+            template_cache=self._template_cache,
         )
 
         # Initialize event publisher and handler

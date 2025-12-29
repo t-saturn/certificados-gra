@@ -10,8 +10,6 @@ from pdf_svc.models.events import (
     FileUploadCompleted,
     FileUploadFailed,
     FileUploadPayload,
-    FileUploadRequest,
-    FileUploadRequestPayload,
     JobStatusRequest,
     JobStatusRequestPayload,
     JobStatusResponse,
@@ -57,11 +55,9 @@ __all__ = [
     "FileUploadPayload",
     "FileUploadCompleted",
     "FileUploadFailed",
-    # File-svc events (outbound)
+    # File-svc events (outbound - download only, upload uses HTTP)
     "FileDownloadRequestPayload",
     "FileDownloadRequest",
-    "FileUploadRequestPayload",
-    "FileUploadRequest",
     # PDF-svc events (inbound)
     "PdfItemRequest",
     "PdfBatchRequestPayload",

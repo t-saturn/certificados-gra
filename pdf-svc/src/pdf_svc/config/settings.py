@@ -50,16 +50,18 @@ class NatsSettings(BaseSettings):
 
 
 class FileSvcSettings(BaseSettings):
-    """File service subjects configuration."""
+    """File service configuration."""
 
     model_config = SettingsConfigDict(env_prefix="FILE_SVC_", extra="ignore")
 
+    # HTTP endpoints
+    base_url: str = Field(default="http://localhost:8080")
+    upload_url: str = Field(default="http://localhost:8080/upload")
+
+    # NATS subjects (only for download - upload uses HTTP)
     download_subject: str = Field(default="files.download.requested")
-    upload_subject: str = Field(default="files.upload.requested")
     download_completed_subject: str = Field(default="files.download.completed")
     download_failed_subject: str = Field(default="files.download.failed")
-    upload_completed_subject: str = Field(default="files.upload.completed")
-    upload_failed_subject: str = Field(default="files.upload.failed")
 
 
 class PdfSvcSettings(BaseSettings):
@@ -106,7 +108,9 @@ class Settings(BaseSettings):
 
     # General
     environment: str = Field(default="development")
-    temp_dir: str = Field(default="./tmp")
+    
+    # Template cache directory (TTL: 1 day)
+    cache_dir: str = Field(default="./cache/templates")
 
     # Sub-settings (instantiated fresh to pick up env vars)
     @property

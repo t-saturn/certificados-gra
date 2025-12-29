@@ -2,7 +2,7 @@
 PDF Orchestrator Service.
 
 Coordinates the full PDF processing pipeline for batch items:
-1. Download template from file-svc
+1. Get template from cache (or download from file-svc)
 2. Render PDF with placeholder replacements
 3. Generate QR code
 4. Insert QR into PDF
@@ -13,16 +13,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import os
-import shutil
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
 
-from pdf_svc.dto.pdf_request import BatchItemRequest, QrConfig, QrPdfConfig
+from pdf_svc.dto.pdf_request import QrConfig, QrPdfConfig
 from pdf_svc.models.job import BatchItem, BatchJob, ItemData, ItemStatus
 from pdf_svc.services.pdf_qr_insert_service import PdfQrInsertService
 from pdf_svc.services.pdf_replace_service import PdfReplaceService
@@ -31,6 +28,7 @@ from pdf_svc.services.qr_service import QrService
 if TYPE_CHECKING:
     from pdf_svc.repositories.file_repository import FileRepository
     from pdf_svc.repositories.job_repository import RedisJobRepository
+    from pdf_svc.services.template_cache import TemplateCache
 
 logger = structlog.get_logger()
 
@@ -45,7 +43,7 @@ class PdfOrchestrator:
         pdf_qr_insert_service: PdfQrInsertService,
         file_repository: "FileRepository",
         job_repository: "RedisJobRepository",
-        temp_dir: str = "./tmp",
+        template_cache: "TemplateCache",
     ) -> None:
         """Initialize orchestrator with services."""
         self.qr_service = qr_service
@@ -53,8 +51,7 @@ class PdfOrchestrator:
         self.pdf_qr_insert_service = pdf_qr_insert_service
         self.file_repository = file_repository
         self.job_repository = job_repository
-        self.temp_dir = Path(temp_dir)
-        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.template_cache = template_cache
 
     async def process_batch(self, job: BatchJob) -> BatchJob:
         """
@@ -114,21 +111,13 @@ class PdfOrchestrator:
         log.info("processing_item")
 
         start_time = datetime.now(timezone.utc)
-        item_temp_dir = self.temp_dir / str(item.item_id)
-        item_temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Paths for this item
-            template_path = item_temp_dir / "template.pdf"
-            rendered_path = item_temp_dir / "rendered.pdf"
-            qr_path = item_temp_dir / "qr.png"
-            output_path = item_temp_dir / f"{item.serial_code}.pdf"
-
-            # Step 1: Download template
+            # Step 1: Get template from cache (or download)
             item.update_status(ItemStatus.DOWNLOADING, 10)
-            template_bytes = await self._download_template(item, template_path)
+            template_bytes = await self._get_template(item)
             item.update_status(ItemStatus.DOWNLOADED, 20)
-            log.debug("template_downloaded", size=len(template_bytes))
+            log.debug("template_ready", size=len(template_bytes))
 
             # Step 2: Render PDF with placeholders
             item.update_status(ItemStatus.RENDERING, 30)
@@ -138,7 +127,7 @@ class PdfOrchestrator:
 
             # Step 3: Generate QR code
             item.update_status(ItemStatus.GENERATING_QR, 60)
-            qr_bytes = await self._generate_qr(item, qr_path)
+            qr_bytes = await self._generate_qr(item)
             item.update_status(ItemStatus.QR_GENERATED, 70)
             log.debug("qr_generated", size=len(qr_bytes))
 
@@ -148,12 +137,9 @@ class PdfOrchestrator:
             item.update_status(ItemStatus.QR_INSERTED, 85)
             log.debug("qr_inserted", size=len(final_bytes))
 
-            # Save final PDF
-            output_path.write_bytes(final_bytes)
-
             # Step 5: Upload result
             item.update_status(ItemStatus.UPLOADING, 90)
-            upload_result = await self._upload_result(job, item, output_path)
+            upload_result = await self._upload_result(job, item, final_bytes)
 
             # Calculate processing time
             end_time = datetime.now(timezone.utc)
@@ -182,35 +168,20 @@ class PdfOrchestrator:
             log.error("item_failed", error=str(e))
             raise
 
-        finally:
-            # Cleanup temp files
-            self._cleanup_temp_dir(item_temp_dir)
-
-    async def _download_template(
-        self, item: BatchItem, dest_path: Path
-    ) -> bytes:
-        """Download template PDF from file-svc."""
+    async def _get_template(self, item: BatchItem) -> bytes:
+        """Get template PDF from cache or download."""
         log = logger.bind(item_id=str(item.item_id), template_id=str(item.template_id))
 
         try:
-            # Request download from file-svc
-            result = await self.file_repository.download_and_wait(
-                file_id=item.template_id,
+            # Use template cache (handles caching automatically)
+            template_bytes = await self.template_cache.get_template(
+                template_id=item.template_id,
                 user_id=item.user_id,
-                destination_path=str(dest_path),
             )
-
-            if not result.get("success"):
-                raise RuntimeError(f"Download failed: {result.get('error', 'Unknown error')}")
-
-            # Read downloaded file
-            if dest_path.exists():
-                return dest_path.read_bytes()
-            else:
-                raise FileNotFoundError(f"Template not found at {dest_path}")
+            return template_bytes
 
         except Exception as e:
-            log.error("download_failed", error=str(e))
+            log.error("get_template_failed", error=str(e))
             item.set_failed("download", str(e))
             raise
 
@@ -240,7 +211,7 @@ class PdfOrchestrator:
             item.set_failed("render", str(e))
             raise
 
-    async def _generate_qr(self, item: BatchItem, dest_path: Path) -> bytes:
+    async def _generate_qr(self, item: BatchItem) -> bytes:
         """Generate QR code PNG."""
         try:
             # Parse QR config
@@ -253,9 +224,6 @@ class PdfOrchestrator:
                 base_url=qr_config.base_url,
                 verify_code=qr_config.verify_code,
             )
-
-            # Save to file for reference
-            dest_path.write_bytes(qr_bytes)
 
             return qr_bytes
 
@@ -288,16 +256,15 @@ class PdfOrchestrator:
             raise
 
     async def _upload_result(
-        self, job: BatchJob, item: BatchItem, file_path: Path
+        self, job: BatchJob, item: BatchItem, file_data: bytes
     ) -> dict:
-        """Upload result PDF to file-svc."""
+        """Upload result PDF to file-svc via HTTP."""
         log = logger.bind(item_id=str(item.item_id))
 
         try:
-            result = await self.file_repository.upload_and_wait(
+            result = await self.file_repository.upload_file(
                 user_id=item.user_id,
-                project_id=job.project_id,
-                file_path=str(file_path),
+                file_data=file_data,
                 file_name=f"{item.serial_code}.pdf",
                 is_public=item.is_public,
             )
@@ -312,14 +279,6 @@ class PdfOrchestrator:
             log.error("upload_failed", error=str(e))
             item.set_failed("upload", str(e))
             raise
-
-    def _cleanup_temp_dir(self, temp_dir: Path) -> None:
-        """Clean up temporary directory."""
-        try:
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir)
-        except Exception as e:
-            logger.warning("cleanup_failed", path=str(temp_dir), error=str(e))
 
     async def process_item_local(
         self,

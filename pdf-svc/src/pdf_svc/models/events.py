@@ -93,12 +93,11 @@ class FileUploadFailed(BaseEvent):
 
 
 class FileDownloadRequestPayload(BaseModel):
-    """Payload for requesting file download."""
+    """Payload for requesting file download via NATS."""
 
     job_id: UUID
     file_id: UUID
-    user_id: UUID | None = None
-    destination_path: str  # Where to save the file
+    user_id: UUID
 
 
 class FileDownloadRequest(BaseEvent):
@@ -106,24 +105,6 @@ class FileDownloadRequest(BaseEvent):
 
     event_type: str = "files.download.requested"
     payload: FileDownloadRequestPayload
-
-
-class FileUploadRequestPayload(BaseModel):
-    """Payload for requesting file upload."""
-
-    job_id: UUID
-    user_id: UUID
-    file_path: str  # Local path of file to upload
-    file_name: str
-    is_public: bool = True
-    mime_type: str = "application/pdf"
-
-
-class FileUploadRequest(BaseEvent):
-    """Event to request file upload to file-svc."""
-
-    event_type: str = "files.upload.requested"
-    payload: FileUploadRequestPayload
 
 
 # =============================================================================

@@ -46,7 +46,7 @@ def orchestrator(tmp_path) -> PdfOrchestrator:
         pdf_qr_insert_service=PdfQrInsertService(),
         file_repository=None,  # type: ignore
         job_repository=None,  # type: ignore
-        temp_dir=str(tmp_path),
+        template_cache=None,  # type: ignore - not needed for local processing
     )
 
 

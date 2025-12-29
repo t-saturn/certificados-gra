@@ -142,11 +142,13 @@ pdf-svc/
 │   │   ├── qr_service.py
 │   │   ├── pdf_replace_service.py
 │   │   ├── pdf_qr_insert_service.py
-│   │   └── pdf_orchestrator.py
+│   │   ├── pdf_orchestrator.py
+│   │   └── template_cache.py  # Cache de templates (TTL: 1 día)
 │   ├── repositories/     # Acceso a datos
 │   ├── events/           # Handlers NATS
 │   ├── shared/           # Logger, utils
 │   └── main.py           # Entry point
+├── cache/templates/      # Cache de templates descargados
 ├── tests/
 │   ├── test_unit_*.py           # Tests unitarios (sin servicio)
 │   ├── test_integration_pipeline.py  # Tests locales
@@ -344,14 +346,20 @@ Ver `.env.example` para todas las variables.
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │    Caller       │────▶│    pdf-svc      │────▶│    file-svc     │
 │   (worker)      │     │  (processing)   │     │   (storage)     │
-└─────────────────┘     └────────┬────────┘     └─────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    ▼                     ▼
-              ┌─────────┐           ┌─────────┐
-              │  Redis  │           │  NATS   │
-              │  (jobs) │           │(events) │
-              └─────────┘           └─────────┘
+└─────────────────┘     └────────┬────────┘     └────────┬────────┘
+                               │                        │
+              ┌────────────────┼────────────────┐       │
+              ▼                ▼                ▼       │
+        ┌─────────┐     ┌─────────────┐   ┌─────────┐   │
+        │  Redis  │     │  Template   │   │  NATS   │◄──┘
+        │  (jobs) │     │   Cache     │   │(events) │
+        └─────────┘     │ (TTL: 1día) │   └─────────┘
+                        └─────────────┘
+
+Comunicación con file-svc:
+- Download templates: NATS events (files.download.*)
+- Upload results: HTTP REST API (POST /upload)
+- Template cache: 1 día TTL, evita descargas repetidas
 ```
 
 ## Estados de Item
