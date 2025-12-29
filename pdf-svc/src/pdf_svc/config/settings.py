@@ -4,16 +4,25 @@ Configuration settings for pdf-svc.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
+from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Load .env file explicitly
+_env_file = Path(__file__).parent.parent.parent.parent / ".env"
+if _env_file.exists():
+    load_dotenv(_env_file)
 
 
 class RedisSettings(BaseSettings):
     """Redis configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="REDIS_")
+    model_config = SettingsConfigDict(env_prefix="REDIS_", extra="ignore")
 
     host: str = Field(default="127.0.0.1")
     port: int = Field(default=6379)
@@ -35,7 +44,7 @@ class RedisSettings(BaseSettings):
 class NatsSettings(BaseSettings):
     """NATS configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="NATS_")
+    model_config = SettingsConfigDict(env_prefix="NATS_", extra="ignore")
 
     url: str = Field(default="nats://127.0.0.1:4222")
 
@@ -43,7 +52,7 @@ class NatsSettings(BaseSettings):
 class FileSvcSettings(BaseSettings):
     """File service subjects configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="FILE_SVC_")
+    model_config = SettingsConfigDict(env_prefix="FILE_SVC_", extra="ignore")
 
     download_subject: str = Field(default="files.download.requested")
     upload_subject: str = Field(default="files.upload.requested")
@@ -56,7 +65,7 @@ class FileSvcSettings(BaseSettings):
 class PdfSvcSettings(BaseSettings):
     """PDF service subjects configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="PDF_SVC_")
+    model_config = SettingsConfigDict(env_prefix="PDF_SVC_", extra="ignore")
 
     process_subject: str = Field(default="pdf.batch.requested")
     completed_subject: str = Field(default="pdf.batch.completed")
@@ -68,7 +77,7 @@ class PdfSvcSettings(BaseSettings):
 class QrSettings(BaseSettings):
     """QR code configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="QR_")
+    model_config = SettingsConfigDict(env_prefix="QR_", extra="ignore")
 
     logo_url: str | None = Field(default=None)
     logo_path: str | None = Field(default="./assets/logo.png")
@@ -78,7 +87,7 @@ class QrSettings(BaseSettings):
 class LogSettings(BaseSettings):
     """Logging configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="LOG_")
+    model_config = SettingsConfigDict(env_prefix="LOG_", extra="ignore")
 
     dir: str = Field(default="./logs")
     file: str = Field(default="pdf-svc.log")
@@ -99,13 +108,30 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
     temp_dir: str = Field(default="./tmp")
 
-    # Sub-settings
-    redis: RedisSettings = Field(default_factory=RedisSettings)
-    nats: NatsSettings = Field(default_factory=NatsSettings)
-    file_svc: FileSvcSettings = Field(default_factory=FileSvcSettings)
-    pdf_svc: PdfSvcSettings = Field(default_factory=PdfSvcSettings)
-    qr: QrSettings = Field(default_factory=QrSettings)
-    log: LogSettings = Field(default_factory=LogSettings)
+    # Sub-settings (instantiated fresh to pick up env vars)
+    @property
+    def redis(self) -> RedisSettings:
+        return RedisSettings()
+
+    @property
+    def nats(self) -> NatsSettings:
+        return NatsSettings()
+
+    @property
+    def file_svc(self) -> FileSvcSettings:
+        return FileSvcSettings()
+
+    @property
+    def pdf_svc(self) -> PdfSvcSettings:
+        return PdfSvcSettings()
+
+    @property
+    def qr(self) -> QrSettings:
+        return QrSettings()
+
+    @property
+    def log(self) -> LogSettings:
+        return LogSettings()
 
 
 @lru_cache

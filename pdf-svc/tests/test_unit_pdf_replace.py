@@ -19,10 +19,7 @@ class TestPdfReplaceService:
         """Create PDF replace service."""
         return PdfReplaceService()
 
-    # -------------------------------------------------------------------------
-    # Placeholder Formatting Tests
-    # -------------------------------------------------------------------------
-
+    # -- Placeholder Formatting Tests
     @pytest.mark.unit
     def test_format_placeholders_basic(self, service: PdfReplaceService) -> None:
         """Test basic placeholder formatting."""
@@ -80,10 +77,7 @@ class TestPdfReplaceService:
         assert result["{{nombre}}"] == "María José García-Ñoño"
         assert result["{{cargo}}"] == "Director & CEO"
 
-    # -------------------------------------------------------------------------
-    # PDF Rendering Tests
-    # -------------------------------------------------------------------------
-
+    # -- PDF Rendering Tests
     @pytest.mark.unit
     def test_render_pdf_bytes_basic(
         self, service: PdfReplaceService, sample_pdf_with_placeholders: bytes, pdf_items: list

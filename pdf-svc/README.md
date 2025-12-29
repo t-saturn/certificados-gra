@@ -288,6 +288,3 @@ make docker-build
 
 La imagen se integra con el docker-compose del repositorio principal.
 
-## Licencia
-
-MIT

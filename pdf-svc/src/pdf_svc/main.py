@@ -7,9 +7,7 @@ Entry point for the service.
 from __future__ import annotations
 
 import asyncio
-import signal
 import sys
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 import nats
@@ -37,7 +35,6 @@ class PdfService:
         """Initialize service."""
         self.settings = get_settings()
         self._running = False
-        self._shutdown_event = asyncio.Event()
 
         # Connections
         self._redis: Redis | None = None
@@ -155,36 +152,35 @@ class PdfService:
         """Run the service until shutdown."""
         await self.start()
 
-        # Setup signal handlers
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(
-                sig,
-                lambda s=sig: asyncio.create_task(self._handle_signal(s)),
-            )
+        log = logger.bind(component="pdf_service")
+        log.info("service_running", message="Press Ctrl+C to stop")
 
-        logger.info("service_running", message="Press Ctrl+C to stop")
-
-        # Wait for shutdown
-        await self._shutdown_event.wait()
-        await self.stop()
-
-    async def _handle_signal(self, sig: signal.Signals) -> None:
-        """Handle shutdown signal."""
-        logger.info("shutdown_signal_received", signal=sig.name)
-        self._shutdown_event.set()
+        # Keep running until interrupted
+        try:
+            while self._running:
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await self.stop()
 
 
 def main() -> None:
     """Main entry point."""
+    # Setup basic logging before anything else
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
     service = PdfService()
 
     try:
         asyncio.run(service.run())
     except KeyboardInterrupt:
-        logger.info("keyboard_interrupt")
+        print("\n[info] Shutting down...")
     except Exception as e:
-        logger.error("service_error", error=str(e))
+        print(f"[error] Service error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
