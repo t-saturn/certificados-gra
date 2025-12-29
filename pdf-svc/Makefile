@@ -55,9 +55,9 @@ sync:
 run:
 	uv run python -m pdf_svc.main
 
-# Run with auto-reload (requires watchfiles)
+# Run with auto-reload (cross-platform)
 dev:
-	uv run watchfiles "python -m pdf_svc.main" src
+	uv run python dev.py
 
 # -----------------------------------------------------------------------------
 # Testing

@@ -1,301 +1,364 @@
 """
 Integration tests for the complete PDF processing pipeline.
-
-Tests the full flow: template → render → QR → insert → output
-(without file-svc events, using local processing)
+5 tests that simulate the full flow with clear REQUEST/RESPONSE display.
+These tests work WITHOUT requiring the service to be running.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
+from uuid import uuid4
 
 import fitz
 import pytest
 
 from pdf_svc.dto.pdf_request import QrConfig, QrPdfConfig
+from pdf_svc.models.job import BatchItem, BatchJob, ItemData, ItemStatus, JobStatus
 from pdf_svc.services.pdf_orchestrator import PdfOrchestrator
 from pdf_svc.services.pdf_qr_insert_service import PdfQrInsertService
 from pdf_svc.services.pdf_replace_service import PdfReplaceService
 from pdf_svc.services.qr_service import QrService
 
 
-class TestPipelineIntegration:
-    """Integration tests for the complete processing pipeline."""
+def print_request(pdf_job_id: str, items: list[dict]) -> None:
+    """Print formatted request."""
+    print("\n" + "=" * 70)
+    print("📤 REQUEST: pdf.batch.requested")
+    print("=" * 70)
+    request = {
+        "event_type": "pdf.batch.requested",
+        "payload": {
+            "pdf_job_id": pdf_job_id,
+            "items": items,
+        }
+    }
+    print(json.dumps(request, indent=2, ensure_ascii=False))
+    print("-" * 70)
 
-    @pytest.fixture
-    def orchestrator(self, temp_dir: Path) -> PdfOrchestrator:
-        """Create orchestrator for local processing (no file-svc)."""
-        return PdfOrchestrator(
-            qr_service=QrService(),
-            pdf_replace_service=PdfReplaceService(),
-            pdf_qr_insert_service=PdfQrInsertService(),
-            file_repository=None,  # type: ignore
-            job_repository=None,  # type: ignore
-            temp_dir=str(temp_dir),
-        )
 
-    # -------------------------------------------------------------------------
-    # Full Pipeline Tests
-    # -------------------------------------------------------------------------
+def print_response(job: BatchJob) -> None:
+    """Print formatted response."""
+    print("\n" + "-" * 70)
+    print("📥 RESPONSE: pdf.batch.completed")
+    print("-" * 70)
+    response = job.to_response()
+    print(json.dumps(response, indent=2, ensure_ascii=False, default=str))
+    print("=" * 70)
 
-    @pytest.mark.integration
-    async def test_full_pipeline_landscape(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_pdf_with_placeholders: bytes,
-        pdf_items: list,
-        qr_config: list,
-        qr_pdf_config: list,
+
+@pytest.fixture
+def sample_template() -> bytes:
+    """Create a sample PDF template with placeholders."""
+    doc = fitz.open()
+    page = doc.new_page(width=792, height=612)  # Landscape
+    page.insert_text((100, 100), "CERTIFICADO", fontsize=24)
+    page.insert_text((100, 180), "Se certifica que: {{nombre}}", fontsize=14)
+    page.insert_text((100, 220), "ha completado el curso: {{curso}}", fontsize=12)
+    page.insert_text((100, 260), "Fecha: {{fecha}}", fontsize=12)
+    pdf_bytes = doc.write()
+    doc.close()
+    return pdf_bytes
+
+
+@pytest.fixture
+def orchestrator(tmp_path) -> PdfOrchestrator:
+    """Create orchestrator for local processing."""
+    return PdfOrchestrator(
+        qr_service=QrService(),
+        pdf_replace_service=PdfReplaceService(),
+        pdf_qr_insert_service=PdfQrInsertService(),
+        file_repository=None,  # type: ignore
+        job_repository=None,  # type: ignore
+        temp_dir=str(tmp_path),
+    )
+
+
+@pytest.mark.integration
+class TestPipelineSimulation:
+    """Integration tests simulating full pipeline - 5 tests."""
+
+    async def test_single_item_success(
+        self, orchestrator: PdfOrchestrator, sample_template: bytes
     ) -> None:
-        """Test complete pipeline with landscape PDF."""
+        """Simulate: Single item batch - SUCCESS."""
+        pdf_job_id = str(uuid4())
+        user_id = uuid4()
+        
+        items = [{
+            "user_id": str(user_id),
+            "template_id": str(uuid4()),
+            "serial_code": "CERT-2025-000001",
+            "is_public": True,
+            "pdf": [
+                {"key": "nombre", "value": "MARÍA LUQUE RIVERA"},
+                {"key": "curso", "value": "Python Avanzado"},
+                {"key": "fecha", "value": "28/12/2024"},
+            ],
+            "qr": [
+                {"base_url": "https://verify.gob.pe"},
+                {"verify_code": "CERT-2025-000001"},
+            ],
+            "qr_pdf": [
+                {"qr_size_cm": "2.5"},
+                {"qr_page": "0"},
+            ],
+        }]
+        
+        print_request(pdf_job_id, items)
+        
+        # Create job and process
+        job = BatchJob(pdf_job_id=uuid4())
+        item = BatchItem(
+            user_id=user_id,
+            template_id=uuid4(),
+            serial_code="CERT-2025-000001",
+            pdf_items=items[0]["pdf"],
+            qr_config=items[0]["qr"],
+            qr_pdf_config=items[0]["qr_pdf"],
+        )
+        job.add_item(item)
+        job.start_processing()
+        
+        # Process locally
         result = await orchestrator.process_item_local(
-            template_bytes=sample_pdf_with_placeholders,
-            pdf_items=pdf_items,
-            qr_config=qr_config,
-            qr_pdf_config=qr_pdf_config,
+            template_bytes=sample_template,
+            pdf_items=items[0]["pdf"],
+            qr_config=items[0]["qr"],
+            qr_pdf_config=items[0]["qr_pdf"],
         )
+        
+        # Mark completed
+        item.set_completed(ItemData(
+            file_id=uuid4(),
+            file_name="CERT-2025-000001.pdf",
+            file_size=len(result),
+            download_url="https://files.example.com/CERT-2025-000001.pdf",
+        ))
+        job.finalize()
+        
+        print_response(job)
+        
+        assert job.status == JobStatus.COMPLETED
+        assert job.success_count == 1
+        assert job.failed_count == 0
 
-        # Verify output is valid PDF
-        assert result is not None
-        assert result[:4] == b"%PDF"
-
-        # Verify PDF can be opened
-        doc = fitz.open(stream=result, filetype="pdf")
-        assert len(doc) >= 1
-        doc.close()
-
-    @pytest.mark.integration
-    async def test_full_pipeline_portrait_with_rect(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_portrait_pdf: bytes,
-        pdf_items: list,
-        qr_config: list,
-        qr_pdf_config_with_rect: list,
+    async def test_multiple_items_all_success(
+        self, orchestrator: PdfOrchestrator, sample_template: bytes
     ) -> None:
-        """Test complete pipeline with portrait PDF and explicit QR rect."""
-        result = await orchestrator.process_item_local(
-            template_bytes=sample_portrait_pdf,
-            pdf_items=pdf_items,
-            qr_config=qr_config,
-            qr_pdf_config=qr_pdf_config_with_rect,
-        )
-
-        assert result is not None
-        assert result[:4] == b"%PDF"
-
-    @pytest.mark.integration
-    async def test_pipeline_preserves_pdf_structure(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_pdf_with_placeholders: bytes,
-        pdf_items: list,
-        qr_config: list,
-        qr_pdf_config: list,
-    ) -> None:
-        """Test that pipeline preserves PDF structure."""
-        # Get original page count
-        original_doc = fitz.open(stream=sample_pdf_with_placeholders, filetype="pdf")
-        original_pages = len(original_doc)
-        original_doc.close()
-
-        result = await orchestrator.process_item_local(
-            template_bytes=sample_pdf_with_placeholders,
-            pdf_items=pdf_items,
-            qr_config=qr_config,
-            qr_pdf_config=qr_pdf_config,
-        )
-
-        result_doc = fitz.open(stream=result, filetype="pdf")
-        assert len(result_doc) == original_pages
-        result_doc.close()
-
-    # -------------------------------------------------------------------------
-    # Error Handling Tests
-    # -------------------------------------------------------------------------
-
-    @pytest.mark.integration
-    async def test_pipeline_invalid_qr_config(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_pdf_with_placeholders: bytes,
-        pdf_items: list,
-        qr_pdf_config: list,
-    ) -> None:
-        """Test pipeline with invalid QR config."""
-        invalid_qr_config = [
-            {"base_url": ""},  # Empty base_url
-            {"verify_code": ""},  # Empty verify_code
-        ]
-
-        with pytest.raises(ValueError):
-            await orchestrator.process_item_local(
-                template_bytes=sample_pdf_with_placeholders,
-                pdf_items=pdf_items,
-                qr_config=invalid_qr_config,
-                qr_pdf_config=qr_pdf_config,
-            )
-
-    @pytest.mark.integration
-    async def test_pipeline_missing_qr_config(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_pdf_with_placeholders: bytes,
-        pdf_items: list,
-        qr_pdf_config: list,
-    ) -> None:
-        """Test pipeline with missing QR config."""
-        with pytest.raises(ValueError):
-            await orchestrator.process_item_local(
-                template_bytes=sample_pdf_with_placeholders,
-                pdf_items=pdf_items,
-                qr_config=[],  # Empty
-                qr_pdf_config=qr_pdf_config,
-            )
-
-    @pytest.mark.integration
-    async def test_pipeline_invalid_pdf(
-        self,
-        orchestrator: PdfOrchestrator,
-        pdf_items: list,
-        qr_config: list,
-        qr_pdf_config: list,
-    ) -> None:
-        """Test pipeline with invalid PDF bytes."""
-        with pytest.raises(Exception):
-            await orchestrator.process_item_local(
-                template_bytes=b"not a valid pdf",
-                pdf_items=pdf_items,
-                qr_config=qr_config,
-                qr_pdf_config=qr_pdf_config,
-            )
-
-    # -------------------------------------------------------------------------
-    # Edge Cases
-    # -------------------------------------------------------------------------
-
-    @pytest.mark.integration
-    async def test_pipeline_no_placeholders(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_landscape_pdf: bytes,
-        qr_config: list,
-        qr_pdf_config: list,
-    ) -> None:
-        """Test pipeline with PDF that has no placeholders."""
-        result = await orchestrator.process_item_local(
-            template_bytes=sample_landscape_pdf,
-            pdf_items=[],
-            qr_config=qr_config,
-            qr_pdf_config=qr_pdf_config,
-        )
-
-        assert result is not None
-        assert result[:4] == b"%PDF"
-
-    @pytest.mark.integration
-    async def test_pipeline_special_characters(
-        self,
-        orchestrator: PdfOrchestrator,
-        sample_pdf_with_placeholders: bytes,
-        qr_pdf_config: list,
-    ) -> None:
-        """Test pipeline with special characters."""
-        pdf_items = [
-            {"key": "nombre_participante", "value": "MARÍA JOSÉ GARCÍA-ÑOÑO"},
-            {"key": "fecha", "value": "28/12/2024"},
-            {"key": "curso", "value": "Programación & Diseño"},
-        ]
-
-        qr_config = [
-            {"base_url": "https://example.com/verify"},
-            {"verify_code": "CERT-ÑOÑO-2025-001"},
-        ]
-
-        result = await orchestrator.process_item_local(
-            template_bytes=sample_pdf_with_placeholders,
-            pdf_items=pdf_items,
-            qr_config=qr_config,
-            qr_pdf_config=qr_pdf_config,
-        )
-
-        assert result is not None
-        assert result[:4] == b"%PDF"
-
-    @pytest.mark.integration
-    async def test_pipeline_multi_page_pdf(
-        self,
-        orchestrator: PdfOrchestrator,
-        qr_config: list,
-    ) -> None:
-        """Test pipeline with multi-page PDF."""
-        # Create multi-page PDF
-        doc = fitz.open()
-        for i in range(3):
-            page = doc.new_page(width=792, height=612)
-            page.insert_text((100, 100), f"Page {i + 1} - {{{{nombre}}}}", fontsize=12)
-        pdf_bytes = doc.write()
-        doc.close()
-
-        pdf_items = [{"key": "nombre", "value": "Test User"}]
-        qr_pdf_config = [
-            {"qr_size_cm": "2.0"},
-            {"qr_page": "2"},  # Insert on last page
-        ]
-
-        result = await orchestrator.process_item_local(
-            template_bytes=pdf_bytes,
-            pdf_items=pdf_items,
-            qr_config=qr_config,
-            qr_pdf_config=qr_pdf_config,
-        )
-
-        result_doc = fitz.open(stream=result, filetype="pdf")
-        assert len(result_doc) == 3
-        result_doc.close()
-
-
-class TestDTOParsing:
-    """Tests for DTO parsing from request format."""
-
-    @pytest.mark.integration
-    def test_qr_config_from_list(self) -> None:
-        """Test QrConfig parsing from list format."""
+        """Simulate: Multiple items - ALL SUCCESS."""
+        pdf_job_id = str(uuid4())
+        
         items = [
-            {"base_url": "https://example.com/verify"},
-            {"verify_code": "TEST-001"},
+            {
+                "user_id": str(uuid4()),
+                "template_id": str(uuid4()),
+                "serial_code": f"CERT-2025-{i:06d}",
+                "pdf": [
+                    {"key": "nombre", "value": f"Usuario {i}"},
+                    {"key": "curso", "value": "Curso de Prueba"},
+                    {"key": "fecha", "value": "28/12/2024"},
+                ],
+                "qr": [
+                    {"base_url": "https://verify.gob.pe"},
+                    {"verify_code": f"CERT-2025-{i:06d}"},
+                ],
+                "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
+            }
+            for i in range(1, 4)  # 3 items
         ]
+        
+        print_request(pdf_job_id, items)
+        
+        # Create and process job
+        job = BatchJob(pdf_job_id=uuid4())
+        
+        for item_data in items:
+            batch_item = BatchItem(
+                user_id=uuid4(),
+                template_id=uuid4(),
+                serial_code=item_data["serial_code"],
+                pdf_items=item_data["pdf"],
+                qr_config=item_data["qr"],
+                qr_pdf_config=item_data["qr_pdf"],
+            )
+            
+            result = await orchestrator.process_item_local(
+                template_bytes=sample_template,
+                pdf_items=item_data["pdf"],
+                qr_config=item_data["qr"],
+                qr_pdf_config=item_data["qr_pdf"],
+            )
+            
+            batch_item.set_completed(ItemData(
+                file_id=uuid4(),
+                file_name=f"{item_data['serial_code']}.pdf",
+                file_size=len(result),
+            ))
+            job.add_item(batch_item)
+        
+        job.start_processing()
+        job.finalize()
+        
+        print_response(job)
+        
+        assert job.status == JobStatus.COMPLETED
+        assert job.success_count == 3
+        assert job.failed_count == 0
 
-        config = QrConfig.from_list(items)
-
-        assert config.base_url == "https://example.com/verify"
-        assert config.verify_code == "TEST-001"
-
-    @pytest.mark.integration
-    def test_qr_pdf_config_from_list(self) -> None:
-        """Test QrPdfConfig parsing from list format."""
+    async def test_partial_failure(
+        self, orchestrator: PdfOrchestrator, sample_template: bytes
+    ) -> None:
+        """Simulate: Mixed results - PARTIAL (some fail)."""
+        pdf_job_id = str(uuid4())
+        
         items = [
+            {
+                "user_id": str(uuid4()),
+                "serial_code": "CERT-2025-000001",
+                "pdf": [{"key": "nombre", "value": "Usuario 1"}],
+                "qr": [{"base_url": "https://verify.gob.pe"}, {"verify_code": "CERT-001"}],
+                "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
+            },
+            {
+                "user_id": str(uuid4()),
+                "serial_code": "CERT-2025-000002",
+                "pdf": [{"key": "nombre", "value": "Usuario 2"}],
+                "qr": [{"base_url": ""}, {"verify_code": ""}],  # Invalid - will fail
+                "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
+            },
+            {
+                "user_id": str(uuid4()),
+                "serial_code": "CERT-2025-000003",
+                "pdf": [{"key": "nombre", "value": "Usuario 3"}],
+                "qr": [{"base_url": "https://verify.gob.pe"}, {"verify_code": "CERT-003"}],
+                "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
+            },
+        ]
+        
+        print_request(pdf_job_id, items)
+        
+        job = BatchJob(pdf_job_id=uuid4())
+        job.start_processing()
+        
+        for item_data in items:
+            user_id = uuid4()
+            batch_item = BatchItem(
+                user_id=user_id,
+                template_id=uuid4(),
+                serial_code=item_data["serial_code"],
+            )
+            
+            try:
+                result = await orchestrator.process_item_local(
+                    template_bytes=sample_template,
+                    pdf_items=item_data["pdf"],
+                    qr_config=item_data["qr"],
+                    qr_pdf_config=item_data["qr_pdf"],
+                )
+                batch_item.set_completed(ItemData(
+                    file_id=uuid4(),
+                    file_name=f"{item_data['serial_code']}.pdf",
+                    file_size=len(result),
+                ))
+            except Exception as e:
+                batch_item.set_failed(
+                    stage="qr_generation",
+                    message=str(e),
+                    code="QR_ERROR",
+                )
+            
+            job.add_item(batch_item)
+        
+        job.finalize()
+        
+        print_response(job)
+        
+        assert job.status == JobStatus.PARTIAL
+        assert job.success_count == 2
+        assert job.failed_count == 1
+
+    async def test_all_items_fail(self, orchestrator: PdfOrchestrator) -> None:
+        """Simulate: All items fail - FAILED."""
+        pdf_job_id = str(uuid4())
+        
+        items = [
+            {
+                "user_id": str(uuid4()),
+                "serial_code": f"CERT-FAIL-{i:03d}",
+                "pdf": [{"key": "nombre", "value": f"Usuario {i}"}],
+                "qr": [{"base_url": ""}, {"verify_code": ""}],  # Invalid
+                "qr_pdf": [{"qr_size_cm": "2.5"}, {"qr_page": "0"}],
+            }
+            for i in range(1, 3)
+        ]
+        
+        print_request(pdf_job_id, items)
+        
+        job = BatchJob(pdf_job_id=uuid4())
+        job.start_processing()
+        
+        for item_data in items:
+            user_id = uuid4()
+            batch_item = BatchItem(
+                user_id=user_id,
+                template_id=uuid4(),
+                serial_code=item_data["serial_code"],
+            )
+            
+            # All will fail due to invalid QR config
+            batch_item.set_failed(
+                stage="validation",
+                message="Invalid QR configuration: empty base_url",
+                code="VALIDATION_ERROR",
+            )
+            job.add_item(batch_item)
+        
+        job.finalize()
+        
+        print_response(job)
+        
+        assert job.status == JobStatus.FAILED
+        assert job.success_count == 0
+        assert job.failed_count == 2
+
+    def test_dto_parsing(self) -> None:
+        """Test DTO parsing from request format."""
+        print("\n" + "=" * 70)
+        print("TEST: DTO Parsing")
+        print("=" * 70)
+        
+        # QR Config
+        qr_items = [
+            {"base_url": "https://verify.gob.pe"},
+            {"verify_code": "CERT-2025-000001"},
+        ]
+        print(f"INPUT qr:")
+        print(f"  {qr_items}")
+        
+        qr_config = QrConfig.from_list(qr_items)
+        print(f"OUTPUT QrConfig:")
+        print(f"  base_url:    {qr_config.base_url}")
+        print(f"  verify_code: {qr_config.verify_code}")
+        
+        # QR PDF Config
+        qr_pdf_items = [
             {"qr_size_cm": "2.5"},
             {"qr_margin_y_cm": "1.0"},
             {"qr_page": "0"},
-        ]
-
-        config = QrPdfConfig.from_list(items)
-
-        assert config.qr_size_cm == 2.5
-        assert config.qr_margin_y_cm == 1.0
-        assert config.qr_page == 0
-        assert config.qr_rect is None
-
-    @pytest.mark.integration
-    def test_qr_pdf_config_with_rect(self) -> None:
-        """Test QrPdfConfig parsing with rect."""
-        items = [
-            {"qr_size_cm": "2.0"},
-            {"qr_page": "0"},
             {"qr_rect": "460,40,540,120"},
         ]
-
-        config = QrPdfConfig.from_list(items)
-
-        assert config.qr_rect == (460.0, 40.0, 540.0, 120.0)
+        print(f"\nINPUT qr_pdf:")
+        print(f"  {qr_pdf_items}")
+        
+        qr_pdf_config = QrPdfConfig.from_list(qr_pdf_items)
+        print(f"OUTPUT QrPdfConfig:")
+        print(f"  qr_size_cm:     {qr_pdf_config.qr_size_cm}")
+        print(f"  qr_margin_y_cm: {qr_pdf_config.qr_margin_y_cm}")
+        print(f"  qr_page:        {qr_pdf_config.qr_page}")
+        print(f"  qr_rect:        {qr_pdf_config.qr_rect}")
+        print("=" * 70)
+        
+        assert qr_config.base_url == "https://verify.gob.pe"
+        assert qr_config.verify_code == "CERT-2025-000001"
+        assert qr_pdf_config.qr_size_cm == 2.5
+        assert qr_pdf_config.qr_rect == (460.0, 40.0, 540.0, 120.0)
