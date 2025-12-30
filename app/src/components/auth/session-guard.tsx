@@ -1,17 +1,23 @@
 'use client';
 
 import type { FC, ReactNode, JSX } from 'react';
-import { useSession, signIn } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useEffect, useCallback } from 'react';
-import type { ExtendedSession } from '@/types/auth.types';
+import { useSessionValidator } from '@/hooks/use-session-validator';
 
 type SessionGuardProps = {
   children: ReactNode;
 };
 
 const SessionGuard: FC<SessionGuardProps> = ({ children }): JSX.Element | null => {
-  const { data, status, update } = useSession();
-  const session = data as ExtendedSession | null;
+  const handleSessionInvalid = useCallback((): void => {
+    // console.log('Sesión invalidada desde Keycloak');
+  }, []);
+
+  const { session, status } = useSessionValidator({
+    pollingInterval: 2000,
+    onSessionInvalid: handleSessionInvalid,
+  });
 
   const redirectToKeycloak = useCallback((): void => {
     signIn('keycloak', { callbackUrl: '/main' });
@@ -28,25 +34,6 @@ const SessionGuard: FC<SessionGuardProps> = ({ children }): JSX.Element | null =
       redirectToKeycloak();
     }
   }, [status, redirectToKeycloak]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      update();
-    }, 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [update]);
-
-  useEffect(() => {
-    const handleVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') {
-        update();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [update]);
 
   if (status === 'loading') {
     return (

@@ -43,21 +43,17 @@ export const POST = async (request: NextRequest): Promise<NextResponse> => {
       logoutToken = body.logout_token;
     }
 
-    if (!logoutToken) {
-      return NextResponse.json({ error: 'logout_token not provided' }, { status: 400 });
-    }
+    if (!logoutToken) return NextResponse.json({ error: 'logout_token not provided' }, { status: 400 });
 
     const payload = parseJwt(logoutToken);
 
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid logout_token' }, { status: 400 });
-    }
+    if (!payload) return NextResponse.json({ error: 'Invalid logout_token' }, { status: 400 });
 
-    console.log('Back-channel logout received:', { sid: payload.sid, sub: payload.sub, iss: payload.iss });
+    // console.log('Back-channel logout received:', { sid: payload.sid, sub: payload.sub, iss: payload.iss });
 
     return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error) {
-    console.error('Back-channel logout error:', error);
+  } catch {
+    // console.error('Back-channel logout error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 };

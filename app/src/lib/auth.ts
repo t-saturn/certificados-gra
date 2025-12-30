@@ -32,20 +32,10 @@ const refreshAccessToken = async (token: ExtendedJWT): Promise<ExtendedJWT> => {
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     };
   } catch {
-    return { ...token, error: 'RefreshAccessTokenError' };
-  }
-};
-
-const verifyTokenWithKeycloak = async (accessToken: string): Promise<boolean> => {
-  try {
-    const response = await fetch(`${process.env.KEYCLOAK_ISSUER}/protocol/openid-connect/userinfo`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-    return response.ok;
-  } catch {
-    return false;
+    return {
+      ...token,
+      error: 'RefreshAccessTokenError',
+    };
   }
 };
 
@@ -75,7 +65,7 @@ const authConfig: NextAuthConfig = {
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 5 * 60,
+    maxAge: 30 * 60,
   },
   trustHost: true,
   callbacks: {
@@ -100,16 +90,6 @@ const authConfig: NextAuthConfig = {
       const now = Math.floor(Date.now() / 1000);
       const expiresAt = extendedToken.expiresAt as number;
 
-      if (extendedToken.accessToken) {
-        const isValid = await verifyTokenWithKeycloak(extendedToken.accessToken);
-        if (!isValid) {
-          return {
-            ...extendedToken,
-            error: 'RefreshAccessTokenError',
-          };
-        }
-      }
-
       if (now < expiresAt - 60) {
         return extendedToken;
       }
@@ -119,18 +99,6 @@ const authConfig: NextAuthConfig = {
 
     session: async ({ session, token }): Promise<ExtendedSession> => {
       const extendedToken = token as ExtendedJWT;
-
-      if (extendedToken.error) {
-        return {
-          ...session,
-          user: {
-            ...session.user,
-            id: '',
-            roles: [],
-          },
-          error: extendedToken.error,
-        };
-      }
 
       return {
         ...session,
