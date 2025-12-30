@@ -1,9 +1,12 @@
 import type { FC, ReactNode, JSX } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { DM_Sans, Playfair_Display } from 'next/font/google';
+import { ThemeProvider } from '@/components/providers/theme-provider';
 import './globals.css';
 
+// ============================================
 // Font Configuration
+// ============================================
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -19,7 +22,9 @@ const playfairDisplay = Playfair_Display({
   weight: ['400', '500', '600', '700'],
 });
 
+// ============================================
 // Metadata Configuration
+// ============================================
 
 export const metadata: Metadata = {
   title: {
@@ -77,19 +82,23 @@ export const viewport: Viewport = {
   ],
 };
 
+// ============================================
 // Layout Props Type
+// ============================================
 
 type RootLayoutProps = {
   children: ReactNode;
 };
 
+// ============================================
 // Root Layout Component
+// ============================================
 
 const RootLayout: FC<RootLayoutProps> = ({ children }): JSX.Element => {
   return (
     <html lang="es-PE" className={`${dmSans.variable} ${playfairDisplay.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-text-primary antialiased" style={{ fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

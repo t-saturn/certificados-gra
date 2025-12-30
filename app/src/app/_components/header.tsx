@@ -4,7 +4,9 @@ import type { FC, JSX } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
+import { Menu, X } from 'lucide-react';
 import type { HeaderProps, NavigationItem } from '@/types/landing.types';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 const NavLink: FC<{ item: NavigationItem }> = ({ item }): JSX.Element => {
   const linkClasses: string =
@@ -22,22 +24,6 @@ const NavLink: FC<{ item: NavigationItem }> = ({ item }): JSX.Element => {
     <Link href={item.href} className={linkClasses}>
       {item.label}
     </Link>
-  );
-};
-
-const MobileMenuButton: FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpen, onClick }): JSX.Element => {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative z-50 flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-md lg:hidden transition-colors duration-200 hover:bg-surface-elevated"
-      aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
-      aria-expanded={isOpen}
-    >
-      <span className={`h-0.5 w-5 bg-text-primary transition-all duration-200 ${isOpen ? 'translate-y-2 rotate-45' : ''}`} />
-      <span className={`h-0.5 w-5 bg-text-primary transition-all duration-200 ${isOpen ? 'opacity-0' : ''}`} />
-      <span className={`h-0.5 w-5 bg-text-primary transition-all duration-200 ${isOpen ? '-translate-y-2 -rotate-45' : ''}`} />
-    </button>
   );
 };
 
@@ -70,8 +56,12 @@ export const Header: FC<HeaderProps> = ({ logoSrc, logoAlt, navigationItems }): 
             )}
           </nav>
 
-          {/* CTA Button Desktop */}
-          <div className="hidden items-center gap-4 lg:flex">
+          {/* Desktop Actions */}
+          <div className="hidden items-center gap-3 lg:flex">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
+            {/* CTA Button */}
             <Link
               href="/login"
               className="px-6 py-2.5 text-sm font-semibold bg-primary text-text-inverse rounded-full transition-all duration-200 hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/25 active:scale-95"
@@ -80,13 +70,24 @@ export const Header: FC<HeaderProps> = ({ logoSrc, logoAlt, navigationItems }): 
             </Link>
           </div>
 
-          {/* Mobile Menu Button */}
-          <MobileMenuButton isOpen={isMobileMenuOpen} onClick={toggleMobileMenu} />
+          {/* Mobile Actions */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-elevated text-text-secondary transition-colors duration-200 hover:bg-primary hover:text-text-inverse"
+              aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Mobile Menu */}
-      <div className={`fixed inset-0 top-20 z-40 lg:hidden bg-surface transition-all duration-300 ${isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+      <div className={`fixed inset-0 top-20 z-40 lg:hidden bg-background transition-all duration-300 ${isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
         <nav className="flex flex-col gap-2 p-6">
           {navigationItems.map(
             (item: NavigationItem): JSX.Element => (
