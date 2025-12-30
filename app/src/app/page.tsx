@@ -1,8 +1,27 @@
 import type { FC, ReactNode, JSX } from 'react';
+import dynamic from 'next/dynamic';
 import type { NavigationItem, FeatureItem, StatItem, ProcessStep, FooterSection, ContactInfo } from '@/types/landing.types';
-import { Header, HeroSection, FeaturesSection, StatsSection, ProcessSection, CtaSection, Footer } from './_components';
+import { Header, HeroSection } from './_components';
 
-// Icons Components
+const FeaturesSection = dynamic(() => import('./_components/features-section').then((mod) => ({ default: mod.FeaturesSection })), {
+  loading: () => <div className="min-h-150 bg-muted/50 animate-pulse" />,
+});
+
+const StatsSection = dynamic(() => import('./_components/stats-section').then((mod) => ({ default: mod.StatsSection })), {
+  loading: () => <div className="min-h-75 bg-primary animate-pulse" />,
+});
+
+const ProcessSection = dynamic(() => import('./_components/process-section').then((mod) => ({ default: mod.ProcessSection })), {
+  loading: () => <div className="min-h-150 bg-background animate-pulse" />,
+});
+
+const CtaSection = dynamic(() => import('./_components/cta-section').then((mod) => ({ default: mod.CtaSection })), {
+  loading: () => <div className="min-h-100 bg-muted/50 animate-pulse" />,
+});
+
+const Footer = dynamic(() => import('./_components/footer').then((mod) => ({ default: mod.Footer })), {
+  loading: () => <div className="min-h-100 bg-card animate-pulse" />,
+});
 
 const ShieldCheckIcon: FC = (): ReactNode => (
   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -82,49 +101,47 @@ const PencilSquareIcon: FC = (): ReactNode => (
   </svg>
 );
 
-// Static Data Configuration
-
 const navigationItems: NavigationItem[] = [
   { label: 'Inicio', href: '/' },
-  { label: 'Características', href: '#caracteristicas' },
-  { label: 'Proceso', href: '#proceso' },
+  { label: 'Características', href: '#features' },
+  { label: 'Proceso', href: '#process' },
   { label: 'Verificar Certificado', href: '/verify' },
-  { label: 'Contacto', href: '#contacto' },
+  { label: 'Contacto', href: '#contact' },
 ];
 
 const features: FeatureItem[] = [
   {
-    id: 'firma-digital',
+    id: 'digital-signature',
     icon: <ShieldCheckIcon />,
     title: 'Firma Digital Certificada',
     description: 'Certificados con firma digital PKI que garantizan autenticidad, integridad y no repudio conforme a la legislación peruana.',
   },
   {
-    id: 'validez-legal',
+    id: 'legal-validity',
     icon: <DocumentCheckIcon />,
     title: 'Validez Legal Plena',
     description: 'Documentos con el mismo valor legal que los físicos, reconocidos por todas las entidades públicas y privadas del país.',
   },
   {
-    id: 'disponibilidad',
+    id: 'availability',
     icon: <ClockIcon />,
     title: 'Disponible 24/7',
     description: 'Accede a tus certificados en cualquier momento desde cualquier dispositivo, sin necesidad de filas ni horarios de atención.',
   },
   {
-    id: 'acceso-global',
+    id: 'global-access',
     icon: <GlobeIcon />,
     title: 'Acceso Global',
     description: 'Verifica y descarga certificados desde cualquier parte del mundo con conexión a internet.',
   },
   {
-    id: 'seguridad',
+    id: 'security',
     icon: <LockClosedIcon />,
     title: 'Máxima Seguridad',
     description: 'Infraestructura de seguridad de nivel bancario con cifrado de extremo a extremo y protección contra falsificaciones.',
   },
   {
-    id: 'descarga-inmediata',
+    id: 'instant-download',
     icon: <CloudArrowDownIcon />,
     title: 'Descarga Inmediata',
     description: 'Obtén tu certificado en formato PDF firmado digitalmente de forma instantánea tras la aprobación.',
@@ -132,36 +149,36 @@ const features: FeatureItem[] = [
 ];
 
 const stats: StatItem[] = [
-  { id: 'certificados', value: '45000', label: 'Certificados Emitidos', suffix: '+' },
-  { id: 'usuarios', value: '12500', label: 'Usuarios Registrados', suffix: '+' },
-  { id: 'tramites', value: '98', label: 'Satisfacción', suffix: '%' },
-  { id: 'disponibilidad', value: '24', label: 'Horas Disponible', suffix: '/7' },
+  { id: 'certificates', value: '45000', label: 'Certificados Emitidos', suffix: '+' },
+  { id: 'users', value: '12500', label: 'Usuarios Registrados', suffix: '+' },
+  { id: 'satisfaction', value: '98', label: 'Satisfacción', suffix: '%' },
+  { id: 'availability', value: '24', label: 'Horas Disponible', suffix: '/7' },
 ];
 
 const processSteps: ProcessStep[] = [
   {
-    id: 'registro',
+    id: 'register',
     stepNumber: 1,
     title: 'Regístrate',
     description: 'Crea tu cuenta con tu DNI y correo electrónico. Verifica tu identidad de forma segura.',
     icon: <UserIcon />,
   },
   {
-    id: 'solicitud',
+    id: 'request',
     stepNumber: 2,
     title: 'Solicita',
     description: 'Selecciona el tipo de certificado que necesitas y completa el formulario de solicitud.',
     icon: <ClipboardDocumentCheckIcon />,
   },
   {
-    id: 'firma',
+    id: 'signature',
     stepNumber: 3,
     title: 'Firma Digital',
     description: 'Tu solicitud es procesada y el certificado es firmado digitalmente por la autoridad competente.',
     icon: <PencilSquareIcon />,
   },
   {
-    id: 'descarga',
+    id: 'download',
     stepNumber: 4,
     title: 'Descarga',
     description: 'Recibe una notificación y descarga tu certificado firmado en formato PDF.',
@@ -173,19 +190,19 @@ const footerSections: FooterSection[] = [
   {
     title: 'Servicios',
     links: [
-      { label: 'Emisión de Certificados', href: '/servicios/emision' },
+      { label: 'Emisión de Certificados', href: '/services/issuance' },
       { label: 'Verificación', href: '/verify' },
-      { label: 'Firma Digital', href: '/servicios/firma-digital' },
-      { label: 'Consultas', href: '/consultas' },
+      { label: 'Firma Digital', href: '/services/digital-signature' },
+      { label: 'Consultas', href: '/inquiries' },
     ],
   },
   {
     title: 'Recursos',
     links: [
-      { label: 'Guía de Usuario', href: '/recursos/guia' },
-      { label: 'Preguntas Frecuentes', href: '/recursos/faq' },
-      { label: 'Manual de Verificación', href: '/recursos/verificacion' },
-      { label: 'Normativa', href: '/recursos/normativa' },
+      { label: 'Guía de Usuario', href: '/resources/guide' },
+      { label: 'Preguntas Frecuentes', href: '/resources/faq' },
+      { label: 'Manual de Verificación', href: '/resources/verification' },
+      { label: 'Normativa', href: '/resources/regulations' },
     ],
   },
 ];
@@ -195,8 +212,6 @@ const contactInfo: ContactInfo = {
   phone: '(066) 312-456',
   email: 'certificaciones@regionayacucho.gob.pe',
 };
-
-// Page Component
 
 const HomePage: FC = (): JSX.Element => {
   return (
@@ -209,9 +224,9 @@ const HomePage: FC = (): JSX.Element => {
           subtitle="Plataforma Oficial"
           description="Emite, gestiona y verifica certificados con firma digital de manera segura, rápida y con validez legal en todo el territorio nacional."
           primaryButtonText="Solicitar Certificado"
-          primaryButtonHref="/solicitar"
+          primaryButtonHref="/request"
           secondaryButtonText="Conocer más"
-          secondaryButtonHref="#caracteristicas"
+          secondaryButtonHref="#features"
         />
 
         <FeaturesSection title="¿Por qué elegir nuestra plataforma?" subtitle="Características" features={features} />
@@ -224,7 +239,7 @@ const HomePage: FC = (): JSX.Element => {
           title="Comienza Ahora"
           description="Únete a miles de ciudadanos que ya disfrutan de la agilidad y seguridad de los certificados digitales del Gobierno Regional de Ayacucho."
           buttonText="Crear mi Cuenta"
-          buttonHref="/registro"
+          buttonHref="/register"
         />
       </main>
 

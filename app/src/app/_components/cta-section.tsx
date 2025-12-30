@@ -1,13 +1,12 @@
-import type { FC, JSX } from 'react';
+import type { FC } from 'react';
 import Link from 'next/link';
 import type { CtaSectionProps } from '@/types/landing.types';
 
-export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText, buttonHref }): JSX.Element => {
+export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText, buttonHref }) => {
   return (
     <section className="relative py-24 bg-muted/50 overflow-hidden">
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl bg-primary p-12 sm:p-16 text-center overflow-hidden">
-          {/* Background Pattern */}
           <div
             className="absolute inset-0 opacity-10"
             style={{
@@ -16,9 +15,7 @@ export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText
             }}
           />
 
-          {/* Content */}
           <div className="relative z-10">
-            {/* Icon */}
             <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
               <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path
@@ -39,6 +36,7 @@ export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText
               <Link
                 href={buttonHref}
                 className="group inline-flex items-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-primary transition-all duration-200 hover:bg-white/90 hover:shadow-xl active:scale-95"
+                prefetch={false}
               >
                 {buttonText}
                 <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -47,8 +45,9 @@ export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText
               </Link>
 
               <Link
-                href="/verificar"
+                href="/verify"
                 className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 px-8 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/50 active:scale-95"
+                prefetch={false}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

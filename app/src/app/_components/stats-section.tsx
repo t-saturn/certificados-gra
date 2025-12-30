@@ -1,6 +1,6 @@
 'use client';
 
-import type { FC, JSX } from 'react';
+import type { FC } from 'react';
 import { useEffect, useState, useRef } from 'react';
 import type { StatsSectionProps, StatItem } from '@/types/landing.types';
 
@@ -9,7 +9,7 @@ type AnimatedCounterProps = {
   suffix?: string;
 };
 
-const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }): JSX.Element => {
+const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }) => {
   const [count, setCount] = useState<number>(0);
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const ref = useRef<HTMLSpanElement>(null);
@@ -68,24 +68,21 @@ const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }): JSX.
   );
 };
 
-const StatCard: FC<{ stat: StatItem; index: number }> = ({ stat, index }): JSX.Element => {
+const StatCard: FC<{ stat: StatItem; index: number }> = ({ stat, index }) => {
   return (
     <div className="relative flex flex-col items-center p-8 text-center transition-transform duration-300 hover:scale-105" style={{ animationDelay: `${index * 100}ms` }}>
-      {/* Value */}
       <div className="relative mb-2 text-5xl font-bold text-white sm:text-6xl" style={{ fontFamily: 'var(--font-montserrat)' }}>
         <AnimatedCounter value={stat.value} suffix={stat.suffix} />
       </div>
 
-      {/* Label */}
       <p className="relative text-base font-medium uppercase tracking-wider text-white/80">{stat.label}</p>
     </div>
   );
 };
 
-export const StatsSection: FC<StatsSectionProps> = ({ stats }): JSX.Element => {
+export const StatsSection: FC<StatsSectionProps> = ({ stats }) => {
   return (
     <section className="relative py-20 bg-primary overflow-hidden">
-      {/* Background Pattern */}
       <div
         className="absolute inset-0 opacity-10"
         style={{
@@ -94,7 +91,6 @@ export const StatsSection: FC<StatsSectionProps> = ({ stats }): JSX.Element => {
       />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold text-white sm:text-4xl" style={{ fontFamily: 'var(--font-montserrat)' }}>
             Impacto en la Región
@@ -102,7 +98,6 @@ export const StatsSection: FC<StatsSectionProps> = ({ stats }): JSX.Element => {
           <p className="text-lg text-white/70">Transformando la gestión documental en Ayacucho</p>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <StatCard key={stat.id} stat={stat} index={index} />

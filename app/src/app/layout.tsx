@@ -4,23 +4,23 @@ import { Poppins, Montserrat } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import './globals.css';
 
-// Font Configuration
-
 const poppins = Poppins({
   subsets: ['latin'],
   variable: '--font-poppins',
   display: 'swap',
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700'],
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 });
 
 const montserrat = Montserrat({
   subsets: ['latin'],
   variable: '--font-montserrat',
   display: 'swap',
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['500', '600', '700', '800'],
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 });
-
-// Metadata Configuration
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://certificaciones.regionayacucho.gob.pe'),
@@ -70,7 +70,6 @@ export const metadata: Metadata = {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
       { url: '/img/icon-32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/img/icon-16.png', sizes: '16x16', type: 'image/png' },
     ],
     apple: [{ url: '/img/apple-touch-icon.png', sizes: '180x180' }],
   },
@@ -90,17 +89,18 @@ export const viewport: Viewport = {
   ],
 };
 
-// Layout Props Type
-
 type RootLayoutProps = {
   children: ReactNode;
 };
 
-// Root Layout Component
-
 const RootLayout: FC<RootLayoutProps> = ({ children }): JSX.Element => {
   return (
     <html lang="es-PE" className={`${poppins.variable} ${montserrat.variable}`} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+      </head>
       <body className="min-h-screen bg-background font-sans antialiased" style={{ fontFamily: 'var(--font-poppins), system-ui, sans-serif' }}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>

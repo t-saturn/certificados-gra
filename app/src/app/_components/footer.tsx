@@ -1,16 +1,16 @@
-import type { FC, JSX } from 'react';
+import type { FC } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { FooterProps, FooterSection, FooterLink } from '@/types/landing.types';
 
-const FooterColumn: FC<{ section: FooterSection }> = ({ section }): JSX.Element => {
+const FooterColumn: FC<{ section: FooterSection }> = ({ section }) => {
   return (
     <div>
       <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">{section.title}</h3>
       <ul className="space-y-3">
         {section.links.map((link: FooterLink) => (
           <li key={link.href}>
-            <Link href={link.href} className="text-sm text-muted-foreground transition-colors duration-200 hover:text-primary">
+            <Link href={link.href} className="text-sm text-muted-foreground transition-colors duration-200 hover:text-primary" prefetch={false}>
               {link.label}
             </Link>
           </li>
@@ -20,7 +20,7 @@ const FooterColumn: FC<{ section: FooterSection }> = ({ section }): JSX.Element 
   );
 };
 
-const SocialLinks: FC = (): JSX.Element => {
+const SocialLinks: FC = () => {
   const socialIcons = [
     {
       name: 'Facebook',
@@ -69,15 +69,13 @@ const SocialLinks: FC = (): JSX.Element => {
   );
 };
 
-export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, sections, contactInfo, copyrightText }): JSX.Element => {
+export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, sections, contactInfo, copyrightText }) => {
   return (
-    <footer className="relative bg-card border-t border-border">
-      {/* Main Footer Content */}
+    <footer id="contact" className="relative bg-card border-t border-border">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-4">
-          {/* Brand Column */}
           <div className="lg:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-3">
+            <Link href="/" className="inline-flex items-center gap-3" prefetch={false}>
               <Image src={logoSrc} alt={logoAlt} width={48} height={48} className="h-12 w-auto" />
               <div className="flex flex-col">
                 <span className="text-xs font-semibold uppercase tracking-wider text-primary">Gobierno Regional</span>
@@ -90,12 +88,10 @@ export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, section
             </div>
           </div>
 
-          {/* Links Columns */}
           {sections.map((section) => (
             <FooterColumn key={section.title} section={section} />
           ))}
 
-          {/* Contact Column */}
           <div>
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">Contacto</h3>
             <address className="not-italic space-y-3">
@@ -137,16 +133,15 @@ export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, section
         </div>
       </div>
 
-      {/* Bottom Bar */}
       <div className="border-t border-border bg-muted/50">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-sm text-muted-foreground">{copyrightText}</p>
             <div className="flex gap-6">
-              <Link href="/privacidad" className="text-sm text-muted-foreground hover:text-primary">
+              <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary" prefetch={false}>
                 Política de Privacidad
               </Link>
-              <Link href="/terminos" className="text-sm text-muted-foreground hover:text-primary">
+              <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary" prefetch={false}>
                 Términos de Uso
               </Link>
             </div>

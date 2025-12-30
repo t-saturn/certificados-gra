@@ -1,8 +1,8 @@
-import type { FC, JSX, ReactNode, CSSProperties } from 'react';
+import type { FC, ReactNode, CSSProperties } from 'react';
 import Link from 'next/link';
 import type { HeroSectionProps } from '@/types/landing.types';
 
-const ShieldIcon: FC = (): JSX.Element => (
+const ShieldIcon: FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-full w-full">
     <path
       strokeLinecap="round"
@@ -12,7 +12,7 @@ const ShieldIcon: FC = (): JSX.Element => (
   </svg>
 );
 
-const DocumentCheckIcon: FC = (): JSX.Element => (
+const DocumentCheckIcon: FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-full w-full">
     <path
       strokeLinecap="round"
@@ -28,34 +28,27 @@ type FloatingBadgeProps = {
   style?: CSSProperties;
 };
 
-const FloatingBadge: FC<FloatingBadgeProps> = ({ children, className = '', style }): JSX.Element => (
+const FloatingBadge: FC<FloatingBadgeProps> = ({ children, className = '', style }) => (
   <div className={`absolute flex items-center gap-2 rounded-lg bg-card px-4 py-2.5 shadow-lg border border-border animate-float ${className}`} style={style}>
     {children}
   </div>
 );
 
-export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description, primaryButtonText, primaryButtonHref, secondaryButtonText, secondaryButtonHref }): JSX.Element => {
+export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description, primaryButtonText, primaryButtonHref, secondaryButtonText, secondaryButtonHref }) => {
   return (
-    <section className="relative min-h-screen pt-20 bg-background overflow-hidden">
-      {/* Decorative Gradient Orbs - Colores que combinan mejor */}
-      <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
-      <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-chart-2/10 blur-3xl" />
+    <section className="relative min-h-screen pt-16 lg:pt-20 bg-background overflow-hidden">
+      <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" aria-hidden="true" />
+      <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-chart-2/10 blur-3xl" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[calc(100vh-5rem)] flex-col items-center justify-center py-20 lg:flex-row lg:gap-16">
-          {/* Content */}
+        <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center py-12 lg:min-h-[calc(100vh-5rem)] lg:flex-row lg:gap-16 lg:py-20">
           <div className="flex-1 text-center lg:text-left">
-            {/* Badge */}
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 animate-fade-in-up">
-              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" aria-hidden="true" />
               <span className="text-sm font-medium text-primary">{subtitle}</span>
             </div>
 
-            {/* Title */}
-            <h1
-              className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl animate-fade-in-up delay-100"
-              style={{ fontFamily: 'var(--font-montserrat)', opacity: 0, animationFillMode: 'forwards' }}
-            >
+            <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl" style={{ fontFamily: 'var(--font-montserrat)' }}>
               {title.split(' ').map((word, index) =>
                 word === 'Certificados' || word === 'Digitales' ? (
                   <span key={index} className="text-primary">
@@ -69,19 +62,16 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
               )}
             </h1>
 
-            {/* Description */}
-            <p className="mb-8 max-w-xl text-lg leading-relaxed text-muted-foreground mx-auto lg:mx-0 animate-fade-in-up delay-200" style={{ opacity: 0, animationFillMode: 'forwards' }}>
-              {description}
-            </p>
+            <p className="mb-8 max-w-xl text-lg leading-relaxed text-muted-foreground mx-auto lg:mx-0">{description}</p>
 
-            {/* Buttons */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start animate-fade-in-up delay-300" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
               <Link
                 href={primaryButtonHref}
                 className="group relative inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-semibold text-primary-foreground transition-all duration-200 hover:bg-primary/90 hover:shadow-xl active:scale-95 overflow-hidden"
+                prefetch={false}
               >
                 <span className="relative z-10">{primaryButtonText}</span>
-                <svg className="relative z-10 h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="relative z-10 h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
@@ -89,15 +79,14 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
               <Link
                 href={secondaryButtonHref}
                 className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-transparent px-8 py-4 text-base font-semibold text-foreground transition-all duration-200 hover:border-primary hover:text-primary hover:bg-primary/5 active:scale-95"
+                prefetch={false}
               >
                 {secondaryButtonText}
               </Link>
             </div>
           </div>
 
-          {/* Illustration */}
-          <div className="relative mt-16 flex-1 lg:mt-0 animate-fade-in-up delay-400" style={{ opacity: 0, animationFillMode: 'forwards' }}>
-            {/* Main Card */}
+          <div className="relative mt-12 flex-1 lg:mt-0">
             <div className="relative mx-auto w-full max-w-md rounded-xl bg-card p-8 shadow-xl border border-border">
               <div className="flex flex-col items-center text-center">
                 <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -121,7 +110,6 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
               </div>
             </div>
 
-            {/* Floating Badges */}
             <FloatingBadge className="-left-8 top-1/4 hidden lg:flex">
               <div className="h-8 w-8 text-primary">
                 <ShieldIcon />
@@ -134,7 +122,7 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
 
             <FloatingBadge className="-right-4 bottom-1/4 hidden lg:flex" style={{ animationDelay: '1s' }}>
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-chart-2/20 text-chart-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -147,8 +135,7 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
         </div>
       </div>
 
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:block" aria-hidden="true">
         <div className="flex h-10 w-6 items-start justify-center rounded-full border-2 border-border p-1.5">
           <div className="h-2 w-1 rounded-full bg-primary animate-bounce" />
         </div>
