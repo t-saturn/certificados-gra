@@ -1,5 +1,3 @@
-'use client';
-
 import type { FC } from 'react';
 import type { FeaturesSectionProps, FeatureItem } from '@/types/landing.types';
 

@@ -69,9 +69,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
-      { url: '/img/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/img/logo.webp', sizes: '32x32', type: 'image/webp' },
     ],
-    apple: [{ url: '/img/apple-touch-icon.png', sizes: '180x180' }],
+    apple: [{ url: '/img/logo.webp', sizes: '180x180' }],
   },
   manifest: '/manifest.json',
   alternates: {

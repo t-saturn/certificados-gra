@@ -43,9 +43,9 @@ export const Header: FC<HeaderProps> = memo(({ logoSrc, logoAlt, navigationItems
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between lg:h-20">
+        <div className="flex h-20 items-center justify-between">
           <Link href="/" className="flex items-center gap-3" prefetch={false}>
-            <Image src={logoSrc} alt={logoAlt} width={48} height={48} className="h-12 w-auto lg:h-14" priority quality={85} />
+            <Image src={logoSrc} alt={logoAlt} width={48} height={48} className="h-12 w-auto lg:h-14" priority />
             <div className="hidden flex-col sm:flex">
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">Gobierno Regional</span>
               <span className="text-sm font-bold text-foreground">Ayacucho</span>
@@ -87,7 +87,7 @@ export const Header: FC<HeaderProps> = memo(({ logoSrc, logoAlt, navigationItems
 
       <div
         id="mobile-menu"
-        className={`fixed inset-0 top-16 z-40 lg:hidden bg-background transition-all duration-300 lg:top-20 ${isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}
+        className={`fixed inset-0 top-20 z-40 lg:hidden bg-background transition-all duration-300 ${isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}
         aria-hidden={!isMobileMenuOpen}
       >
         <nav className="flex flex-col gap-2 p-6" aria-label="Navegación móvil">

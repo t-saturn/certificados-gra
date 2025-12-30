@@ -36,12 +36,12 @@ const FloatingBadge: FC<FloatingBadgeProps> = ({ children, className = '', style
 
 export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description, primaryButtonText, primaryButtonHref, secondaryButtonText, secondaryButtonHref }) => {
   return (
-    <section className="relative min-h-screen pt-16 lg:pt-20 bg-background overflow-hidden">
+    <section className="relative min-h-screen bg-background overflow-hidden flex items-center">
       <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" aria-hidden="true" />
       <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-chart-2/10 blur-3xl" aria-hidden="true" />
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center py-12 lg:min-h-[calc(100vh-5rem)] lg:flex-row lg:gap-16 lg:py-20">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full pt-20 pb-12">
+        <div className="flex flex-col items-center justify-center lg:flex-row lg:gap-16">
           <div className="flex-1 text-center lg:text-left">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5">
               <span className="h-2 w-2 rounded-full bg-primary animate-pulse" aria-hidden="true" />
