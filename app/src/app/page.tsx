@@ -88,7 +88,7 @@ const navigationItems: NavigationItem[] = [
   { label: 'Inicio', href: '/' },
   { label: 'Características', href: '#caracteristicas' },
   { label: 'Proceso', href: '#proceso' },
-  { label: 'Verificar Certificado', href: '/verificar' },
+  { label: 'Verificar Certificado', href: '/verify' },
   { label: 'Contacto', href: '#contacto' },
 ];
 
@@ -174,7 +174,7 @@ const footerSections: FooterSection[] = [
     title: 'Servicios',
     links: [
       { label: 'Emisión de Certificados', href: '/servicios/emision' },
-      { label: 'Verificación', href: '/verificar' },
+      { label: 'Verificación', href: '/verify' },
       { label: 'Firma Digital', href: '/servicios/firma-digital' },
       { label: 'Consultas', href: '/consultas' },
     ],

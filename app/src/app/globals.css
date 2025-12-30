@@ -1,41 +1,190 @@
 @import 'tailwindcss';
 
-@theme {
-  /* Colores Institucionales - Gobierno Regional de Ayacucho */
-  --color-primary: #8b1538;
-  --color-primary-light: #a91d45;
-  --color-primary-dark: #6b102b;
+@import 'tw-animate-css';
 
-  --color-secondary: #c9a227;
-  --color-secondary-light: #d4b43a;
-  --color-secondary-dark: #a8871f;
+@custom-variant dark (&:is(.dark *));
 
-  --color-accent: #1e3a5f;
-  --color-accent-light: #2a4d7a;
-  --color-accent-dark: #152a45;
-
-  /* Neutros */
-  --color-background: #fafafa;
-  --color-surface: #ffffff;
-  --color-surface-elevated: #f5f5f5;
-
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #4a4a4a;
-  --color-text-muted: #6b6b6b;
-  --color-text-inverse: #ffffff;
-
-  /* Bordes */
-  --color-border: #e5e5e5;
-  --color-border-light: #f0f0f0;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+:root {
+  --font-size: 14px;
+  --radius: 0.65rem;
+  --background: #ffffff;
+  --foreground: #252429;
+  --card: #ffffff;
+  --card-foreground: #252429;
+  --popover: #f8f7f7;
+  --popover-foreground: #252429;
+  --primary: #d20f39;
+  --primary-foreground: #fdf5f3;
+  --secondary: #f6f6f7;
+  --secondary-foreground: #363439;
+  --muted: #f6f6f7;
+  --muted-foreground: #8f8c93;
+  --accent: #f6f6f7;
+  --accent-foreground: #363439;
+  --destructive: #eb3030;
+  --destructive-foreground: #ffffff;
+  --border: #ececed;
+  --input: #ececed;
+  --input-background: #f8f9fa;
+  --switch-background: #dadce0;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #f16d4c;
+  --chart-1: #f37859;
+  --chart-2: #4ca4a2;
+  --chart-3: #406283;
+  --chart-4: #c8cb83;
+  --chart-5: #b5a96b;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #252429;
+  --sidebar-primary: #f16d4c;
+  --sidebar-primary-foreground: #fdf5f3;
+  --sidebar-accent: #f6f6f7;
+  --sidebar-accent-foreground: #363439;
+  --sidebar-border: #ececed;
+  --sidebar-ring: #f16d4c;
+}
+
+.dark {
+  --background: #252429;
+  --foreground: #fafafa;
+  --card: #363439;
+  --card-foreground: #fafafa;
+  --popover: #313033;
+  --popover-foreground: #fafafa;
+  --primary: #d20f39;
+  --primary-foreground: #fdf5f3;
+  --secondary: #454449;
+  --secondary-foreground: #fafafa;
+  --muted: #454449;
+  --muted-foreground: #b6b4bb;
+  --accent: #454449;
+  --accent-foreground: #fafafa;
+  --destructive: #f12b2b;
+  --destructive-foreground: #ffffff;
+  --border: #ffffff1a;
+  --input: #ffffff26;
+  --ring: #f16d4c;
+  --chart-1: #6a6be8;
+  --chart-2: #7ac8c0;
+  --chart-3: #b5a96b;
+  --chart-4: #a96be2;
+  --chart-5: #ef6953;
+  --sidebar: #363439;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #f16d4c;
+  --sidebar-primary-foreground: #fdf5f3;
+  --sidebar-accent: #454449;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #ffffff1a;
+  --sidebar-ring: #f16d4c;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
 }
 
 html {
+  font-size: var(--font-size);
   scroll-behavior: smooth;
 }
 
@@ -46,9 +195,6 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
 }
 
 /* Tipografía */
@@ -82,10 +228,6 @@ h6 {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-}
-
-.dark .glass-effect {
-  background: rgba(20, 20, 20, 0.8);
 }
 
 /* Animaciones */

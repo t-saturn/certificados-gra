@@ -23,8 +23,9 @@ export const ThemeToggleDropdown: FC = (): JSX.Element | null => {
   const { theme, setTheme } = useTheme();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect((): void => {
-    setMounted(true);
+  useEffect((): (() => void) => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   useEffect((): (() => void) => {
