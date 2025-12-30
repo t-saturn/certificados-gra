@@ -31,13 +31,21 @@ const refreshAccessToken = async (token: ExtendedJWT): Promise<ExtendedJWT> => {
       expiresAt: Math.floor(Date.now() / 1000) + refreshedTokens.expires_in,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     };
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error refrescando access token:', error);
-    return {
-      ...token,
-      error: 'RefreshAccessTokenError',
-    };
+  } catch {
+    return { ...token, error: 'RefreshAccessTokenError' };
+  }
+};
+
+const verifyTokenWithKeycloak = async (accessToken: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${process.env.KEYCLOAK_ISSUER}/protocol/openid-connect/userinfo`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 };
 
@@ -65,11 +73,10 @@ const authConfig: NextAuthConfig = {
       issuer: process.env.KEYCLOAK_ISSUER!,
     }),
   ],
-  pages: {
-    signIn: '/login',
-    error: '/auth/error',
+  session: {
+    strategy: 'jwt',
+    maxAge: 5 * 60,
   },
-  session: { strategy: 'jwt' },
   trustHost: true,
   callbacks: {
     jwt: async ({ token, account, profile }): Promise<ExtendedJWT> => {
@@ -89,18 +96,41 @@ const authConfig: NextAuthConfig = {
         };
       }
 
+      const extendedToken = token as ExtendedJWT;
       const now = Math.floor(Date.now() / 1000);
-      const expiresAt = token.expiresAt as number;
+      const expiresAt = extendedToken.expiresAt as number;
 
-      if (now < expiresAt - 60) {
-        return token as ExtendedJWT;
+      if (extendedToken.accessToken) {
+        const isValid = await verifyTokenWithKeycloak(extendedToken.accessToken);
+        if (!isValid) {
+          return {
+            ...extendedToken,
+            error: 'RefreshAccessTokenError',
+          };
+        }
       }
 
-      return await refreshAccessToken(token as ExtendedJWT);
+      if (now < expiresAt - 60) {
+        return extendedToken;
+      }
+
+      return await refreshAccessToken(extendedToken);
     },
 
     session: async ({ session, token }): Promise<ExtendedSession> => {
       const extendedToken = token as ExtendedJWT;
+
+      if (extendedToken.error) {
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id: '',
+            roles: [],
+          },
+          error: extendedToken.error,
+        };
+      }
 
       return {
         ...session,

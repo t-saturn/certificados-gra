@@ -1,6 +1,6 @@
 'use client';
 
-import type { FC } from 'react';
+import type { FC, JSX } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useCallback, memo } from 'react';
@@ -8,7 +8,11 @@ import { Menu, X } from 'lucide-react';
 import type { HeaderProps, NavigationItem } from '@/types/landing.types';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
-const NavLink: FC<{ item: NavigationItem }> = memo(({ item }) => {
+type NavLinkProps = {
+  item: NavigationItem;
+};
+
+const NavLink: FC<NavLinkProps> = memo(({ item }): JSX.Element => {
   const linkClasses =
     'relative px-4 py-2 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary after:absolute after:bottom-0 after:left-1/2 after:h-0.5 after:w-0 after:bg-primary after:transition-all after:duration-200 after:-translate-x-1/2 hover:after:w-full';
 
@@ -29,14 +33,16 @@ const NavLink: FC<{ item: NavigationItem }> = memo(({ item }) => {
 
 NavLink.displayName = 'NavLink';
 
-export const Header: FC<HeaderProps> = memo(({ logoSrc, logoAlt, navigationItems }) => {
+const LOGIN_HREF = '/main';
+
+export const Header: FC<HeaderProps> = memo(({ logoSrc, logoAlt, navigationItems }): JSX.Element => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const toggleMobileMenu = useCallback(() => {
+  const toggleMobileMenu = useCallback((): void => {
     setIsMobileMenuOpen((prev) => !prev);
   }, []);
 
-  const closeMobileMenu = useCallback(() => {
+  const closeMobileMenu = useCallback((): void => {
     setIsMobileMenuOpen(false);
   }, []);
 
@@ -61,7 +67,7 @@ export const Header: FC<HeaderProps> = memo(({ logoSrc, logoAlt, navigationItems
           <div className="hidden items-center gap-3 lg:flex">
             <ThemeToggle />
             <Link
-              href="/login"
+              href={LOGIN_HREF}
               className="px-6 py-2.5 text-sm font-semibold bg-primary text-primary-foreground rounded-full transition-all duration-200 hover:bg-primary/90 hover:shadow-lg active:scale-95"
               prefetch={false}
             >
@@ -102,7 +108,12 @@ export const Header: FC<HeaderProps> = memo(({ logoSrc, logoAlt, navigationItems
               {item.label}
             </Link>
           ))}
-          <Link href="/login" className="mt-4 px-6 py-3 text-center text-base font-semibold bg-primary text-primary-foreground rounded-full transition-all duration-200 hover:bg-primary/90" prefetch={false}>
+          <Link
+            href={LOGIN_HREF}
+            onClick={closeMobileMenu}
+            className="mt-4 px-6 py-3 text-center text-base font-semibold bg-primary text-primary-foreground rounded-full transition-all duration-200 hover:bg-primary/90"
+            prefetch={false}
+          >
             Iniciar Sesión
           </Link>
         </nav>
