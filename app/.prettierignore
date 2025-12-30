@@ -1,12 +1,2 @@
 .prettierrc
 tsconfig.json
-
-# Build
-.next/
-out/
-build/
-
-# Dependencies
-node_modules/
-bun.lock
-next-env.d.ts

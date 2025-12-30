@@ -1,10 +1,8 @@
 import type { FC, ReactNode, JSX } from 'react';
-import type { NavigationItem, FeatureItem, StatItem, ProcessStep, FooterSection, ContactInfo } from './_components';
+import type { NavigationItem, FeatureItem, StatItem, ProcessStep, FooterSection, ContactInfo } from '@/types/landing.types';
 import { Header, HeroSection, FeaturesSection, StatsSection, ProcessSection, CtaSection, Footer } from './_components';
 
-// ============================================
 // Icons Components
-// ============================================
 
 const ShieldCheckIcon: FC = (): ReactNode => (
   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -84,9 +82,7 @@ const PencilSquareIcon: FC = (): ReactNode => (
   </svg>
 );
 
-// ============================================
 // Static Data Configuration
-// ============================================
 
 const navigationItems: NavigationItem[] = [
   { label: 'Inicio', href: '/' },
@@ -200,9 +196,7 @@ const contactInfo: ContactInfo = {
   email: 'certificaciones@regionayacucho.gob.pe',
 };
 
-// ============================================
 // Page Component
-// ============================================
 
 const HomePage: FC = (): JSX.Element => {
   return (

@@ -88,12 +88,7 @@ type RootLayoutProps = {
 const RootLayout: FC<RootLayoutProps> = ({ children }): JSX.Element => {
   return (
     <html lang="es-PE" className={`${dmSans.variable} ${playfairDisplay.variable}`} suppressHydrationWarning>
-      <body
-        className="          min-h-screen          bg-background          font-sans          text-text-primary          antialiased        "
-        style={{
-          fontFamily: 'var(--font-dm-sans), system-ui, sans-serif',
-        }}
-      >
+      <body className="min-h-screen bg-background font-sans text-text-primary antialiased" style={{ fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
         {children}
       </body>
     </html>

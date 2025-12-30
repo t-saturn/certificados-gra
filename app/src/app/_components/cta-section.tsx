@@ -1,53 +1,21 @@
 import type { FC, JSX } from 'react';
 import Link from 'next/link';
-import type { CtaSectionProps } from '.';
+import type { CtaSectionProps } from '@/types/landing.types';
 
 export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText, buttonHref }): JSX.Element => {
   return (
-    <section
-      className="
-        relative py-24
-        bg-(--color-surface-elevated)
-        overflow-hidden
-      "
-    >
+    <section className="relative py-24 bg-surface-elevated overflow-hidden">
       {/* Decorative Background */}
       <div className="absolute inset-0 overflow-hidden">
-        <div
-          className="
-            absolute -top-1/2 -left-1/4 h-full w-1/2
-            rounded-full
-            bg-linear-to-br from-(--color-primary)/5 to-transparent
-            blur-3xl
-          "
-        />
-        <div
-          className="
-            absolute -bottom-1/2 -right-1/4 h-full w-1/2
-            rounded-full
-            bg-linear-to-tl from-(--color-secondary)/5 to-transparent
-            blur-3xl
-          "
-        />
+        <div className="absolute -top-1/2 -left-1/4 h-full w-1/2 rounded-full bg-linear-to-br from-primary/5 to-transparent blur-3xl" />
+        <div className="absolute -bottom-1/2 -right-1/4 h-full w-1/2 rounded-full bg-linear-to-tl from-secondary/5 to-transparent blur-3xl" />
       </div>
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div
-          className="
-            relative
-            rounded-(--radius-xl)
-            bg-linear-to-br from-(--color-primary) via-(--color-primary-dark) to-(--color-accent-dark)
-            p-12 sm:p-16
-            text-center
-            overflow-hidden
-          "
-        >
+        <div className="relative rounded-xl bg-linear-to-br from-primary via-primary-dark to-accent-dark p-12 sm:p-16 text-center overflow-hidden">
           {/* Background Pattern */}
           <div
-            className="
-              absolute inset-0
-              opacity-10
-            "
+            className="absolute inset-0 opacity-10"
             style={{
               backgroundImage: `radial-gradient(circle at 25% 25%, white 2px, transparent 2px)`,
               backgroundSize: '40px 40px',
@@ -55,37 +23,14 @@ export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText
           />
 
           {/* Decorative Shapes */}
-          <div
-            className="
-              absolute top-0 right-0 h-40 w-40
-              translate-x-1/2 -translate-y-1/2
-              rounded-full
-              bg-(--color-secondary)/20
-              blur-2xl
-            "
-          />
-          <div
-            className="
-              absolute bottom-0 left-0 h-32 w-32
-              -translate-x-1/2 translate-y-1/2
-              rounded-full
-              bg-(--color-secondary)/20
-              blur-2xl
-            "
-          />
+          <div className="absolute top-0 right-0 h-40 w-40 translate-x-1/2 -translate-y-1/2 rounded-full bg-secondary/20 blur-2xl" />
+          <div className="absolute bottom-0 left-0 h-32 w-32 -translate-x-1/2 translate-y-1/2 rounded-full bg-secondary/20 blur-2xl" />
 
           {/* Content */}
           <div className="relative z-10">
             {/* Icon */}
-            <div
-              className="
-                mx-auto mb-6 flex h-16 w-16 items-center justify-center
-                rounded-full
-                bg-white/10
-                backdrop-blur-sm
-              "
-            >
-              <svg className="h-8 w-8 text-(--color-text-inverse)" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+              <svg className="h-8 w-8 text-text-inverse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -94,41 +39,14 @@ export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText
               </svg>
             </div>
 
-            <h2
-              className="
-                mb-4 text-3xl font-bold
-                text-(--color-text-inverse)
-                sm:text-4xl
-              "
-            >
-              {title}
-            </h2>
+            <h2 className="mb-4 text-3xl font-bold text-text-inverse sm:text-4xl">{title}</h2>
 
-            <p
-              className="
-                mx-auto mb-8 max-w-xl text-lg
-                text-(--color-text-inverse)/80
-                leading-relaxed
-              "
-            >
-              {description}
-            </p>
+            <p className="mx-auto mb-8 max-w-xl text-lg text-text-inverse/80 leading-relaxed">{description}</p>
 
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Link
                 href={buttonHref}
-                className="
-                  group inline-flex items-center gap-2
-                  rounded-(--radius-full)
-                  bg-white
-                  px-8 py-4
-                  text-base font-semibold text-(--color-primary)
-                  transition-all duration-(--transition-base)
-                  hover:bg-(--color-secondary)
-                  hover:text-(--color-text-primary)
-                  hover:shadow-xl
-                  active:scale-95
-                "
+                className="group inline-flex items-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-primary transition-all duration-200 hover:bg-secondary hover:text-text-primary hover:shadow-xl active:scale-95"
               >
                 {buttonText}
                 <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -138,17 +56,7 @@ export const CtaSection: FC<CtaSectionProps> = ({ title, description, buttonText
 
               <Link
                 href="/verificar"
-                className="
-                  inline-flex items-center gap-2
-                  rounded-(--radius-full)
-                  border-2 border-white/30
-                  px-8 py-4
-                  text-base font-semibold text-(--color-text-inverse)
-                  transition-all duration-(--transition-base)
-                  hover:bg-white/10
-                  hover:border-white/50
-                  active:scale-95
-                "
+                className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 px-8 py-4 text-base font-semibold text-text-inverse transition-all duration-200 hover:bg-white/10 hover:border-white/50 active:scale-95"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
