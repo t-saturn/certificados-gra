@@ -1,0 +1,24 @@
+{
+  "name": "Sistema de Certificaciones Digitales - GRA",
+  "short_name": "GRA Certificados",
+  "description": "Plataforma oficial del Gobierno Regional de Ayacucho para la emisión y verificación de certificados digitales",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#d20f39",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

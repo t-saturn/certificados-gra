@@ -29,20 +29,17 @@ type FloatingBadgeProps = {
 };
 
 const FloatingBadge: FC<FloatingBadgeProps> = ({ children, className = '', style }): JSX.Element => (
-  <div className={`absolute flex items-center gap-2 rounded-lg bg-surface px-4 py-2.5 shadow-lg border border-border-light animate-float ${className}`} style={style}>
+  <div className={`absolute flex items-center gap-2 rounded-lg bg-card px-4 py-2.5 shadow-lg border border-border animate-float ${className}`} style={style}>
     {children}
   </div>
 );
 
 export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description, primaryButtonText, primaryButtonHref, secondaryButtonText, secondaryButtonHref }): JSX.Element => {
   return (
-    <section className="relative min-h-screen pt-20 bg-linear-to-br from-background via-surface to-background overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 bg-pattern pointer-events-none" />
-
-      {/* Decorative Gradient Orbs */}
-      <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
-      <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
+    <section className="relative min-h-screen pt-20 bg-background overflow-hidden">
+      {/* Decorative Gradient Orbs - Colores que combinan mejor */}
+      <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+      <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-chart-2/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-[calc(100vh-5rem)] flex-col items-center justify-center py-20 lg:flex-row lg:gap-16">
@@ -55,21 +52,25 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
             </div>
 
             {/* Title */}
-            <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl animate-fade-in-up delay-100" style={{ opacity: 0, animationFillMode: 'forwards' }}>
-              {title.split(' ').map(
-                (word: string, index: number): JSX.Element =>
-                  word === 'Certificados' || word === 'Digitales' ? (
-                    <span key={index} className="text-gradient">
-                      {word}{' '}
-                    </span>
-                  ) : (
-                    <span key={index}>{word} </span>
-                  ),
+            <h1
+              className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl animate-fade-in-up delay-100"
+              style={{ fontFamily: 'var(--font-montserrat)', opacity: 0, animationFillMode: 'forwards' }}
+            >
+              {title.split(' ').map((word, index) =>
+                word === 'Certificados' || word === 'Digitales' ? (
+                  <span key={index} className="text-primary">
+                    {word}{' '}
+                  </span>
+                ) : (
+                  <span key={index} className="text-foreground">
+                    {word}{' '}
+                  </span>
+                ),
               )}
             </h1>
 
             {/* Description */}
-            <p className="mb-8 max-w-xl text-lg leading-relaxed text-text-secondary mx-auto lg:mx-0 animate-fade-in-up delay-200" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+            <p className="mb-8 max-w-xl text-lg leading-relaxed text-muted-foreground mx-auto lg:mx-0 animate-fade-in-up delay-200" style={{ opacity: 0, animationFillMode: 'forwards' }}>
               {description}
             </p>
 
@@ -77,7 +78,7 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start animate-fade-in-up delay-300" style={{ opacity: 0, animationFillMode: 'forwards' }}>
               <Link
                 href={primaryButtonHref}
-                className="group relative inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-semibold text-text-inverse transition-all duration-200 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/30 active:scale-95 overflow-hidden"
+                className="group relative inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-semibold text-primary-foreground transition-all duration-200 hover:bg-primary/90 hover:shadow-xl active:scale-95 overflow-hidden"
               >
                 <span className="relative z-10">{primaryButtonText}</span>
                 <svg className="relative z-10 h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,7 +88,7 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
 
               <Link
                 href={secondaryButtonHref}
-                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-transparent px-8 py-4 text-base font-semibold text-text-primary transition-all duration-200 hover:border-primary hover:text-primary hover:bg-primary/5 active:scale-95"
+                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-transparent px-8 py-4 text-base font-semibold text-foreground transition-all duration-200 hover:border-primary hover:text-primary hover:bg-primary/5 active:scale-95"
               >
                 {secondaryButtonText}
               </Link>
@@ -97,26 +98,25 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
           {/* Illustration */}
           <div className="relative mt-16 flex-1 lg:mt-0 animate-fade-in-up delay-400" style={{ opacity: 0, animationFillMode: 'forwards' }}>
             {/* Main Card */}
-            <div className="relative mx-auto w-full max-w-md rounded-xl bg-surface p-8 shadow-xl border border-border-light">
-              {/* Certificate Preview */}
+            <div className="relative mx-auto w-full max-w-md rounded-xl bg-card p-8 shadow-xl border border-border">
               <div className="flex flex-col items-center text-center">
-                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-primary to-primary-dark text-text-inverse">
+                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <div className="h-10 w-10">
                     <DocumentCheckIcon />
                   </div>
                 </div>
-                <div className="mb-2 h-3 w-32 rounded-full bg-surface-elevated" />
-                <div className="mb-4 h-2 w-48 rounded-full bg-surface-elevated" />
+                <div className="mb-2 h-3 w-32 rounded-full bg-muted" />
+                <div className="mb-4 h-2 w-48 rounded-full bg-muted" />
                 <div className="grid w-full grid-cols-2 gap-3">
-                  <div className="h-8 rounded-md bg-surface-elevated" />
-                  <div className="h-8 rounded-md bg-surface-elevated" />
+                  <div className="h-8 rounded-md bg-muted" />
+                  <div className="h-8 rounded-md bg-muted" />
                 </div>
-                <div className="mt-6 flex w-full items-center justify-between border-t border-border-light pt-6">
+                <div className="mt-6 flex w-full items-center justify-between border-t border-border pt-6">
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-green-500" />
-                    <span className="text-xs font-medium text-green-600">Verificado</span>
+                    <div className="h-3 w-3 rounded-full bg-chart-2" />
+                    <span className="text-xs font-medium text-chart-2">Verificado</span>
                   </div>
-                  <div className="text-xs text-text-muted">Firma Digital Válida</div>
+                  <div className="text-xs text-muted-foreground">Firma Digital Válida</div>
                 </div>
               </div>
             </div>
@@ -127,20 +127,20 @@ export const HeroSection: FC<HeroSectionProps> = ({ title, subtitle, description
                 <ShieldIcon />
               </div>
               <div>
-                <p className="text-xs font-semibold text-text-primary">Firma Digital</p>
-                <p className="text-xs text-text-muted">PKI Certificado</p>
+                <p className="text-xs font-semibold text-foreground">Firma Digital</p>
+                <p className="text-xs text-muted-foreground">PKI Certificado</p>
               </div>
             </FloatingBadge>
 
             <FloatingBadge className="-right-4 bottom-1/4 hidden lg:flex" style={{ animationDelay: '1s' }}>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-chart-2/20 text-chart-2">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <div>
-                <p className="text-xs font-semibold text-text-primary">100% Legal</p>
-                <p className="text-xs text-text-muted">Validez Jurídica</p>
+                <p className="text-xs font-semibold text-foreground">100% Legal</p>
+                <p className="text-xs text-muted-foreground">Validez Jurídica</p>
               </div>
             </FloatingBadge>
           </div>

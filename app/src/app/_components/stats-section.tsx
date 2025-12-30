@@ -16,9 +16,9 @@ const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }): JSX.
 
   const numericValue: number = parseInt(value.replace(/\D/g, ''), 10);
 
-  useEffect((): (() => void) => {
-    const observer: IntersectionObserver = new IntersectionObserver(
-      (entries: IntersectionObserverEntry[]): void => {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
         const [entry] = entries;
         if (entry.isIntersecting) {
           setIsVisible(true);
@@ -27,29 +27,29 @@ const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }): JSX.
       { threshold: 0.5 },
     );
 
-    const currentRef: HTMLSpanElement | null = ref.current;
+    const currentRef = ref.current;
     if (currentRef) {
       observer.observe(currentRef);
     }
 
-    return (): void => {
+    return () => {
       if (currentRef) {
         observer.unobserve(currentRef);
       }
     };
   }, []);
 
-  useEffect((): (() => void) | undefined => {
+  useEffect(() => {
     if (!isVisible) return;
 
-    const duration: number = 2000;
-    const steps: number = 60;
-    const increment: number = numericValue / steps;
-    let currentStep: number = 0;
+    const duration = 2000;
+    const steps = 60;
+    const increment = numericValue / steps;
+    let currentStep = 0;
 
-    const timer: NodeJS.Timeout = setInterval((): void => {
+    const timer = setInterval(() => {
       currentStep += 1;
-      const newValue: number = Math.min(Math.round(increment * currentStep), numericValue);
+      const newValue = Math.min(Math.round(increment * currentStep), numericValue);
       setCount(newValue);
 
       if (currentStep >= steps) {
@@ -57,7 +57,7 @@ const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }): JSX.
       }
     }, duration / steps);
 
-    return (): void => clearInterval(timer);
+    return () => clearInterval(timer);
   }, [isVisible, numericValue]);
 
   return (
@@ -71,23 +71,20 @@ const AnimatedCounter: FC<AnimatedCounterProps> = ({ value, suffix = '' }): JSX.
 const StatCard: FC<{ stat: StatItem; index: number }> = ({ stat, index }): JSX.Element => {
   return (
     <div className="relative flex flex-col items-center p-8 text-center transition-transform duration-300 hover:scale-105" style={{ animationDelay: `${index * 100}ms` }}>
-      {/* Decorative Ring */}
-      <div className="absolute inset-0 m-auto h-32 w-32 rounded-full bg-linear-to-br from-secondary/20 to-transparent blur-2xl" />
-
       {/* Value */}
-      <div className="relative mb-2 text-5xl font-bold text-gradient sm:text-6xl">
+      <div className="relative mb-2 text-5xl font-bold text-white sm:text-6xl" style={{ fontFamily: 'var(--font-montserrat)' }}>
         <AnimatedCounter value={stat.value} suffix={stat.suffix} />
       </div>
 
       {/* Label */}
-      <p className="relative text-base font-medium uppercase tracking-wider text-text-inverse/80">{stat.label}</p>
+      <p className="relative text-base font-medium uppercase tracking-wider text-white/80">{stat.label}</p>
     </div>
   );
 };
 
 export const StatsSection: FC<StatsSectionProps> = ({ stats }): JSX.Element => {
   return (
-    <section className="relative py-20 bg-linear-to-br from-primary via-primary-dark to-accent-dark overflow-hidden">
+    <section className="relative py-20 bg-primary overflow-hidden">
       {/* Background Pattern */}
       <div
         className="absolute inset-0 opacity-10"
@@ -96,24 +93,20 @@ export const StatsSection: FC<StatsSectionProps> = ({ stats }): JSX.Element => {
         }}
       />
 
-      {/* Decorative Elements */}
-      <div className="absolute -top-20 -left-20 h-40 w-40 rounded-full bg-secondary/20 blur-3xl" />
-      <div className="absolute -bottom-20 -right-20 h-40 w-40 rounded-full bg-secondary/20 blur-3xl" />
-
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="mb-12 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-text-inverse sm:text-4xl">Impacto en la Región</h2>
-          <p className="text-lg text-text-inverse/70">Transformando la gestión documental en Ayacucho</p>
+          <h2 className="mb-4 text-3xl font-bold text-white sm:text-4xl" style={{ fontFamily: 'var(--font-montserrat)' }}>
+            Impacto en la Región
+          </h2>
+          <p className="text-lg text-white/70">Transformando la gestión documental en Ayacucho</p>
         </div>
 
         {/* Stats Grid */}
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map(
-            (stat: StatItem, index: number): JSX.Element => (
-              <StatCard key={stat.id} stat={stat} index={index} />
-            ),
-          )}
+          {stats.map((stat, index) => (
+            <StatCard key={stat.id} stat={stat} index={index} />
+          ))}
         </div>
       </div>
     </section>

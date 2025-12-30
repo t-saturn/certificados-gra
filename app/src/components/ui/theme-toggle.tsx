@@ -19,7 +19,6 @@ const NEXT_THEME: Record<ThemeKey, ThemeKey> = {
   system: 'light',
 };
 
-// Type guard real
 const isThemeKey = (value: unknown): value is ThemeKey => value === 'light' || value === 'dark' || value === 'system';
 
 export const ThemeToggle: FC = (): JSX.Element | null => {
@@ -33,18 +32,14 @@ export const ThemeToggle: FC = (): JSX.Element | null => {
 
   if (!mounted) {
     return (
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-elevated">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <div className="h-5 w-5 animate-pulse rounded-full bg-border" />
       </div>
     );
   }
 
-  // theme puede ser "system", entonces usamos resolvedTheme
   const raw = theme === 'system' ? resolvedTheme : theme;
-
-  // fallback garantizado
   const key: ThemeKey = isThemeKey(raw) ? raw : 'system';
-
   const { icon, label } = THEME_META[key];
 
   const cycleTheme = (): void => {
@@ -56,7 +51,7 @@ export const ThemeToggle: FC = (): JSX.Element | null => {
     <button
       type="button"
       onClick={cycleTheme}
-      className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-elevated text-text-secondary transition-all duration-200 hover:bg-primary hover:text-text-inverse hover:scale-105 active:scale-95"
+      className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:scale-105 active:scale-95"
       aria-label={label}
       title={label}
     >

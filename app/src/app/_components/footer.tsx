@@ -6,24 +6,22 @@ import type { FooterProps, FooterSection, FooterLink } from '@/types/landing.typ
 const FooterColumn: FC<{ section: FooterSection }> = ({ section }): JSX.Element => {
   return (
     <div>
-      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-primary">{section.title}</h3>
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">{section.title}</h3>
       <ul className="space-y-3">
-        {section.links.map(
-          (link: FooterLink): JSX.Element => (
-            <li key={link.href}>
-              <Link href={link.href} className="text-sm text-text-secondary transition-colors duration-200 hover:text-primary">
-                {link.label}
-              </Link>
-            </li>
-          ),
-        )}
+        {section.links.map((link: FooterLink) => (
+          <li key={link.href}>
+            <Link href={link.href} className="text-sm text-muted-foreground transition-colors duration-200 hover:text-primary">
+              {link.label}
+            </Link>
+          </li>
+        ))}
       </ul>
     </div>
   );
 };
 
 const SocialLinks: FC = (): JSX.Element => {
-  const socialIcons: Array<{ name: string; href: string; icon: JSX.Element }> = [
+  const socialIcons = [
     {
       name: 'Facebook',
       href: 'https://facebook.com/gaboregionalayacucho',
@@ -55,27 +53,25 @@ const SocialLinks: FC = (): JSX.Element => {
 
   return (
     <div className="flex gap-4">
-      {socialIcons.map(
-        (social): JSX.Element => (
-          <a
-            key={social.name}
-            href={social.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-elevated text-text-secondary transition-all duration-200 hover:bg-primary hover:text-text-inverse"
-            aria-label={social.name}
-          >
-            {social.icon}
-          </a>
-        ),
-      )}
+      {socialIcons.map((social) => (
+        <a
+          key={social.name}
+          href={social.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all duration-200 hover:bg-primary hover:text-primary-foreground"
+          aria-label={social.name}
+        >
+          {social.icon}
+        </a>
+      ))}
     </div>
   );
 };
 
 export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, sections, contactInfo, copyrightText }): JSX.Element => {
   return (
-    <footer className="relative bg-surface border-t border-border">
+    <footer className="relative bg-card border-t border-border">
       {/* Main Footer Content */}
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-4">
@@ -85,32 +81,30 @@ export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, section
               <Image src={logoSrc} alt={logoAlt} width={48} height={48} className="h-12 w-auto" />
               <div className="flex flex-col">
                 <span className="text-xs font-semibold uppercase tracking-wider text-primary">Gobierno Regional</span>
-                <span className="text-sm font-bold text-text-primary">Ayacucho</span>
+                <span className="text-sm font-bold text-foreground">Ayacucho</span>
               </div>
             </Link>
-            <p className="mt-4 text-sm text-text-secondary leading-relaxed">{description}</p>
+            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">{description}</p>
             <div className="mt-6">
               <SocialLinks />
             </div>
           </div>
 
           {/* Links Columns */}
-          {sections.map(
-            (section: FooterSection): JSX.Element => (
-              <FooterColumn key={section.title} section={section} />
-            ),
-          )}
+          {sections.map((section) => (
+            <FooterColumn key={section.title} section={section} />
+          ))}
 
           {/* Contact Column */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-primary">Contacto</h3>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">Contacto</h3>
             <address className="not-italic space-y-3">
               <div className="flex items-start gap-3">
                 <svg className="mt-0.5 h-5 w-5 shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
-                <span className="text-sm text-text-secondary">{contactInfo.address}</span>
+                <span className="text-sm text-muted-foreground">{contactInfo.address}</span>
               </div>
               <div className="flex items-center gap-3">
                 <svg className="h-5 w-5 shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -121,7 +115,7 @@ export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, section
                     d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"
                   />
                 </svg>
-                <a href={`tel:${contactInfo.phone}`} className="text-sm text-text-secondary hover:text-primary">
+                <a href={`tel:${contactInfo.phone}`} className="text-sm text-muted-foreground hover:text-primary">
                   {contactInfo.phone}
                 </a>
               </div>
@@ -134,7 +128,7 @@ export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, section
                     d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
                   />
                 </svg>
-                <a href={`mailto:${contactInfo.email}`} className="text-sm text-text-secondary hover:text-primary">
+                <a href={`mailto:${contactInfo.email}`} className="text-sm text-muted-foreground hover:text-primary">
                   {contactInfo.email}
                 </a>
               </div>
@@ -144,15 +138,15 @@ export const Footer: FC<FooterProps> = ({ logoSrc, logoAlt, description, section
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-border bg-surface-elevated">
+      <div className="border-t border-border bg-muted/50">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p className="text-sm text-text-muted">{copyrightText}</p>
+            <p className="text-sm text-muted-foreground">{copyrightText}</p>
             <div className="flex gap-6">
-              <Link href="/privacidad" className="text-sm text-text-muted hover:text-primary">
+              <Link href="/privacidad" className="text-sm text-muted-foreground hover:text-primary">
                 Política de Privacidad
               </Link>
-              <Link href="/terminos" className="text-sm text-text-muted hover:text-primary">
+              <Link href="/terminos" className="text-sm text-muted-foreground hover:text-primary">
                 Términos de Uso
               </Link>
             </div>
