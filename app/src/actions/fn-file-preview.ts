@@ -1,6 +1,6 @@
 'use server';
 
-import { fetchFileById } from '@/lib/file-server';
+import { fetchFileById } from '@/lib/file-service';
 
 export type FilePreviewResult =
   | {

@@ -6,17 +6,14 @@ export interface SidebarSubItem {
   url: string;
 }
 
-// Interfaz para los ítems principales (puede tener submenús)
-export interface SidebarItem {
+export interface SidebarMenuItem {
   label: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   url: string;
-  items?: SidebarSubItem[];
-  roles?: string[];
+  items?: SidebarMenuItem[];
 }
 
-// Interfaz para los grupos de menú
 export interface SidebarMenuGroup {
   title: string;
-  menu: SidebarItem[];
+  menu: SidebarMenuItem[];
 }

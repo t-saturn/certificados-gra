@@ -1,8 +1,26 @@
 'use client';
 
 import { createContext, useContext } from 'react';
+import type { SidebarMenuGroup } from '@/types/sidebar-types.';
 
-export type RoleValue = { id: string; name: string; modules?: string[] } | null;
+export interface ModuleInfo {
+  id: string;
+  item?: string | null;
+  name: string;
+  route?: string | null;
+  icon?: string | null;
+  parent_id?: string | null;
+  sort_order: number;
+  status: string;
+  children?: { id: string; name: string }[];
+}
+
+export type RoleValue = {
+  id: string;
+  name: string;
+  modules: ModuleInfo[];
+  sidebarMenu?: SidebarMenuGroup[];
+} | null;
 
 const RoleContext = createContext<RoleValue>(null);
 

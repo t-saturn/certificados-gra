@@ -3,7 +3,7 @@
 'use server';
 
 import { auth } from '@/lib/auth';
-import { uploadFileToFileServer, type UploadedFileData } from '@/lib/file-server';
+import { uploadFileToFileServer, type UploadedFileData } from '@/lib/file-service';
 
 export type UploadResult = {
   id: string;

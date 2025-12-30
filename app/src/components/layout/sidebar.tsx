@@ -9,22 +9,21 @@ import { useState, useRef } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader } from '@/components/ui/sidebar';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, useSidebar } from '@/components/ui/sidebar';
-import { fn_get_sidebar_menu } from '@/helpers/sidebar-helper';
-import { SidebarItem, SidebarSubItem } from '@/types/sidebar-types';
-import { useProfile } from '@/context/profile';
+import { useRole } from '@/providers/role';
 
 export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredItem: string | null; setHoveredItem: (item: string | null) => void }) {
-  const { profile } = useProfile();
+  const role = useRole();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const pathname = usePathname();
   const [hoverPosition, setHoverPosition] = useState<number>(0);
   const menuRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const sidebarMenus = fn_get_sidebar_menu(profile.role);
+  // Usar el menú dinámico del rol
+  const sidebarMenus = role?.sidebarMenu || [];
 
   const handleMouseEnter = (item: string, event: React.MouseEvent) => {
-    if (isCollapsed && sidebarMenus.some((group) => group.menu.some((menuItem: SidebarItem) => menuItem.label === item && menuItem.items))) {
+    if (isCollapsed && sidebarMenus.some((group) => group.menu.some((menuItem) => menuItem.label === item && menuItem.items))) {
       setHoveredItem(item);
       const target = event.currentTarget as HTMLDivElement;
       const rect = target.getBoundingClientRect();
@@ -42,8 +41,8 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
             <div className="flex items-center gap-4 p-6 font-semibold">
               <Image src="/img/logo.webp" alt="logo" width={40} height={20} />
               <div className="flex flex-col">
-                <span className="font-bold text-xl">Certificaciones</span>
-                <span className="font-light text-muted-foreground text-sm">Sistema de Certificaciones</span>
+                <span className="font-bold text-xl">CUM</span>
+                <span className="font-light text-muted-foreground text-sm">Central User Manager</span>
               </div>
             </div>
           ) : (
@@ -57,10 +56,9 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
             <SidebarGroup key={index}>
               {!isCollapsed && <SidebarGroupLabel className="px-6 font-semibold text-muted-foreground text-xs uppercase">{menubar.title}</SidebarGroupLabel>}
               <SidebarMenu>
-                {menubar.menu.map((item: SidebarItem, i: number) => {
-                  const isActive = item.url === pathname || (item.items && item.items.some((subitem: SidebarSubItem) => subitem.url === pathname));
-
-                  const isSubItemActive = item.items && item.items.some((subitem: SidebarSubItem) => subitem.url === pathname);
+                {menubar.menu.map((item, i) => {
+                  const isActive = item.url === pathname || (item.items && item.items.some((subitem) => subitem.url === pathname));
+                  const isSubItemActive = item.items && item.items.some((subitem) => subitem.url === pathname);
 
                   return (
                     <SidebarMenuItem key={i}>
@@ -77,7 +75,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
                                 className={`hover:bg-primary hover:text-[#eff1f5] ${
                                   isActive
                                     ? isSubItemActive && !isCollapsed
-                                      ? 'bg-secondary group-data-[state=closed]/collapsible:bg-primary'
+                                      ? 'bg-primary text-[#eff1f5] group-data-[state=closed]/collapsible:bg-primary'
                                       : 'bg-primary text-[#eff1f5]'
                                     : 'data-[active=true]:bg-primary data-[active=true]:text-[#eff1f5]'
                                 } hover:cursor-pointer`}
@@ -91,13 +89,13 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <SidebarMenuSub>
-                                {item.items.map((subitem: SidebarSubItem, j: number) => {
-                                  const isSubItemActive = subitem.url === pathname;
+                                {item.items.map((subitem, j) => {
+                                  const isSubActive = subitem.url === pathname;
                                   return (
                                     <Link
                                       href={subitem.url}
                                       key={j}
-                                      className={`px-2 py-1 text-xs flex items-center gap-2 rounded-lg ${isSubItemActive ? 'bg-primary text-[#eff1f5]' : 'hover:bg-primary hover:text-[#eff1f5]'}`}
+                                      className={`px-2 py-1 text-xs flex items-center gap-2 rounded-lg ${isSubActive ? 'bg-primary text-[#eff1f5]' : 'hover:bg-primary hover:text-[#eff1f5]'}`}
                                       onClick={() => {
                                         if (isMobile) {
                                           setOpenMobile(false);
@@ -140,7 +138,7 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
         </SidebarContent>
       </Sidebar>
 
-      {hoveredItem && isCollapsed && sidebarMenus.some((group) => group.menu.some((item: SidebarItem) => item.label === hoveredItem && item.items)) && (
+      {hoveredItem && isCollapsed && sidebarMenus.some((group) => group.menu.some((item) => item.label === hoveredItem && item.items)) && (
         <div
           className="left-11 z-50 absolute bg-card shadow-lg py-1 border rounded-md w-48"
           style={{ top: `${hoverPosition}px` }}
@@ -155,10 +153,10 @@ export default function AppSidebar({ hoveredItem, setHoveredItem }: { hoveredIte
           {sidebarMenus
             .flatMap((group) => group.menu)
             .find((item) => item.label === hoveredItem)
-            ?.items?.map((subitem: SidebarSubItem, index: number) => {
-              const isSubItemActive = subitem.url === pathname;
+            ?.items?.map((subitem, index) => {
+              const isSubActive = subitem.url === pathname;
               return (
-                <Link href={subitem.url} key={index} className={`flex items-center gap-2 m-2 px-3 py-2 text-sm rounded-lg ${isSubItemActive ? 'bg-primary text-white' : 'hover:bg-primary hover:text-white'}`}>
+                <Link href={subitem.url} key={index} className={`flex items-center gap-2 m-2 px-3 py-2 text-sm rounded-lg ${isSubActive ? 'bg-primary text-white' : 'hover:bg-primary hover:text-white'}`}>
                   {subitem.icon && <subitem.icon className="w-4 h-4" />}
                   <span>{subitem.label}</span>
                 </Link>
