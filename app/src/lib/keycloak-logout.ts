@@ -1,19 +1,23 @@
 import { signOut } from 'next-auth/react';
 
-export async function keycloakSignOut() {
-  // 1 cerrar NextAuth (limpia cookies authjs)
-  await signOut({ redirect: false });
+type KeycloakLogoutResponse = {
+  url?: string;
+  error?: string;
+};
 
-  // 2 pedir al server la URL de logout Keycloak
-  const res = await fetch('/api/auth/keycloak-logout', { cache: 'no-store' });
-  const data = await res.json();
+export const keycloakSignOut = async (): Promise<void> => {
+  try {
+    const response = await fetch('/api/auth/keycloak-logout');
+    const data: KeycloakLogoutResponse = await response.json();
 
-  if (!res.ok || !data?.url) {
-    // fallback: al menos vuelve al inicio
-    window.location.href = '/';
-    return;
+    await signOut({ redirect: false });
+
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      window.location.href = '/';
+    }
+  } catch {
+    await signOut({ callbackUrl: '/' });
   }
-
-  // 3 redirigir a Keycloak logout real
-  window.location.href = data.url;
-}
+};
