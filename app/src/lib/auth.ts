@@ -1,39 +1,130 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import NextAuth from 'next-auth';
 import Keycloak from 'next-auth/providers/keycloak';
+import type { NextAuthConfig } from 'next-auth';
+import type { ExtendedJWT, ExtendedSession, KeycloakProfile, KeycloakTokenResponse } from '@/types/auth.types';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const refreshAccessToken = async (token: ExtendedJWT): Promise<ExtendedJWT> => {
+  try {
+    const url = `${process.env.KEYCLOAK_ISSUER}/protocol/openid-connect/token`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.KEYCLOAK_CLIENT_ID!,
+        client_secret: process.env.KEYCLOAK_CLIENT_SECRET!,
+        grant_type: 'refresh_token',
+        refresh_token: token.refreshToken as string,
+      }),
+    });
+
+    const refreshedTokens: KeycloakTokenResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error('Error al refrescar token');
+    }
+
+    return {
+      ...token,
+      accessToken: refreshedTokens.access_token,
+      idToken: refreshedTokens.id_token,
+      expiresAt: Math.floor(Date.now() / 1000) + refreshedTokens.expires_in,
+      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+    };
+  } catch {
+    // console.error('Error refrescando access token:', error);
+    return {
+      ...token,
+      error: 'RefreshAccessTokenError',
+    };
+  }
+};
+
+const parseJwtPayload = (token: string): Record<string, unknown> | null => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+};
+
+const keycloakClientId = process.env.KEYCLOAK_CLIENT_ID;
+const keycloakClientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
+const keycloakIssuer = process.env.KEYCLOAK_ISSUER;
+
+if (!keycloakClientId || !keycloakClientSecret || !keycloakIssuer) {
+  // console.error('Missing Keycloak environment variables:', { KEYCLOAK_CLIENT_ID: !!keycloakClientId, KEYCLOAK_CLIENT_SECRET: !!keycloakClientSecret, KEYCLOAK_ISSUER: !!keycloakIssuer });
+}
+
+const authConfig: NextAuthConfig = {
   providers: [
     Keycloak({
-      clientId: process.env.KEYCLOAK_CLIENT_ID!,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-      issuer: process.env.KEYCLOAK_ISSUER!,
+      clientId: keycloakClientId ?? '',
+      clientSecret: keycloakClientSecret ?? '',
+      issuer: keycloakIssuer ?? '',
     }),
   ],
-  session: { strategy: 'jwt' },
-
+  debug: process.env.NODE_ENV === 'development',
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 60,
+  },
+  trustHost: true,
   callbacks: {
-    async jwt({ token, account, profile }) {
-      if (account) {
-        token.accessToken = account.access_token;
-        token.idToken = account.id_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
+    jwt: async ({ token, account, profile }): Promise<ExtendedJWT> => {
+      if (account && profile) {
+        const keycloakProfile = profile as KeycloakProfile;
+        const decoded = account.access_token ? parseJwtPayload(account.access_token) : null;
+        const realmAccess = decoded?.realm_access as { roles?: string[] } | undefined;
 
-        //  este es el user_id de Keycloak
-        // profile.sub viene del id_token/userinfo
-        token.userId = profile?.sub ?? token.sub;
+        return {
+          ...token,
+          accessToken: account.access_token,
+          idToken: account.id_token,
+          refreshToken: account.refresh_token,
+          expiresAt: account.expires_at,
+          userId: keycloakProfile.sub ?? token.sub,
+          roles: realmAccess?.roles ?? keycloakProfile.realm_access?.roles ?? [],
+        };
       }
-      return token;
+
+      const extendedToken = token as ExtendedJWT;
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = extendedToken.expiresAt as number;
+
+      if (now < expiresAt - 60) {
+        return extendedToken;
+      }
+
+      return await refreshAccessToken(extendedToken);
     },
 
-    async session({ session, token }) {
-      (session.user as any).id = token.userId;
+    session: async ({ session, token }): Promise<ExtendedSession> => {
+      const extendedToken = token as ExtendedJWT;
 
-      (session as any).accessToken = token.accessToken;
-      (session as any).idToken = token.idToken;
-
-      return session;
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: extendedToken.userId ?? extendedToken.sub ?? '',
+          roles: extendedToken.roles,
+        },
+        accessToken: extendedToken.accessToken,
+        idToken: extendedToken.idToken,
+        refreshToken: extendedToken.refreshToken,
+        expiresAt: extendedToken.expiresAt,
+        error: extendedToken.error,
+      };
     },
   },
-});
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

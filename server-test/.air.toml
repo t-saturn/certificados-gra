@@ -1,0 +1,33 @@
+# Configuración para air en formato TOML
+
+# Directorio raíz del proyecto
+root = "."
+
+# Directorio temporal para el binario compilado
+tmp_dir = "tmp"
+
+[build]
+# Comando para compilar el proyecto
+# Indicamos que compile el archivo en cmd/server/main.go
+cmd = "go build -o ./tmp/main.exe ./cmd/server/main.go"
+# Nombre del binario generado
+bin = "tmp/main.exe"
+# Extensiones de archivos a monitorear
+include_ext = ["go"]
+# Directorios a incluir en el monitoreo
+include_dir = ["cmd", "internal"]
+# Directorios a excluir del monitoreo
+exclude_dir = ["tmp", "vendor"]
+# Retraso para evitar compilaciones frecuentes
+delay = 1000
+# Detener el proceso si hay errores de compilación
+stop_on_error = true
+
+[color]
+build = "yellow"
+main = "magenta"
+runner = "green"
+watcher = "cyan"
+
+[log]
+time = true

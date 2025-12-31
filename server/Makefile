@@ -1,53 +1,103 @@
-# Makefile
-SHELL := /bin/bash
-.ONESHELL:
+.PHONY: help build run dev test clean migrate-up migrate-down migrate-reset seed docker-build docker-run
 
-APP_NAME      ?= server
-GO            ?= go
-AIR           ?= air
-ENTRY         ?= cmd/$(APP_NAME)/main.go
-MIGRATE_ENTRY ?= cmd/migrate/main.go
-SEED_ENTRY    ?= cmd/seed/main.go
+# Variables
+APP_NAME=server
+MAIN_PATH=./cmd/server
+MIGRATE_PATH=./cmd/migrate
+SEED_PATH=./cmd/seed
+BUILD_DIR=./bin
+DOCKER_IMAGE=cert-server
+
+# Colors
+GREEN=\033[0;32m
+NC=\033[0m # No Color
+
+help: ## Display this help message
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+build: ## Build the application
+	@echo "Building $(APP_NAME)..."
+	@go build -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_PATH)
+	@echo "Build complete: $(BUILD_DIR)/$(APP_NAME)"
+
+run: build ## Build and run the application
+	@echo "Running $(APP_NAME)..."
+	@$(BUILD_DIR)/$(APP_NAME)
+
+dev: ## Run with air for hot reload
+	@echo "Starting development server with air..."
+	@air
+
+test: ## Run tests
+	@echo "Running tests..."
+	@go test -v -race -cover ./...
+
+clean: ## Clean build artifacts
+	@echo "Cleaning..."
+	@rm -rf $(BUILD_DIR)
+	@rm -rf logs/*.log
+	@rm -rf tmp
+	@echo "Clean complete"
+
+# Database commands
+migrate-up: ## Run database migrations
+	@echo "Running migrations UP..."
+	@go run $(MIGRATE_PATH)/main.go -action=up
+
+migrate-down: ## Rollback database migrations
+	@echo "Running migrations DOWN..."
+	@go run $(MIGRATE_PATH)/main.go -action=down
+
+migrate-reset: ## Reset database (down + up)
+	@echo "Resetting database..."
+	@go run $(MIGRATE_PATH)/main.go -action=reset
+
+seed: ## Seed the database with initial data
+	@echo "Seeding database..."
+	@go run $(SEED_PATH)/main.go
+
+# Docker commands
+docker-build: ## Build Docker image
+	@echo "Building Docker image..."
+	@docker build -t $(DOCKER_IMAGE):latest .
+
+docker-run: ## Run Docker container
+	@echo "Running Docker container..."
+	@docker run --rm -p 8080:8080 --env-file .env $(DOCKER_IMAGE):latest
+
+docker-compose-up: ## Start with docker-compose
+	@echo "Starting services with docker-compose..."
+	@docker-compose up -d
+
+docker-compose-down: ## Stop docker-compose services
+	@echo "Stopping services..."
+	@docker-compose down
+
+# Development setup
+setup: ## Install development dependencies
+	@echo "Installing development dependencies..."
+	@go install github.com/air-verse/air@latest
+	@go mod download
+	@echo "Setup complete"
+
+tidy: ## Tidy and verify go modules
+	@echo "Tidying modules..."
+	@go mod tidy
+	@go mod verify
+
+lint: ## Run linter
+	@echo "Running linter..."
+	@golangci-lint run ./...
+
+fmt: ## Format code
+	@echo "Formatting code..."
+	@go fmt ./...
+
+# Full setup
+init: setup tidy migrate-up seed ## Full initialization (setup, migrate, seed)
+	@echo "Initialization complete!"
 
 .DEFAULT_GOAL := help
-
-.PHONY: help dev run migrate-up migrate-down migrate-reset seed
-
-## Mostrar esta ayuda
-help:
-	@echo ""
-	@echo "Comandos disponibles:"
-	@echo "---------------------"
-	@awk 'BEGIN {FS := ":.*##"} /^[a-zA-Z0-9\._-]+:.*##/ { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
-	@echo ""
-	@echo "Variables:"
-	@echo "  APP_NAME      (default: $(APP_NAME))"
-	@echo "  ENTRY         (default: $(ENTRY))"
-	@echo "  MIGRATE_ENTRY (default: $(MIGRATE_ENTRY))"
-	@echo "  SEED_ENTRY    (default: $(SEED_ENTRY))"
-	@echo ""
-
-## Desarrollo en caliente con air
-dev: ## Ejecutar servidor con air
-	@echo "▶ Ejecutando 'air' (si no está instalado: go install github.com/air-verse/air@latest)"
-	@$(AIR)
-
-## Ejecutar en modo producción simple (go run)
-run: ## go run del servidor
-	$(GO) run $(ENTRY)
-
-## Migrar la base de datos (up)
-migrate-up: ## Crear/actualizar tablas
-	$(GO) run $(MIGRATE_ENTRY) migrate-up
-
-## Revertir migraciones (drop tables)
-migrate-down: ## Eliminar tablas
-	$(GO) run $(MIGRATE_ENTRY) migrate-down
-
-## Resetear migraciones (down + up)
-migrate-reset: ## Drop + migrate-up
-	$(GO) run $(MIGRATE_ENTRY) migrate-reset
-
-## Ejecutar seeders (usuarios, etc.)
-seed: ## Ejecutar todos los seeders
-	$(GO) run $(SEED_ENTRY)

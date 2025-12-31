@@ -1,0 +1,24 @@
+.prettierrc
+tsconfig.json
+
+# Build
+.next/
+out/
+build/
+
+# Dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env*.local
+
+# Misc
+.DS_Store
+*.tsbuildinfo
+
+next-env.d.ts

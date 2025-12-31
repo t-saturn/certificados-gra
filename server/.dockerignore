@@ -2,34 +2,45 @@
 .git
 .gitignore
 
-# Docker
-Dockerfile
-.dockerignore
-
-# Documentación / misc
-README*
-LICENSE*
-
-# Archivos de editor / IDE
-.vscode
+# IDE
 .idea
+.vscode
 *.swp
 *.swo
+*~
 
-# Archivos de sistema
-.DS_Store
-Thumbs.db
+# Build artifacts
+bin/
+tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Logs y temporales del proyecto
-server/logs
-server/tmp
+# Test files
+*_test.go
+*.test
+coverage.out
+coverage.html
+
+# Logs
+logs/
 *.log
 
-# Binarios y ejecutables
-*.exe
-*.out
-*.test
+# Environment files (use docker secrets or env vars instead)
+.env
+.env.local
+.env.*.local
 
-# Archivos de build locales comunes
-bin/
-dist/
+# Documentation
+docs/
+*.md
+!README.md
+
+# Air configuration (development only)
+.air.toml
+
+# Misc
+.DS_Store
+Thumbs.db

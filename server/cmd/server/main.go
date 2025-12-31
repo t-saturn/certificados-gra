@@ -2,84 +2,127 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"server/internal/background"
-	"server/internal/config"
-	"server/internal/middlewares"
-	"server/internal/repositories"
-	"server/internal/routes"
-	"server/internal/services"
-	"server/pkgs/logger"
-	"server/pkgs/validator"
+	"github.com/rs/zerolog/log"
 
-	"github.com/gofiber/fiber/v3"
-	"github.com/joho/godotenv"
+	"server/internal/config"
+	"server/internal/handler"
+	"server/internal/repository"
+	"server/internal/router"
+	"server/internal/service"
+	"server/pkg/shared/logger"
 )
 
 func main() {
-	_ = godotenv.Load()
-
-	logger.InitLogger()
-	logger.Log.Info().Msg("Iniciando servidor...")
-
-	// Config + conexiones
-	config.LoadConfig()
-	config.ConnectDB()
-	config.ConnectRedis()
-
-	if err := validator.InitValidator(); err != nil {
-		logger.Log.Fatal().Msgf("Error al inicializar el validador: %v", err)
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
-	cfg := config.GetConfig()
+	// Initialize logger
+	logger.Init(cfg.Server.Environment)
 
-	// Background runner:
-	// consume queue:docs:generate:done y finaliza PDFs en BD
+	log.Info().
+		Str("environment", cfg.Server.Environment).
+		Str("version", cfg.Server.Version).
+		Msg("Starting cert-server")
 
-	// Repo que inserta en document_pdfs y actualiza documents
-	docFinalizeRepo := repositories.NewDocumentPdfFinalizeRepository(config.DB)
+	// Initialize PostgreSQL
+	db, err := config.NewPostgresDB(cfg.Database)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to PostgreSQL")
+	}
+	log.Info().Str("host", cfg.Database.Host).Msg("PostgreSQL connected")
 
-	// Redis repos: BRPOP done + LRANGE results/errors
-	redisJobsRepo := repositories.NewRedisJobsRepository(config.GetRedis())
-	pdfJobRedisRepo := repositories.NewPdfJobRedisRepository(redisJobsRepo)
+	// Initialize Redis (optional)
+	redisClient, err := config.NewRedisClient(cfg.Redis)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to connect to Redis, continuing without cache")
+	} else {
+		log.Info().Str("host", cfg.Redis.Host).Msg("Redis connected")
+	}
 
-	// Service que procesa N jobs por tick (batchSize=50)
-	finalizeSvc := services.NewPdfJobFinalizeService(
-		config.DB,
-		docFinalizeRepo,
-		pdfJobRedisRepo,
-		50,
-	)
+	// Initialize NATS (optional)
+	natsClient, err := config.NewNATSClient(cfg.NATS)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to connect to NATS, continuing without messaging")
+	} else {
+		log.Info().Str("url", cfg.NATS.URL).Msg("NATS connected")
+	}
 
-	// Runner: cada 3s corre finalizeSvc.Tick/RunOnce (según tu implementación)
-	runner := background.NewPdfFinalizeRunner(finalizeSvc, 3*time.Second)
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(db)
+	docTypeRepo := repository.NewDocumentTypeRepository(db)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// Initialize services
+	userService := service.NewUserService(userRepo)
+	docTypeService := service.NewDocumentTypeService(docTypeRepo)
+
+	// Initialize handlers
+	userHandler := handler.NewUserHandler(userService)
+	docTypeHandler := handler.NewDocumentTypeHandler(docTypeService)
+
+	var healthHandler *handler.HealthHandler
+	if redisClient != nil && natsClient != nil {
+		healthHandler = handler.NewHealthHandler(db, redisClient.Client, natsClient.Conn)
+	} else if redisClient != nil {
+		healthHandler = handler.NewHealthHandler(db, redisClient.Client, nil)
+	} else if natsClient != nil {
+		healthHandler = handler.NewHealthHandler(db, nil, natsClient.Conn)
+	} else {
+		healthHandler = handler.NewHealthHandler(db, nil, nil)
+	}
+
+	// Initialize router
+	r := router.New(userHandler, docTypeHandler, healthHandler)
+	app := r.Setup("cert-server")
+
+	// Start server
+	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
+
+	go func() {
+		log.Info().Str("addr", addr).Msg("Server starting")
+		if err := app.Listen(addr); err != nil {
+			log.Fatal().Err(err).Msg("Server failed to start")
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Info().Msg("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	logger.Log.Info().
-		Str("done_queue", cfg.REDISQueueDocsDone).
-		Dur("interval", 3*time.Second).
-		Int("batch_size", 50).
-		Msg("pdf-finalize runner starting")
-
-	runner.Start(ctx)
-
-	// HTTP server
-	app := fiber.New(fiber.Config{
-		ErrorHandler: middlewares.JSONErrorHandler,
-	})
-
-	app.Use(middlewares.CORSMiddleware())
-	app.Use(middlewares.LoggerMiddleware())
-
-	routes.RegisterRoutes(app)
-
-	port := cfg.SERVERPort
-	logger.Log.Info().Msgf("server-listening-in http://localhost:%s", port)
-
-	if err := app.Listen(":" + port); err != nil {
-		logger.Log.Fatal().Msgf("error-at-the-start-of-the-server: %v", err)
+	// Shutdown Fiber
+	if err := app.ShutdownWithContext(ctx); err != nil {
+		log.Error().Err(err).Msg("Server shutdown error")
 	}
+
+	// Close NATS
+	if natsClient != nil {
+		natsClient.Close()
+	}
+
+	// Close Redis
+	if redisClient != nil {
+		_ = redisClient.Close()
+	}
+
+	// Close PostgreSQL
+	sqlDB, _ := db.DB()
+	if sqlDB != nil {
+		_ = sqlDB.Close()
+	}
+
+	log.Info().Msg("Server shutdown complete")
 }
