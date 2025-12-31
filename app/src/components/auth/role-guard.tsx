@@ -3,10 +3,15 @@
 import type { FC, ReactNode, JSX } from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { RoleProvider } from '../providers/role-provider';
+import { useSession } from 'next-auth/react';
+import { RoleProvider } from '@/components/providers/role-provider';
+import { ProfileProvider } from '@/components/providers/profile-provider';
+import { LayoutClient } from '@/components/layout/layout-client';
 import { fn_get_user_role } from '@/actions/auth/fn_get_user_role';
 import { buildSidebarMenu, extractRoutes, isRouteAllowed } from '@/lib/build-sidebar-menu';
 import type { ModuleDTO, SidebarMenuItem } from '@/types/role.types';
+import type { ExtendedSession } from '@/types/auth.types';
+import type { UserProfile } from '@/types/profile.types';
 
 type RoleState = {
   roleId: string;
@@ -23,6 +28,8 @@ type RoleGuardProps = {
 const RoleGuard: FC<RoleGuardProps> = ({ children }): JSX.Element | null => {
   const router = useRouter();
   const pathname = usePathname();
+  const { data } = useSession();
+  const session = data as ExtendedSession | null;
   const [role, setRole] = useState<RoleState | 'loading'>('loading');
   const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   const modulesRef = useRef<ModuleDTO[] | null>(null);
@@ -70,16 +77,6 @@ const RoleGuard: FC<RoleGuardProps> = ({ children }): JSX.Element | null => {
         return;
       }
 
-      if (message.includes('404') || message.includes('no tiene rol') || message.includes('No se encontraron datos')) {
-        router.replace('/unauthorized');
-        return;
-      }
-
-      if (message.includes('client_id')) {
-        router.replace('/unauthorized');
-        return;
-      }
-
       router.replace('/unauthorized');
     } finally {
       isFetchingRef.current = false;
@@ -115,9 +112,25 @@ const RoleGuard: FC<RoleGuardProps> = ({ children }): JSX.Element | null => {
     );
   }
 
-  if (role === null) return null;
+  if (role === null) {
+    return null;
+  }
 
-  return <RoleProvider value={role}>{children}</RoleProvider>;
+  const userProfile: UserProfile = {
+    id: session?.user?.id ?? '',
+    name: session?.user?.name ?? 'Usuario',
+    email: session?.user?.email ?? '',
+    image: session?.user?.image,
+    roles: session?.user?.roles,
+  };
+
+  return (
+    <RoleProvider value={role}>
+      <ProfileProvider user={userProfile} roleName={role.roleName}>
+        <LayoutClient>{children}</LayoutClient>
+      </ProfileProvider>
+    </RoleProvider>
+  );
 };
 
 export default RoleGuard;
