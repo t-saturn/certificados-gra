@@ -5,15 +5,16 @@ import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { keycloakSignOut } from '@/lib/keycloak-logout';
+import { useRole } from '@/components/providers/role-provider';
 import type { ExtendedSession } from '@/types/auth.types';
 
-type SessionInfoItemProps = {
+type InfoItemProps = {
   label: string;
   value: string | undefined | null;
   isMono?: boolean;
 };
 
-const SessionInfoItem: FC<SessionInfoItemProps> = ({ label, value, isMono = false }): JSX.Element => (
+const InfoItem: FC<InfoItemProps> = ({ label, value, isMono = false }): JSX.Element => (
   <div className="py-3 border-b border-border last:border-0">
     <dt className="text-sm text-muted-foreground mb-1">{label}</dt>
     <dd className={`text-sm text-foreground break-all ${isMono ? 'font-mono text-xs' : ''}`}>{value ?? 'No disponible'}</dd>
@@ -37,6 +38,7 @@ const TokenDisplay: FC<TokenDisplayProps> = ({ title, token }): JSX.Element => (
 const MainPage: FC = (): JSX.Element => {
   const { data, status } = useSession();
   const session = data as ExtendedSession | null;
+  const { roleId, roleName, modules, allowedRoutes } = useRole();
 
   const formatDate = (timestamp: number | undefined): string => {
     if (!timestamp) return 'No disponible';
@@ -77,7 +79,7 @@ const MainPage: FC = (): JSX.Element => {
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">{session?.user?.name}</p>
-                <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+                <p className="text-xs text-muted-foreground">{roleName}</p>
               </div>
 
               <button
@@ -100,7 +102,7 @@ const MainPage: FC = (): JSX.Element => {
           <h1 className="text-3xl font-bold text-foreground" style={{ fontFamily: 'var(--font-montserrat)' }}>
             Panel Principal
           </h1>
-          <p className="mt-2 text-muted-foreground">Información de tu sesión actual</p>
+          <p className="mt-2 text-muted-foreground">Información de sesión y permisos</p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -112,61 +114,70 @@ const MainPage: FC = (): JSX.Element => {
                 <span className="text-sm font-medium text-foreground">{sessionStatus.label}</span>
               </div>
             </div>
-
             <dl>
-              <SessionInfoItem label="Estado de autenticación" value={status} />
-              <SessionInfoItem label="Sesión válida" value={isSessionActive() ? 'Sí' : 'No'} />
-              <SessionInfoItem label="Expira en" value={formatDate(session?.expiresAt)} />
-              <SessionInfoItem label="Error" value={session?.error ?? 'Ninguno'} />
+              <InfoItem label="Estado" value={status} />
+              <InfoItem label="Sesión válida" value={isSessionActive() ? 'Sí' : 'No'} />
+              <InfoItem label="Expira en" value={formatDate(session?.expiresAt)} />
+              <InfoItem label="Error" value={session?.error ?? 'Ninguno'} />
             </dl>
           </div>
 
           <div className="rounded-xl bg-card p-6 border border-border">
             <h2 className="text-lg font-bold text-foreground mb-6">Información del Usuario</h2>
             <dl>
-              <SessionInfoItem label="ID de Usuario (sub)" value={session?.user?.id} isMono />
-              <SessionInfoItem label="Nombre completo" value={session?.user?.name} />
-              <SessionInfoItem label="Correo electrónico" value={session?.user?.email} />
-              <SessionInfoItem label="Roles asignados" value={session?.user?.roles?.length ? session.user.roles.join(', ') : 'Sin roles asignados'} />
+              <InfoItem label="ID de Usuario" value={session?.user?.id} isMono />
+              <InfoItem label="Nombre completo" value={session?.user?.name} />
+              <InfoItem label="Correo electrónico" value={session?.user?.email} />
             </dl>
           </div>
 
-          <div className="rounded-xl bg-card p-6 border border-border lg:col-span-2">
+          <div className="rounded-xl bg-card p-6 border border-border">
+            <h2 className="text-lg font-bold text-foreground mb-6">Rol y Permisos</h2>
+            <dl>
+              <InfoItem label="ID del Rol" value={roleId} isMono />
+              <InfoItem label="Nombre del Rol" value={roleName} />
+              <InfoItem label="Módulos asignados" value={String(modules.length)} />
+              <InfoItem label="Rutas permitidas" value={String(allowedRoutes.length)} />
+            </dl>
+          </div>
+
+          <div className="rounded-xl bg-card p-6 border border-border">
             <h2 className="text-lg font-bold text-foreground mb-6">Tokens de Sesión</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-4">
               <TokenDisplay title="Access Token" token={session?.accessToken} />
               <TokenDisplay title="ID Token" token={session?.idToken} />
-              <TokenDisplay title="Refresh Token" token={session?.refreshToken} />
             </div>
           </div>
 
           <div className="rounded-xl bg-card p-6 border border-border lg:col-span-2">
-            <h2 className="text-lg font-bold text-foreground mb-6">Datos de Sesión (JSON)</h2>
-            <div className="rounded-lg bg-muted p-4 max-h-96 overflow-auto">
-              <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
-                {JSON.stringify(
-                  {
-                    status,
-                    isActive: isSessionActive(),
-                    user: {
-                      id: session?.user?.id,
-                      name: session?.user?.name,
-                      email: session?.user?.email,
-                      roles: session?.user?.roles,
-                    },
-                    expiresAt: session?.expiresAt,
-                    expiresAtFormatted: formatDate(session?.expiresAt),
-                    error: session?.error,
-                    tokens: {
-                      hasAccessToken: !!session?.accessToken,
-                      hasIdToken: !!session?.idToken,
-                      hasRefreshToken: !!session?.refreshToken,
-                    },
-                  },
-                  null,
-                  2,
-                )}
-              </pre>
+            <h2 className="text-lg font-bold text-foreground mb-6">Módulos Asignados</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {modules.map((mod) => (
+                <div key={mod.id} className="flex items-center gap-3 rounded-lg bg-muted p-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{mod.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{mod.route}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-card p-6 border border-border lg:col-span-2">
+            <h2 className="text-lg font-bold text-foreground mb-6">Rutas Permitidas</h2>
+            <div className="rounded-lg bg-muted p-4 max-h-48 overflow-auto">
+              <div className="flex flex-wrap gap-2">
+                {allowedRoutes.map((route) => (
+                  <span key={route} className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                    {route}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>
