@@ -32,6 +32,7 @@ const refreshAccessToken = async (token: ExtendedJWT): Promise<ExtendedJWT> => {
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     };
   } catch {
+    // console.error('Error refrescando access token:', error);
     return {
       ...token,
       error: 'RefreshAccessTokenError',
@@ -55,14 +56,23 @@ const parseJwtPayload = (token: string): Record<string, unknown> | null => {
   }
 };
 
+const keycloakClientId = process.env.KEYCLOAK_CLIENT_ID;
+const keycloakClientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
+const keycloakIssuer = process.env.KEYCLOAK_ISSUER;
+
+if (!keycloakClientId || !keycloakClientSecret || !keycloakIssuer) {
+  // console.error('Missing Keycloak environment variables:', { KEYCLOAK_CLIENT_ID: !!keycloakClientId, KEYCLOAK_CLIENT_SECRET: !!keycloakClientSecret, KEYCLOAK_ISSUER: !!keycloakIssuer });
+}
+
 const authConfig: NextAuthConfig = {
   providers: [
     Keycloak({
-      clientId: process.env.KEYCLOAK_CLIENT_ID!,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-      issuer: process.env.KEYCLOAK_ISSUER!,
+      clientId: keycloakClientId ?? '',
+      clientSecret: keycloakClientSecret ?? '',
+      issuer: keycloakIssuer ?? '',
     }),
   ],
+  debug: process.env.NODE_ENV === 'development',
   session: {
     strategy: 'jwt',
     maxAge: 30 * 60,
