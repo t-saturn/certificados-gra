@@ -1,58 +1,67 @@
-import type { ModuleDTO, SidebarMenuItem } from '@/types/role.types';
+import type { ModuleDTO, SidebarMenuGroup, SidebarMenuItem } from '@/types/role.types';
+import { getIcon } from './icon-map';
 
-export const buildSidebarMenu = (modules: ModuleDTO[]): SidebarMenuItem[] => {
-  const moduleMap = new Map<string, ModuleDTO & { children: ModuleDTO[] }>();
+export const buildSidebarMenu = (modules: ModuleDTO[]): SidebarMenuGroup[] => {
+  const moduleMap = new Map<string, ModuleDTO>();
+  modules.forEach((m) => moduleMap.set(m.id, m));
 
-  modules.forEach((mod) => {
-    moduleMap.set(mod.id, { ...mod, children: [] });
-  });
+  const rootModules = modules.filter((m) => !m.parent_id || m.parent_id === m.id);
 
-  const rootItems: SidebarMenuItem[] = [];
+  const groupMap = new Map<string, ModuleDTO[]>();
 
-  modules.forEach((mod) => {
-    const currentModule = moduleMap.get(mod.id)!;
-
-    if (mod.parent_id === null) {
-      rootItems.push({
-        id: currentModule.id,
-        name: currentModule.name,
-        route: currentModule.route,
-        icon: currentModule.icon,
-        children: [],
-      });
-    } else {
-      const parent = moduleMap.get(mod.parent_id);
-      if (parent) {
-        parent.children.push(currentModule);
-      }
+  rootModules.forEach((m) => {
+    const groupTitle = m.item || 'General';
+    if (!groupMap.has(groupTitle)) {
+      groupMap.set(groupTitle, []);
     }
+    groupMap.get(groupTitle)!.push(m);
   });
 
-  const buildChildren = (parentId: string): SidebarMenuItem[] => {
-    const parent = moduleMap.get(parentId);
-    if (!parent || parent.children.length === 0) return [];
+  const result: SidebarMenuGroup[] = [];
 
-    return parent.children
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((child) => ({
-        id: child.id,
-        name: child.name,
-        route: child.route,
-        icon: child.icon,
-        children: buildChildren(child.id),
-      }));
-  };
+  const groupOrder = ['Menú', 'Gestión', 'Seguridad', 'Configuración'];
 
-  return rootItems
-    .sort((a, b) => {
-      const modA = moduleMap.get(a.id);
-      const modB = moduleMap.get(b.id);
-      return (modA?.sort_order ?? 0) - (modB?.sort_order ?? 0);
-    })
-    .map((item) => ({
-      ...item,
-      children: buildChildren(item.id),
-    }));
+  const sortedGroups = Array.from(groupMap.entries()).sort(([a], [b]) => {
+    const indexA = groupOrder.indexOf(a);
+    const indexB = groupOrder.indexOf(b);
+    if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
+  });
+
+  sortedGroups.forEach(([title, groupModules]) => {
+    const sortedModules = groupModules.sort((a, b) => a.sort_order - b.sort_order);
+
+    const menuItems: SidebarMenuItem[] = sortedModules.map((m) => {
+      const menuItem: SidebarMenuItem = {
+        label: m.name,
+        icon: getIcon(m.icon),
+        url: m.route || '/main',
+      };
+
+      const children = modules.filter((child) => child.parent_id === m.id && child.id !== m.id);
+
+      if (children.length > 0) {
+        const sortedChildren = children.sort((a, b) => a.sort_order - b.sort_order);
+
+        menuItem.items = sortedChildren.map((child) => ({
+          label: child.name,
+          icon: getIcon(child.icon),
+          url: child.route || '/main',
+        }));
+      }
+
+      return menuItem;
+    });
+
+    result.push({
+      title,
+      menu: menuItems,
+    });
+  });
+
+  return result;
 };
 
 export const extractRoutes = (modules: ModuleDTO[]): string[] => {

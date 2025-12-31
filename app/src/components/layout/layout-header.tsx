@@ -1,13 +1,13 @@
 'use client';
 
 import type { FC, JSX } from 'react';
+import { Fragment } from 'react';
+import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { usePathname } from 'next/navigation';
 import { useRole } from '@/components/providers/role-provider';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { Fragment } from 'react';
 
 export const LayoutHeader: FC = (): JSX.Element => {
   const pathname = usePathname();
@@ -24,7 +24,12 @@ export const LayoutHeader: FC = (): JSX.Element => {
       const isLast = index === segments.length - 1;
 
       const matchedModule = modules.find((m) => m.route === currentPath);
-      const label = matchedModule?.name ?? segment.charAt(0).toUpperCase() + segment.slice(1);
+
+      let label = matchedModule?.name ?? segment.charAt(0).toUpperCase() + segment.slice(1);
+
+      if (segment === 'main') {
+        label = 'Inicio';
+      }
 
       breadcrumbs.push({
         label,
@@ -39,7 +44,7 @@ export const LayoutHeader: FC = (): JSX.Element => {
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4" />
       <Breadcrumb>

@@ -2,6 +2,7 @@
 
 import type { FC, JSX } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { useRole } from '@/components/providers/role-provider';
 import { useProfile } from '@/components/providers/profile-provider';
 import type { ExtendedSession } from '@/types/auth.types';
@@ -19,13 +20,13 @@ type StatCardProps = {
 const StatCard: FC<StatCardProps> = ({ title, value, description, icon: Icon, trend }): JSX.Element => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       <Icon className="h-4 w-4 text-muted-foreground" />
     </CardHeader>
     <CardContent>
       <div className="text-2xl font-bold">{value}</div>
       <p className="text-xs text-muted-foreground">
-        {trend && <span className="text-chart-2">{trend} </span>}
+        {trend && <span className="text-emerald-500">{trend} </span>}
         {description}
       </p>
     </CardContent>
@@ -41,7 +42,7 @@ const MainPage: FC = (): JSX.Element => {
   const formatDate = (timestamp: number | undefined): string => {
     if (!timestamp) return 'No disponible';
     return new Date(timestamp * 1000).toLocaleString('es-PE', {
-      dateStyle: 'medium',
+      dateStyle: 'long',
       timeStyle: 'short',
     });
   };
@@ -55,9 +56,7 @@ const MainPage: FC = (): JSX.Element => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-montserrat)' }}>
-          Bienvenido, {user.name.split(' ')[0]}
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Bienvenido, {user.name.split(' ')[0]}</h1>
         <p className="text-muted-foreground">Panel de control del Sistema de Certificaciones Digitales</p>
       </div>
 
@@ -74,11 +73,11 @@ const MainPage: FC = (): JSX.Element => {
             <CardTitle>Información de Sesión</CardTitle>
             <CardDescription>Detalles de tu sesión actual</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Estado</span>
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${status === 'authenticated' && isSessionActive() ? 'bg-chart-2 animate-pulse' : 'bg-destructive'}`} />
+                <span className={`h-2 w-2 rounded-full ${status === 'authenticated' && isSessionActive() ? 'bg-emerald-500' : 'bg-destructive'}`} />
                 <span className="text-sm font-medium">{status === 'authenticated' && isSessionActive() ? 'Activa' : 'Inactiva'}</span>
               </div>
             </div>
@@ -88,7 +87,7 @@ const MainPage: FC = (): JSX.Element => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Rol</span>
-              <span className="text-sm font-medium capitalize">{roleName}</span>
+              <span className="text-sm font-medium">{roleName}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Expira</span>
@@ -102,7 +101,7 @@ const MainPage: FC = (): JSX.Element => {
             <CardTitle>Permisos</CardTitle>
             <CardDescription>Módulos y rutas disponibles</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Módulos asignados</span>
               <span className="text-sm font-medium">{modules.length}</span>
@@ -113,7 +112,7 @@ const MainPage: FC = (): JSX.Element => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">ID de Usuario</span>
-              <span className="font-mono text-xs truncate max-w-32">{user.id}</span>
+              <span className="text-sm font-mono truncate max-w-40">{user.id}</span>
             </div>
           </CardContent>
         </Card>
@@ -127,7 +126,7 @@ const MainPage: FC = (): JSX.Element => {
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {modules.slice(0, 6).map((mod) => (
-              <div key={mod.id} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted">
+              <Link key={mod.id} href={mod.route} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted">
                 <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <FileText className="h-5 w-5" />
                 </div>
@@ -135,7 +134,7 @@ const MainPage: FC = (): JSX.Element => {
                   <p className="text-sm font-medium truncate">{mod.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{mod.route}</p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </CardContent>

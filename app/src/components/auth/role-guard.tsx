@@ -9,7 +9,7 @@ import { ProfileProvider } from '@/components/providers/profile-provider';
 import { LayoutClient } from '@/components/layout/layout-client';
 import { fn_get_user_role } from '@/actions/auth/fn_get_user_role';
 import { buildSidebarMenu, extractRoutes, isRouteAllowed } from '@/lib/build-sidebar-menu';
-import type { ModuleDTO, SidebarMenuItem } from '@/types/role.types';
+import type { ModuleDTO, SidebarMenuGroup } from '@/types/role.types';
 import type { ExtendedSession } from '@/types/auth.types';
 import type { UserProfile } from '@/types/profile.types';
 
@@ -17,7 +17,7 @@ type RoleState = {
   roleId: string;
   roleName: string;
   modules: ModuleDTO[];
-  sidebarMenu: SidebarMenuItem[];
+  sidebarMenu: SidebarMenuGroup[];
   allowedRoutes: string[];
 } | null;
 

@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react';
+
 export type ModuleDTO = {
   id: string;
   item: string;
@@ -17,19 +19,29 @@ export type UserRoleResponse = {
   modules: ModuleDTO[];
 };
 
+export type SidebarSubItem = {
+  label: string;
+  icon: LucideIcon;
+  url: string;
+};
+
 export type SidebarMenuItem = {
-  id: string;
-  name: string;
-  route: string;
-  icon: string;
-  children?: SidebarMenuItem[];
+  label: string;
+  icon: LucideIcon;
+  url: string;
+  items?: SidebarSubItem[];
+};
+
+export type SidebarMenuGroup = {
+  title: string;
+  menu: SidebarMenuItem[];
 };
 
 export type RoleContextValue = {
   roleId: string;
   roleName: string;
   modules: ModuleDTO[];
-  sidebarMenu: SidebarMenuItem[];
+  sidebarMenu: SidebarMenuGroup[];
   allowedRoutes: string[];
   // eslint-disable-next-line no-unused-vars
   hasAccess: (route: string) => boolean;

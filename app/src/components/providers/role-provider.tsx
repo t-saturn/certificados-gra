@@ -2,7 +2,7 @@
 
 import type { FC, ReactNode, JSX } from 'react';
 import { createContext, useContext, useMemo } from 'react';
-import type { RoleContextValue, ModuleDTO, SidebarMenuItem } from '@/types/role.types';
+import type { RoleContextValue, ModuleDTO, SidebarMenuGroup } from '@/types/role.types';
 import { isRouteAllowed } from '@/lib/build-sidebar-menu';
 
 const RoleContext = createContext<RoleContextValue | null>(null);
@@ -13,7 +13,7 @@ type RoleProviderProps = {
     roleId: string;
     roleName: string;
     modules: ModuleDTO[];
-    sidebarMenu: SidebarMenuItem[];
+    sidebarMenu: SidebarMenuGroup[];
     allowedRoutes: string[];
   };
 };
