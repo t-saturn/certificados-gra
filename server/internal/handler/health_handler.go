@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -30,14 +30,14 @@ func NewHealthHandler(db *gorm.DB, redis *redis.Client, nats *nats.Conn) *Health
 	}
 }
 
-func (h *HealthHandler) Health(c *fiber.Ctx) error {
+func (h *HealthHandler) Health(c fiber.Ctx) error {
 	return c.JSON(HealthStatus{
 		Status:    "ok",
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
-func (h *HealthHandler) Ready(c *fiber.Ctx) error {
+func (h *HealthHandler) Ready(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 

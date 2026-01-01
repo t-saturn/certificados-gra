@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 
 	"server/internal/domain/models"
@@ -16,11 +16,11 @@ func NewDocumentTypeHandler(service *service.DocumentTypeService) *DocumentTypeH
 	return &DocumentTypeHandler{service: service}
 }
 
-func (h *DocumentTypeHandler) GetAll(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) GetAll(c fiber.Ctx) error {
+	ctx := c.Context()
 
-	limit := c.QueryInt("limit", 10)
-	offset := c.QueryInt("offset", 0)
+	limit := fiber.Query(c, "limit", 10)
+	offset := fiber.Query(c, "offset", 0)
 
 	docTypes, total, err := h.service.GetAll(ctx, limit, offset)
 	if err != nil {
@@ -33,8 +33,8 @@ func (h *DocumentTypeHandler) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-func (h *DocumentTypeHandler) GetActive(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) GetActive(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	docTypes, err := h.service.GetActive(ctx)
 	if err != nil {
@@ -44,8 +44,8 @@ func (h *DocumentTypeHandler) GetActive(c *fiber.Ctx) error {
 	return SuccessResponse(c, "Active document types retrieved", docTypes)
 }
 
-func (h *DocumentTypeHandler) GetByID(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) GetByID(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -61,8 +61,8 @@ func (h *DocumentTypeHandler) GetByID(c *fiber.Ctx) error {
 	return SuccessResponse(c, "Document type retrieved", docType)
 }
 
-func (h *DocumentTypeHandler) GetByCode(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) GetByCode(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	code := c.Params("code")
 	if code == "" {
@@ -77,11 +77,11 @@ func (h *DocumentTypeHandler) GetByCode(c *fiber.Ctx) error {
 	return SuccessResponse(c, "Document type retrieved", docType)
 }
 
-func (h *DocumentTypeHandler) Create(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) Create(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	var input models.DocumentType
-	if err := c.BodyParser(&input); err != nil {
+	if err := c.Bind().Body(&input); err != nil {
 		return BadRequestResponse(c, "INVALID_BODY", "Invalid request body")
 	}
 
@@ -93,8 +93,8 @@ func (h *DocumentTypeHandler) Create(c *fiber.Ctx) error {
 	return CreatedResponse(c, "Document type created", docType)
 }
 
-func (h *DocumentTypeHandler) Update(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) Update(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -103,7 +103,7 @@ func (h *DocumentTypeHandler) Update(c *fiber.Ctx) error {
 	}
 
 	var input models.DocumentType
-	if err := c.BodyParser(&input); err != nil {
+	if err := c.Bind().Body(&input); err != nil {
 		return BadRequestResponse(c, "INVALID_BODY", "Invalid request body")
 	}
 
@@ -116,8 +116,8 @@ func (h *DocumentTypeHandler) Update(c *fiber.Ctx) error {
 	return SuccessResponse(c, "Document type updated", docType)
 }
 
-func (h *DocumentTypeHandler) Delete(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *DocumentTypeHandler) Delete(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)

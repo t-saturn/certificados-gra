@@ -68,20 +68,22 @@ func main() {
 	userHandler := handler.NewUserHandler(userService)
 	docTypeHandler := handler.NewDocumentTypeHandler(docTypeService)
 
+	// Initialize health handler with available connections
 	var healthHandler *handler.HealthHandler
-	if redisClient != nil && natsClient != nil {
+	switch {
+	case redisClient != nil && natsClient != nil:
 		healthHandler = handler.NewHealthHandler(db, redisClient.Client, natsClient.Conn)
-	} else if redisClient != nil {
+	case redisClient != nil:
 		healthHandler = handler.NewHealthHandler(db, redisClient.Client, nil)
-	} else if natsClient != nil {
+	case natsClient != nil:
 		healthHandler = handler.NewHealthHandler(db, nil, natsClient.Conn)
-	} else {
+	default:
 		healthHandler = handler.NewHealthHandler(db, nil, nil)
 	}
 
 	// Initialize router
-	r := router.New(userHandler, docTypeHandler, healthHandler)
-	app := r.Setup("cert-server")
+	r := router.NewRouter(healthHandler, docTypeHandler, userHandler)
+	app := r.Setup()
 
 	// Start server
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
@@ -100,11 +102,11 @@ func main() {
 
 	log.Info().Msg("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	_, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Shutdown Fiber
-	if err := app.ShutdownWithContext(ctx); err != nil {
+	// Shutdown Fiber (v3 uses Shutdown instead of ShutdownWithContext)
+	if err := app.Shutdown(); err != nil {
 		log.Error().Err(err).Msg("Server shutdown error")
 	}
 

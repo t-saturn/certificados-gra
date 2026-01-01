@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 
 	"server/internal/domain/models"
@@ -16,11 +16,11 @@ func NewUserHandler(service *service.UserService) *UserHandler {
 	return &UserHandler{service: service}
 }
 
-func (h *UserHandler) GetAll(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *UserHandler) GetAll(c fiber.Ctx) error {
+	ctx := c.Context()
 
-	limit := c.QueryInt("limit", 10)
-	offset := c.QueryInt("offset", 0)
+	limit := fiber.Query(c, "limit", 10)
+	offset := fiber.Query(c, "offset", 0)
 
 	users, total, err := h.service.GetAll(ctx, limit, offset)
 	if err != nil {
@@ -33,8 +33,8 @@ func (h *UserHandler) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-func (h *UserHandler) GetByID(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *UserHandler) GetByID(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -50,11 +50,11 @@ func (h *UserHandler) GetByID(c *fiber.Ctx) error {
 	return SuccessResponse(c, "User retrieved successfully", user)
 }
 
-func (h *UserHandler) Create(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *UserHandler) Create(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	var input models.User
-	if err := c.BodyParser(&input); err != nil {
+	if err := c.Bind().Body(&input); err != nil {
 		return BadRequestResponse(c, "INVALID_BODY", "Invalid request body")
 	}
 
@@ -66,8 +66,8 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 	return CreatedResponse(c, "User created successfully", user)
 }
 
-func (h *UserHandler) Update(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *UserHandler) Update(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
@@ -76,7 +76,7 @@ func (h *UserHandler) Update(c *fiber.Ctx) error {
 	}
 
 	var input models.User
-	if err := c.BodyParser(&input); err != nil {
+	if err := c.Bind().Body(&input); err != nil {
 		return BadRequestResponse(c, "INVALID_BODY", "Invalid request body")
 	}
 
@@ -89,8 +89,8 @@ func (h *UserHandler) Update(c *fiber.Ctx) error {
 	return SuccessResponse(c, "User updated successfully", user)
 }
 
-func (h *UserHandler) Delete(c *fiber.Ctx) error {
-	ctx := c.UserContext()
+func (h *UserHandler) Delete(c fiber.Ctx) error {
+	ctx := c.Context()
 
 	idParam := c.Params("id")
 	id, err := uuid.Parse(idParam)
