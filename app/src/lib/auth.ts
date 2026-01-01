@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import NextAuth from 'next-auth';
 import Keycloak from 'next-auth/providers/keycloak';
-import { JWT } from 'next-auth/jwt';
+import type { NextAuthConfig } from 'next-auth';
+import type { ExtendedJWT, ExtendedSession, KeycloakProfile, KeycloakTokenResponse } from '@/types/auth.types';
 
-async function refreshAccessToken(token: JWT): Promise<JWT> {
+const refreshAccessToken = async (token: ExtendedJWT): Promise<ExtendedJWT> => {
   try {
     const url = `${process.env.KEYCLOAK_ISSUER}/protocol/openid-connect/token`;
 
@@ -18,7 +18,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       }),
     });
 
-    const refreshedTokens = await response.json();
+    const refreshedTokens: KeycloakTokenResponse = await response.json();
 
     if (!response.ok) {
       throw new Error('Error al refrescar token');
@@ -31,57 +31,100 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       expiresAt: Math.floor(Date.now() / 1000) + refreshedTokens.expires_in,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     };
-  } catch (error) {
-    console.error('Error refrescando access token:', error);
+  } catch {
+    // console.error('Error refrescando access token:', error);
     return {
       ...token,
       error: 'RefreshAccessTokenError',
     };
   }
+};
+
+const parseJwtPayload = (token: string): Record<string, unknown> | null => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+};
+
+const keycloakClientId = process.env.KEYCLOAK_CLIENT_ID;
+const keycloakClientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
+const keycloakIssuer = process.env.KEYCLOAK_ISSUER;
+
+if (!keycloakClientId || !keycloakClientSecret || !keycloakIssuer) {
+  // console.error('Missing Keycloak environment variables:', { KEYCLOAK_CLIENT_ID: !!keycloakClientId, KEYCLOAK_CLIENT_SECRET: !!keycloakClientSecret, KEYCLOAK_ISSUER: !!keycloakIssuer });
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const authConfig: NextAuthConfig = {
   providers: [
     Keycloak({
-      clientId: process.env.KEYCLOAK_CLIENT_ID!,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-      issuer: process.env.KEYCLOAK_ISSUER!,
+      clientId: keycloakClientId ?? '',
+      clientSecret: keycloakClientSecret ?? '',
+      issuer: keycloakIssuer ?? '',
     }),
   ],
-  session: { strategy: 'jwt' },
-
+  debug: process.env.NODE_ENV === 'development',
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 60,
+  },
   trustHost: true,
-
   callbacks: {
-    async jwt({ token, account, profile }) {
+    jwt: async ({ token, account, profile }): Promise<ExtendedJWT> => {
       if (account && profile) {
+        const keycloakProfile = profile as KeycloakProfile;
+        const decoded = account.access_token ? parseJwtPayload(account.access_token) : null;
+        const realmAccess = decoded?.realm_access as { roles?: string[] } | undefined;
+
         return {
           ...token,
           accessToken: account.access_token,
           idToken: account.id_token,
           refreshToken: account.refresh_token,
           expiresAt: account.expires_at,
-          userId: profile.sub ?? token.sub,
+          userId: keycloakProfile.sub ?? token.sub,
+          roles: realmAccess?.roles ?? keycloakProfile.realm_access?.roles ?? [],
         };
       }
 
+      const extendedToken = token as ExtendedJWT;
       const now = Math.floor(Date.now() / 1000);
-      const expiresAt = token.expiresAt as number;
+      const expiresAt = extendedToken.expiresAt as number;
 
       if (now < expiresAt - 60) {
-        return token;
+        return extendedToken;
       }
 
-      return await refreshAccessToken(token);
+      return await refreshAccessToken(extendedToken);
     },
 
-    async session({ session, token }) {
-      (session.user as any).id = token.userId;
-      (session as any).accessToken = token.accessToken;
-      (session as any).idToken = token.idToken;
-      (session as any).error = token.error;
+    session: async ({ session, token }): Promise<ExtendedSession> => {
+      const extendedToken = token as ExtendedJWT;
 
-      return session;
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: extendedToken.userId ?? extendedToken.sub ?? '',
+          roles: extendedToken.roles,
+        },
+        accessToken: extendedToken.accessToken,
+        idToken: extendedToken.idToken,
+        refreshToken: extendedToken.refreshToken,
+        expiresAt: extendedToken.expiresAt,
+        error: extendedToken.error,
+      };
     },
   },
-});
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://certificaciones.regionayacucho.gob.pe/sitemap.xml
+
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /private/

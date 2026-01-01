@@ -1,45 +1,16 @@
-import {
-  Boxes,
-  CircleHelp,
-  Hexagon,
-  Layers,
-  LayoutDashboard,
-  Package,
-  UsersRound,
-  Settings2,
-  UserCircle,
-  Ban,
-  Shield,
-  Activity,
-  ShieldCheck,
-  UserCog,
-  Map,
-  ScrollText,
-  LucideIcon,
-  HelpCircle,
-} from 'lucide-react';
+import { type LucideIcon, LayoutDashboard, Settings, Circle, FileSpreadsheet, Signature, ChartSpline, Calendar, ShieldCheck } from 'lucide-react';
 
-// Mapeo de nombres de iconos a componentes
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
-  UsersRound,
-  CircleQuestionMark: CircleHelp,
-  Hexagon,
-  Boxes,
-  Package,
-  Layers,
-  Shield,
-  Activity,
-  ScrollText,
+  ChartSpline,
+  Calendar,
+  FileSpreadsheet,
+  Signature,
   ShieldCheck,
-  UserCog,
-  Ban,
-  Settings2,
-  UserCircle,
-  Map,
+  Settings,
 };
 
-export const getIcon = (iconName?: string | null): LucideIcon => {
-  if (!iconName) return HelpCircle;
-  return iconMap[iconName] || HelpCircle;
+export const getIcon = (iconName: string | null | undefined): LucideIcon => {
+  if (!iconName) return Circle;
+  return iconMap[iconName] ?? Circle;
 };
