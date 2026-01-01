@@ -1,26 +1,13 @@
-import { LayoutDashboard, Users, UserCog, Shield, ShieldCheck, Settings, FileText, FolderOpen, Home, Package, Boxes, Layers, Activity, Ban, Hexagon, Circle, ClipboardList, type LucideIcon } from 'lucide-react';
+import { type LucideIcon, LayoutDashboard, Settings, Circle, FileSpreadsheet, Signature, ChartSpline, Calendar, ShieldCheck } from 'lucide-react';
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
-  Dashboard: LayoutDashboard,
-  Users,
-  UsersRound: Users,
-  UserCog,
-  Shield,
+  ChartSpline,
+  Calendar,
+  FileSpreadsheet,
+  Signature,
   ShieldCheck,
   Settings,
-  FileText,
-  FolderOpen,
-  Home,
-  Package,
-  Boxes,
-  Layers,
-  Activity,
-  Ban,
-  Hexagon,
-  Circle,
-  ClipboardList,
-  CircleQuestionMark: Circle,
 };
 
 export const getIcon = (iconName: string | null | undefined): LucideIcon => {
