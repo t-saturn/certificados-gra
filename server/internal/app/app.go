@@ -18,29 +18,32 @@ type App struct {
 	nats  *nats.Conn
 
 	// Repositories
-	userRepo        repository.UserRepository
-	userDetailRepo  repository.UserDetailRepository
-	docTypeRepo     repository.DocumentTypeRepository
-	docCategoryRepo repository.DocumentCategoryRepository
-	docTemplateRepo repository.DocumentTemplateRepository
-	eventRepo       repository.EventRepository
+	userRepo             repository.UserRepository
+	userDetailRepo       repository.UserDetailRepository
+	docTypeRepo          repository.DocumentTypeRepository
+	docCategoryRepo      repository.DocumentCategoryRepository
+	docTemplateRepo      repository.DocumentTemplateRepository
+	eventRepo            repository.EventRepository
+	eventParticipantRepo repository.EventParticipantRepository
 
 	// Services
-	userService        *service.UserService
-	userDetailService  *service.UserDetailService
-	docTypeService     *service.DocumentTypeService
-	docCategoryService *service.DocumentCategoryService
-	docTemplateService *service.DocumentTemplateService
-	eventService       *service.EventService
+	userService             *service.UserService
+	userDetailService       *service.UserDetailService
+	docTypeService          *service.DocumentTypeService
+	docCategoryService      *service.DocumentCategoryService
+	docTemplateService      *service.DocumentTemplateService
+	eventService            *service.EventService
+	eventParticipantService *service.EventParticipantService
 
 	// Handlers
-	healthHandler      *handler.HealthHandler
-	userHandler        *handler.UserHandler
-	userDetailHandler  *handler.UserDetailHandler
-	docTypeHandler     *handler.DocumentTypeHandler
-	docCategoryHandler *handler.DocumentCategoryHandler
-	docTemplateHandler *handler.DocumentTemplateHandler
-	eventHandler       *handler.EventHandler
+	healthHandler           *handler.HealthHandler
+	userHandler             *handler.UserHandler
+	userDetailHandler       *handler.UserDetailHandler
+	docTypeHandler          *handler.DocumentTypeHandler
+	docCategoryHandler      *handler.DocumentCategoryHandler
+	docTemplateHandler      *handler.DocumentTemplateHandler
+	eventHandler            *handler.EventHandler
+	eventParticipantHandler *handler.EventParticipantHandler
 
 	// Fiber app
 	fiber *fiber.App
@@ -77,6 +80,7 @@ func (a *App) initRepositories() {
 	a.docCategoryRepo = repository.NewDocumentCategoryRepository(a.db)
 	a.docTemplateRepo = repository.NewDocumentTemplateRepository(a.db)
 	a.eventRepo = repository.NewEventRepository(a.db)
+	a.eventParticipantRepo = repository.NewEventParticipantRepository(a.db)
 }
 
 // initServices initializes all services
@@ -87,6 +91,7 @@ func (a *App) initServices() {
 	a.docCategoryService = service.NewDocumentCategoryService(a.docCategoryRepo)
 	a.docTemplateService = service.NewDocumentTemplateService(a.docTemplateRepo)
 	a.eventService = service.NewEventService(a.eventRepo)
+	a.eventParticipantService = service.NewEventParticipantService(a.eventParticipantRepo)
 }
 
 // initHandlers initializes all handlers
@@ -98,6 +103,7 @@ func (a *App) initHandlers() {
 	a.docCategoryHandler = handler.NewDocumentCategoryHandler(a.docCategoryService)
 	a.docTemplateHandler = handler.NewDocumentTemplateHandler(a.docTemplateService)
 	a.eventHandler = handler.NewEventHandler(a.eventService)
+	a.eventParticipantHandler = handler.NewEventParticipantHandler(a.eventParticipantService)
 }
 
 // initRouter initializes the Fiber router
@@ -110,6 +116,7 @@ func (a *App) initRouter() {
 		DocumentCategoryHandler: a.docCategoryHandler,
 		DocumentTemplateHandler: a.docTemplateHandler,
 		EventHandler:            a.eventHandler,
+		EventParticipantHandler: a.eventParticipantHandler,
 	})
 	a.fiber = router.Setup()
 }

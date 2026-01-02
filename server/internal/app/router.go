@@ -27,6 +27,7 @@ type RouterConfig struct {
 	DocumentCategoryHandler *handler.DocumentCategoryHandler
 	DocumentTemplateHandler *handler.DocumentTemplateHandler
 	EventHandler        *handler.EventHandler
+	EventParticipantHandler *handler.EventParticipantHandler
 }
 
 // NewRouter creates a new Router instance
@@ -40,6 +41,7 @@ func NewRouter(cfg RouterConfig) *Router {
 			cfg.DocumentCategoryHandler,
 			cfg.DocumentTemplateHandler,
 			cfg.EventHandler,
+			cfg.EventParticipantHandler,
 		),
 		// fnRouter: NewFNRouter(...), // Future
 	}

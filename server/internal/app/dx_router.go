@@ -15,6 +15,7 @@ type DXRouter struct {
 	documentCategoryHandler *handler.DocumentCategoryHandler
 	documentTemplateHandler *handler.DocumentTemplateHandler
 	eventHandler            *handler.EventHandler
+	eventParticipantHandler *handler.EventParticipantHandler
 }
 
 // NewDXRouter creates a new DXRouter instance
@@ -26,6 +27,7 @@ func NewDXRouter(
 	documentCategoryHandler *handler.DocumentCategoryHandler,
 	documentTemplateHandler *handler.DocumentTemplateHandler,
 	eventHandler *handler.EventHandler,
+	eventParticipantHandler *handler.EventParticipantHandler,
 ) *DXRouter {
 	return &DXRouter{
 		healthHandler:           healthHandler,
@@ -35,6 +37,7 @@ func NewDXRouter(
 		documentCategoryHandler: documentCategoryHandler,
 		documentTemplateHandler: documentTemplateHandler,
 		eventHandler:            eventHandler,
+		eventParticipantHandler: eventParticipantHandler,
 	}
 }
 
@@ -52,6 +55,7 @@ func (r *DXRouter) SetupRoutes(api fiber.Router) {
 	r.setupDocumentCategoryRoutes(api)
 	r.setupDocumentTemplateRoutes(api)
 	r.setupEventRoutes(api)
+	r.setupEventParticipantRoutes(api)
 }
 
 // setupDocumentTypeRoutes configures document type routes
@@ -121,4 +125,16 @@ func (r *DXRouter) setupEventRoutes(api fiber.Router) {
 	events.Post("/", r.eventHandler.Create)
 	events.Put("/:id", r.eventHandler.Update)
 	events.Delete("/:id", r.eventHandler.Delete)
+}
+
+// setupEventParticipantRoutes configures event participant routes
+func (r *DXRouter) setupEventParticipantRoutes(api fiber.Router) {
+	participants := api.Group("/event-participants")
+	participants.Get("/:id", r.eventParticipantHandler.GetByID)
+	participants.Get("/event/:eventId", r.eventParticipantHandler.GetByEventID)
+	participants.Get("/event/:eventId/count", r.eventParticipantHandler.CountByEventID)
+	participants.Get("/user-detail/:userDetailId", r.eventParticipantHandler.GetByUserDetailID)
+	participants.Post("/", r.eventParticipantHandler.Create)
+	participants.Put("/:id", r.eventParticipantHandler.Update)
+	participants.Delete("/:id", r.eventParticipantHandler.Delete)
 }
