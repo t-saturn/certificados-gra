@@ -11,6 +11,7 @@ type DXRouter struct {
 	healthHandler       *handler.HealthHandler
 	documentTypeHandler *handler.DocumentTypeHandler
 	userHandler         *handler.UserHandler
+	eventHandler        *handler.EventHandler
 }
 
 // NewDXRouter creates a new DXRouter instance
@@ -18,11 +19,13 @@ func NewDXRouter(
 	healthHandler *handler.HealthHandler,
 	documentTypeHandler *handler.DocumentTypeHandler,
 	userHandler *handler.UserHandler,
+	eventHandler *handler.EventHandler,
 ) *DXRouter {
 	return &DXRouter{
 		healthHandler:       healthHandler,
 		documentTypeHandler: documentTypeHandler,
 		userHandler:         userHandler,
+		eventHandler:        eventHandler,
 	}
 }
 
@@ -36,6 +39,7 @@ func (r *DXRouter) SetupHealthRoutes(app *fiber.App) {
 func (r *DXRouter) SetupRoutes(api fiber.Router) {
 	r.setupDocumentTypeRoutes(api)
 	r.setupUserRoutes(api)
+	r.setupEventRoutes(api)
 }
 
 // setupDocumentTypeRoutes configures document type routes
@@ -58,4 +62,17 @@ func (r *DXRouter) setupUserRoutes(api fiber.Router) {
 	users.Post("/", r.userHandler.Create)
 	users.Put("/:id", r.userHandler.Update)
 	users.Delete("/:id", r.userHandler.Delete)
+}
+
+// setupEventRoutes configures event routes
+func (r *DXRouter) setupEventRoutes(api fiber.Router) {
+	events := api.Group("/events")
+	events.Get("/", r.eventHandler.GetAll)
+	events.Get("/public", r.eventHandler.GetPublic)
+	events.Get("/status/:status", r.eventHandler.GetByStatus)
+	events.Get("/:id", r.eventHandler.GetByID)
+	events.Get("/code/:code", r.eventHandler.GetByCode)
+	events.Post("/", r.eventHandler.Create)
+	events.Put("/:id", r.eventHandler.Update)
+	events.Delete("/:id", r.eventHandler.Delete)
 }

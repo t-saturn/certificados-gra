@@ -20,15 +20,18 @@ type App struct {
 	// Repositories
 	userRepo    repository.UserRepository
 	docTypeRepo repository.DocumentTypeRepository
+	eventRepo   repository.EventRepository
 
 	// Services
 	userService    *service.UserService
 	docTypeService *service.DocumentTypeService
+	eventService   *service.EventService
 
 	// Handlers
 	healthHandler  *handler.HealthHandler
 	userHandler    *handler.UserHandler
 	docTypeHandler *handler.DocumentTypeHandler
+	eventHandler   *handler.EventHandler
 
 	// Fiber app
 	fiber *fiber.App
@@ -61,12 +64,14 @@ func New(cfg Config) *App {
 func (a *App) initRepositories() {
 	a.userRepo = repository.NewUserRepository(a.db)
 	a.docTypeRepo = repository.NewDocumentTypeRepository(a.db)
+	a.eventRepo = repository.NewEventRepository(a.db)
 }
 
 // initServices initializes all services
 func (a *App) initServices() {
 	a.userService = service.NewUserService(a.userRepo)
 	a.docTypeService = service.NewDocumentTypeService(a.docTypeRepo)
+	a.eventService = service.NewEventService(a.eventRepo)
 }
 
 // initHandlers initializes all handlers
@@ -74,6 +79,7 @@ func (a *App) initHandlers() {
 	a.healthHandler = handler.NewHealthHandler(a.db, a.redis, a.nats)
 	a.userHandler = handler.NewUserHandler(a.userService)
 	a.docTypeHandler = handler.NewDocumentTypeHandler(a.docTypeService)
+	a.eventHandler = handler.NewEventHandler(a.eventService)
 }
 
 // initRouter initializes the Fiber router
@@ -82,6 +88,7 @@ func (a *App) initRouter() {
 		HealthHandler:       a.healthHandler,
 		DocumentTypeHandler: a.docTypeHandler,
 		UserHandler:         a.userHandler,
+		EventHandler:        a.eventHandler,
 	})
 	a.fiber = router.Setup()
 }

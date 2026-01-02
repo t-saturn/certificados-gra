@@ -23,7 +23,7 @@ type RouterConfig struct {
 	HealthHandler       *handler.HealthHandler
 	DocumentTypeHandler *handler.DocumentTypeHandler
 	UserHandler         *handler.UserHandler
-	// Future: add more handlers here
+	EventHandler        *handler.EventHandler
 }
 
 // NewRouter creates a new Router instance
@@ -33,6 +33,7 @@ func NewRouter(cfg RouterConfig) *Router {
 			cfg.HealthHandler,
 			cfg.DocumentTypeHandler,
 			cfg.UserHandler,
+			cfg.EventHandler,
 		),
 		// fnRouter: NewFNRouter(...), // Future
 	}
