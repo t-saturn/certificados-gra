@@ -9,22 +9,25 @@ import (
 // DXRouter handles DX (Document Exchange) related routes
 type DXRouter struct {
 	healthHandler       *handler.HealthHandler
-	documentTypeHandler *handler.DocumentTypeHandler
 	userHandler         *handler.UserHandler
+	userDetailHandler   *handler.UserDetailHandler
+	documentTypeHandler *handler.DocumentTypeHandler
 	eventHandler        *handler.EventHandler
 }
 
 // NewDXRouter creates a new DXRouter instance
 func NewDXRouter(
 	healthHandler *handler.HealthHandler,
-	documentTypeHandler *handler.DocumentTypeHandler,
 	userHandler *handler.UserHandler,
+	userDetailHandler *handler.UserDetailHandler,
+	documentTypeHandler *handler.DocumentTypeHandler,
 	eventHandler *handler.EventHandler,
 ) *DXRouter {
 	return &DXRouter{
 		healthHandler:       healthHandler,
-		documentTypeHandler: documentTypeHandler,
 		userHandler:         userHandler,
+		userDetailHandler:   userDetailHandler,
+		documentTypeHandler: documentTypeHandler,
 		eventHandler:        eventHandler,
 	}
 }
@@ -37,8 +40,9 @@ func (r *DXRouter) SetupHealthRoutes(app *fiber.App) {
 
 // SetupRoutes configures all DX routes (protected)
 func (r *DXRouter) SetupRoutes(api fiber.Router) {
-	r.setupDocumentTypeRoutes(api)
 	r.setupUserRoutes(api)
+	r.setupUserDetailRoutes(api)
+	r.setupDocumentTypeRoutes(api)
 	r.setupEventRoutes(api)
 }
 
@@ -62,6 +66,17 @@ func (r *DXRouter) setupUserRoutes(api fiber.Router) {
 	users.Post("/", r.userHandler.Create)
 	users.Put("/:id", r.userHandler.Update)
 	users.Delete("/:id", r.userHandler.Delete)
+}
+
+// setupUserDetailRoutes configures user detail routes (beneficiaries)
+func (r *DXRouter) setupUserDetailRoutes(api fiber.Router) {
+	details := api.Group("/user-details")
+	details.Get("/", r.userDetailHandler.GetAll)
+	details.Get("/:id", r.userDetailHandler.GetByID)
+	details.Get("/dni/:nationalId", r.userDetailHandler.GetByNationalID)
+	details.Post("/", r.userDetailHandler.Create)
+	details.Put("/:id", r.userDetailHandler.Update)
+	details.Delete("/:id", r.userDetailHandler.Delete)
 }
 
 // setupEventRoutes configures event routes

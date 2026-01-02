@@ -21,8 +21,9 @@ type Router struct {
 // RouterConfig holds all handlers needed for routing
 type RouterConfig struct {
 	HealthHandler       *handler.HealthHandler
-	DocumentTypeHandler *handler.DocumentTypeHandler
 	UserHandler         *handler.UserHandler
+	UserDetailHandler   *handler.UserDetailHandler
+	DocumentTypeHandler *handler.DocumentTypeHandler
 	EventHandler        *handler.EventHandler
 }
 
@@ -31,8 +32,9 @@ func NewRouter(cfg RouterConfig) *Router {
 	return &Router{
 		dxRouter: NewDXRouter(
 			cfg.HealthHandler,
-			cfg.DocumentTypeHandler,
 			cfg.UserHandler,
+			cfg.UserDetailHandler,
+			cfg.DocumentTypeHandler,
 			cfg.EventHandler,
 		),
 		// fnRouter: NewFNRouter(...), // Future
