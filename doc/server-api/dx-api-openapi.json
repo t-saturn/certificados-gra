@@ -1,0 +1,868 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DX API - Document Exchange",
+    "description": "API para gestión de documentos, eventos, usuarios y más",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "Local"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get all users",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "user@example.com" },
+                  "keycloak_id": { "type": "string", "example": "uuid-from-keycloak" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get user by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Users"],
+        "summary": "Update user",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Delete user",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/user-details": {
+      "get": {
+        "tags": ["User Details"],
+        "summary": "Get all user details",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["User Details"],
+        "summary": "Create user detail",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "national_id": { "type": "string", "example": "12345678" },
+                  "first_name": { "type": "string", "example": "Juan" },
+                  "last_name": { "type": "string", "example": "Pérez" },
+                  "email": { "type": "string", "example": "juan@example.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/user-details/{id}": {
+      "get": {
+        "tags": ["User Details"],
+        "summary": "Get user detail by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["User Details"],
+        "summary": "Update user detail",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "first_name": { "type": "string" },
+                  "last_name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["User Details"],
+        "summary": "Delete user detail",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/user-details/dni/{nationalId}": {
+      "get": {
+        "tags": ["User Details"],
+        "summary": "Get user detail by National ID (DNI)",
+        "parameters": [{ "name": "nationalId", "in": "path", "required": true, "schema": { "type": "string" }, "example": "12345678" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/document-types": {
+      "get": {
+        "tags": ["Document Types"],
+        "summary": "Get all document types",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Document Types"],
+        "summary": "Create document type",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": { "type": "string", "example": "CERT" },
+                  "name": { "type": "string", "example": "Certificado" },
+                  "description": { "type": "string" },
+                  "is_active": { "type": "boolean", "default": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/document-types/active": {
+      "get": {
+        "tags": ["Document Types"],
+        "summary": "Get active document types",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/document-types/{id}": {
+      "get": {
+        "tags": ["Document Types"],
+        "summary": "Get document type by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Document Types"],
+        "summary": "Update document type",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "is_active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Document Types"],
+        "summary": "Delete document type",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/document-types/code/{code}": {
+      "get": {
+        "tags": ["Document Types"],
+        "summary": "Get document type by code",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "CERT" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/document-categories": {
+      "get": {
+        "tags": ["Document Categories"],
+        "summary": "Get all document categories",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Document Categories"],
+        "summary": "Create document category",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "document_type_id": { "type": "string", "format": "uuid" },
+                  "name": { "type": "string", "example": "Categoría A" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/document-categories/{id}": {
+      "get": {
+        "tags": ["Document Categories"],
+        "summary": "Get document category by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Document Categories"],
+        "summary": "Update document category",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Document Categories"],
+        "summary": "Delete document category",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/document-categories/document-type/{documentTypeId}": {
+      "get": {
+        "tags": ["Document Categories"],
+        "summary": "Get categories by document type",
+        "parameters": [{ "name": "documentTypeId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/document-templates": {
+      "get": {
+        "tags": ["Document Templates"],
+        "summary": "Get all document templates",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Document Templates"],
+        "summary": "Create document template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "document_type_id": { "type": "string", "format": "uuid" },
+                  "category_id": { "type": "integer" },
+                  "name": { "type": "string", "example": "Plantilla Certificado" },
+                  "content": { "type": "string" },
+                  "is_active": { "type": "boolean", "default": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/document-templates/active": {
+      "get": {
+        "tags": ["Document Templates"],
+        "summary": "Get active document templates",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/document-templates/{id}": {
+      "get": {
+        "tags": ["Document Templates"],
+        "summary": "Get document template by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Document Templates"],
+        "summary": "Update document template",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "content": { "type": "string" },
+                  "is_active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Document Templates"],
+        "summary": "Delete document template",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/document-templates/document-type/{documentTypeId}": {
+      "get": {
+        "tags": ["Document Templates"],
+        "summary": "Get templates by document type",
+        "parameters": [{ "name": "documentTypeId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/documents": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get all documents",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Create document",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_detail_id": { "type": "string", "format": "uuid" },
+                  "event_id": { "type": "string", "format": "uuid" },
+                  "template_id": { "type": "string", "format": "uuid" },
+                  "serial_code": { "type": "string", "example": "DOC-2024-001" },
+                  "verification_code": { "type": "string", "example": "ABC123XYZ" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/documents/{id}": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get document by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Documents"],
+        "summary": "Update document",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "serial_code": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Documents"],
+        "summary": "Delete document",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/documents/serial/{serialCode}": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get document by serial code",
+        "parameters": [{ "name": "serialCode", "in": "path", "required": true, "schema": { "type": "string" }, "example": "DOC-2024-001" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/documents/verify/{verificationCode}": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Verify document by verification code",
+        "parameters": [{ "name": "verificationCode", "in": "path", "required": true, "schema": { "type": "string" }, "example": "ABC123XYZ" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/documents/event/{eventId}": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get documents by event",
+        "parameters": [{ "name": "eventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/documents/user-detail/{userDetailId}": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get documents by user detail",
+        "parameters": [{ "name": "userDetailId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "Get all events",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Events"],
+        "summary": "Create event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": { "type": "string", "example": "EVT-2024-001" },
+                  "name": { "type": "string", "example": "Curso de Capacitación" },
+                  "description": { "type": "string" },
+                  "start_date": { "type": "string", "format": "date-time" },
+                  "end_date": { "type": "string", "format": "date-time" },
+                  "status": { "type": "string", "enum": ["draft", "published", "active", "completed", "cancelled"] },
+                  "is_public": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/events/public": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "Get public events",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/events/status/{status}": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "Get events by status",
+        "parameters": [{ "name": "status", "in": "path", "required": true, "schema": { "type": "string", "enum": ["draft", "published", "active", "completed", "cancelled"] } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/events/{id}": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "Get event by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Events"],
+        "summary": "Update event",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Events"],
+        "summary": "Delete event",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/events/code/{code}": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "Get event by code",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "EVT-2024-001" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/event-participants": {
+      "post": {
+        "tags": ["Event Participants"],
+        "summary": "Create event participant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event_id": { "type": "string", "format": "uuid" },
+                  "user_detail_id": { "type": "string", "format": "uuid" },
+                  "status": { "type": "string", "enum": ["registered", "attended", "completed", "cancelled"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/event-participants/{id}": {
+      "get": {
+        "tags": ["Event Participants"],
+        "summary": "Get event participant by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Event Participants"],
+        "summary": "Update event participant",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Event Participants"],
+        "summary": "Delete event participant",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/event-participants/event/{eventId}": {
+      "get": {
+        "tags": ["Event Participants"],
+        "summary": "Get participants by event",
+        "parameters": [{ "name": "eventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/event-participants/event/{eventId}/count": {
+      "get": {
+        "tags": ["Event Participants"],
+        "summary": "Count participants by event",
+        "parameters": [{ "name": "eventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/event-participants/user-detail/{userDetailId}": {
+      "get": {
+        "tags": ["Event Participants"],
+        "summary": "Get participations by user detail",
+        "parameters": [{ "name": "userDetailId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/notifications": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Create notification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string", "example": "Nueva notificación" },
+                  "message": { "type": "string", "example": "Tienes un nuevo documento" },
+                  "type": { "type": "string", "enum": ["info", "warning", "error", "success"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/notifications/{id}": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get notification by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Notifications"],
+        "summary": "Delete notification",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "tags": ["Notifications"],
+        "summary": "Mark notification as read",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/notifications/user/{userId}": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get notifications by user",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/notifications/user/{userId}/unread": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get unread notifications by user",
+        "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/notifications/user/{userId}/unread/count": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Count unread notifications by user",
+        "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/notifications/user/{userId}/read-all": {
+      "patch": {
+        "tags": ["Notifications"],
+        "summary": "Mark all notifications as read",
+        "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/evaluations": {
+      "get": {
+        "tags": ["Evaluations"],
+        "summary": "Get all evaluations",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Evaluations"],
+        "summary": "Create evaluation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": { "type": "string", "format": "uuid" },
+                  "document_id": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string", "example": "Evaluación Final" },
+                  "score": { "type": "number", "example": 85.5 },
+                  "max_score": { "type": "number", "example": 100 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/evaluations/{id}": {
+      "get": {
+        "tags": ["Evaluations"],
+        "summary": "Get evaluation by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Evaluations"],
+        "summary": "Update evaluation",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "score": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Evaluations"],
+        "summary": "Delete evaluation",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/evaluations/user/{userId}": {
+      "get": {
+        "tags": ["Evaluations"],
+        "summary": "Get evaluations by user",
+        "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/study-materials": {
+      "get": {
+        "tags": ["Study Materials"],
+        "summary": "Get all study materials",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "post": {
+        "tags": ["Study Materials"],
+        "summary": "Create study material",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string", "example": "Guía de Estudio" },
+                  "description": { "type": "string" },
+                  "content": { "type": "string" },
+                  "type": { "type": "string", "enum": ["pdf", "video", "article", "quiz"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/study-materials/{id}": {
+      "get": {
+        "tags": ["Study Materials"],
+        "summary": "Get study material by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Success" } }
+      },
+      "put": {
+        "tags": ["Study Materials"],
+        "summary": "Update study material",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "content": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Success" } }
+      },
+      "delete": {
+        "tags": ["Study Materials"],
+        "summary": "Delete study material",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    }
+  }
+}

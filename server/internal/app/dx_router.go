@@ -17,6 +17,9 @@ type DXHandlers struct {
 	Document         *handler.DocumentHandler
 	Event            *handler.EventHandler
 	EventParticipant *handler.EventParticipantHandler
+	Notification     *handler.NotificationHandler
+	Evaluation       *handler.EvaluationHandler
+	StudyMaterial    *handler.StudyMaterialHandler
 }
 
 // DXRouter handles DX (Document Exchange) related routes
@@ -45,6 +48,9 @@ func (r *DXRouter) SetupRoutes(api fiber.Router) {
 	r.setupDocumentRoutes(api)
 	r.setupEventRoutes(api)
 	r.setupEventParticipantRoutes(api)
+	r.setupNotificationRoutes(api)
+	r.setupEvaluationRoutes(api)
+	r.setupStudyMaterialRoutes(api)
 }
 
 // setupUserRoutes configures user routes
@@ -140,4 +146,38 @@ func (r *DXRouter) setupEventParticipantRoutes(api fiber.Router) {
 	g.Post("/", r.h.EventParticipant.Create)
 	g.Put("/:id", r.h.EventParticipant.Update)
 	g.Delete("/:id", r.h.EventParticipant.Delete)
+}
+
+// setupNotificationRoutes configures notification routes
+func (r *DXRouter) setupNotificationRoutes(api fiber.Router) {
+	g := api.Group("/notifications")
+	g.Get("/:id", r.h.Notification.GetByID)
+	g.Get("/user/:userId", r.h.Notification.GetByUserID)
+	g.Get("/user/:userId/unread", r.h.Notification.GetUnreadByUserID)
+	g.Get("/user/:userId/unread/count", r.h.Notification.CountUnreadByUserID)
+	g.Post("/", r.h.Notification.Create)
+	g.Patch("/:id/read", r.h.Notification.MarkAsRead)
+	g.Patch("/user/:userId/read-all", r.h.Notification.MarkAllAsRead)
+	g.Delete("/:id", r.h.Notification.Delete)
+}
+
+// setupEvaluationRoutes configures evaluation routes
+func (r *DXRouter) setupEvaluationRoutes(api fiber.Router) {
+	g := api.Group("/evaluations")
+	g.Get("/", r.h.Evaluation.GetAll)
+	g.Get("/:id", r.h.Evaluation.GetByID)
+	g.Get("/user/:userId", r.h.Evaluation.GetByUserID)
+	g.Post("/", r.h.Evaluation.Create)
+	g.Put("/:id", r.h.Evaluation.Update)
+	g.Delete("/:id", r.h.Evaluation.Delete)
+}
+
+// setupStudyMaterialRoutes configures study material routes
+func (r *DXRouter) setupStudyMaterialRoutes(api fiber.Router) {
+	g := api.Group("/study-materials")
+	g.Get("/", r.h.StudyMaterial.GetAll)
+	g.Get("/:id", r.h.StudyMaterial.GetByID)
+	g.Post("/", r.h.StudyMaterial.Create)
+	g.Put("/:id", r.h.StudyMaterial.Update)
+	g.Delete("/:id", r.h.StudyMaterial.Delete)
 }

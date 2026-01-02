@@ -58,6 +58,9 @@ func (a *App) buildDXHandlers() *DXHandlers {
 	documentRepo := repository.NewDocumentRepository(a.db)
 	eventRepo := repository.NewEventRepository(a.db)
 	eventParticipantRepo := repository.NewEventParticipantRepository(a.db)
+	notificationRepo := repository.NewNotificationRepository(a.db)
+	evaluationRepo := repository.NewEvaluationRepository(a.db)
+	studyMaterialRepo := repository.NewStudyMaterialRepository(a.db)
 
 	// Services
 	userSvc := service.NewUserService(userRepo)
@@ -68,6 +71,9 @@ func (a *App) buildDXHandlers() *DXHandlers {
 	documentSvc := service.NewDocumentService(documentRepo)
 	eventSvc := service.NewEventService(eventRepo)
 	eventParticipantSvc := service.NewEventParticipantService(eventParticipantRepo)
+	notificationSvc := service.NewNotificationService(notificationRepo)
+	evaluationSvc := service.NewEvaluationService(evaluationRepo)
+	studyMaterialSvc := service.NewStudyMaterialService(studyMaterialRepo)
 
 	// Return handlers
 	return &DXHandlers{
@@ -80,6 +86,9 @@ func (a *App) buildDXHandlers() *DXHandlers {
 		Document:         handler.NewDocumentHandler(documentSvc),
 		Event:            handler.NewEventHandler(eventSvc),
 		EventParticipant: handler.NewEventParticipantHandler(eventParticipantSvc),
+		Notification:     handler.NewNotificationHandler(notificationSvc),
+		Evaluation:       handler.NewEvaluationHandler(evaluationSvc),
+		StudyMaterial:    handler.NewStudyMaterialHandler(studyMaterialSvc),
 	}
 }
 
