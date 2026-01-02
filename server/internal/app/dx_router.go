@@ -13,6 +13,7 @@ type DXRouter struct {
 	userDetailHandler       *handler.UserDetailHandler
 	documentTypeHandler     *handler.DocumentTypeHandler
 	documentCategoryHandler *handler.DocumentCategoryHandler
+	documentTemplateHandler *handler.DocumentTemplateHandler
 	eventHandler            *handler.EventHandler
 }
 
@@ -23,6 +24,7 @@ func NewDXRouter(
 	userDetailHandler *handler.UserDetailHandler,
 	documentTypeHandler *handler.DocumentTypeHandler,
 	documentCategoryHandler *handler.DocumentCategoryHandler,
+	documentTemplateHandler *handler.DocumentTemplateHandler,
 	eventHandler *handler.EventHandler,
 ) *DXRouter {
 	return &DXRouter{
@@ -31,6 +33,7 @@ func NewDXRouter(
 		userDetailHandler:       userDetailHandler,
 		documentTypeHandler:     documentTypeHandler,
 		documentCategoryHandler: documentCategoryHandler,
+		documentTemplateHandler: documentTemplateHandler,
 		eventHandler:            eventHandler,
 	}
 }
@@ -47,6 +50,7 @@ func (r *DXRouter) SetupRoutes(api fiber.Router) {
 	r.setupUserDetailRoutes(api)
 	r.setupDocumentTypeRoutes(api)
 	r.setupDocumentCategoryRoutes(api)
+	r.setupDocumentTemplateRoutes(api)
 	r.setupEventRoutes(api)
 }
 
@@ -71,6 +75,18 @@ func (r *DXRouter) setupDocumentCategoryRoutes(api fiber.Router) {
 	categories.Post("/", r.documentCategoryHandler.Create)
 	categories.Put("/:id", r.documentCategoryHandler.Update)
 	categories.Delete("/:id", r.documentCategoryHandler.Delete)
+}
+
+// setupDocumentTemplateRoutes configures document template routes
+func (r *DXRouter) setupDocumentTemplateRoutes(api fiber.Router) {
+	templates := api.Group("/document-templates")
+	templates.Get("/", r.documentTemplateHandler.GetAll)
+	templates.Get("/active", r.documentTemplateHandler.GetActive)
+	templates.Get("/:id", r.documentTemplateHandler.GetByID)
+	templates.Get("/document-type/:documentTypeId", r.documentTemplateHandler.GetByDocumentTypeID)
+	templates.Post("/", r.documentTemplateHandler.Create)
+	templates.Put("/:id", r.documentTemplateHandler.Update)
+	templates.Delete("/:id", r.documentTemplateHandler.Delete)
 }
 
 // setupUserRoutes configures user routes

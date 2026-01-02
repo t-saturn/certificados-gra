@@ -22,6 +22,7 @@ type App struct {
 	userDetailRepo  repository.UserDetailRepository
 	docTypeRepo     repository.DocumentTypeRepository
 	docCategoryRepo repository.DocumentCategoryRepository
+	docTemplateRepo repository.DocumentTemplateRepository
 	eventRepo       repository.EventRepository
 
 	// Services
@@ -29,6 +30,7 @@ type App struct {
 	userDetailService  *service.UserDetailService
 	docTypeService     *service.DocumentTypeService
 	docCategoryService *service.DocumentCategoryService
+	docTemplateService *service.DocumentTemplateService
 	eventService       *service.EventService
 
 	// Handlers
@@ -37,6 +39,7 @@ type App struct {
 	userDetailHandler  *handler.UserDetailHandler
 	docTypeHandler     *handler.DocumentTypeHandler
 	docCategoryHandler *handler.DocumentCategoryHandler
+	docTemplateHandler *handler.DocumentTemplateHandler
 	eventHandler       *handler.EventHandler
 
 	// Fiber app
@@ -72,6 +75,7 @@ func (a *App) initRepositories() {
 	a.userDetailRepo = repository.NewUserDetailRepository(a.db)
 	a.docTypeRepo = repository.NewDocumentTypeRepository(a.db)
 	a.docCategoryRepo = repository.NewDocumentCategoryRepository(a.db)
+	a.docTemplateRepo = repository.NewDocumentTemplateRepository(a.db)
 	a.eventRepo = repository.NewEventRepository(a.db)
 }
 
@@ -81,6 +85,7 @@ func (a *App) initServices() {
 	a.userDetailService = service.NewUserDetailService(a.userDetailRepo)
 	a.docTypeService = service.NewDocumentTypeService(a.docTypeRepo)
 	a.docCategoryService = service.NewDocumentCategoryService(a.docCategoryRepo)
+	a.docTemplateService = service.NewDocumentTemplateService(a.docTemplateRepo)
 	a.eventService = service.NewEventService(a.eventRepo)
 }
 
@@ -91,6 +96,7 @@ func (a *App) initHandlers() {
 	a.userDetailHandler = handler.NewUserDetailHandler(a.userDetailService)
 	a.docTypeHandler = handler.NewDocumentTypeHandler(a.docTypeService)
 	a.docCategoryHandler = handler.NewDocumentCategoryHandler(a.docCategoryService)
+	a.docTemplateHandler = handler.NewDocumentTemplateHandler(a.docTemplateService)
 	a.eventHandler = handler.NewEventHandler(a.eventService)
 }
 
@@ -102,6 +108,7 @@ func (a *App) initRouter() {
 		UserDetailHandler:       a.userDetailHandler,
 		DocumentTypeHandler:     a.docTypeHandler,
 		DocumentCategoryHandler: a.docCategoryHandler,
+		DocumentTemplateHandler: a.docTemplateHandler,
 		EventHandler:            a.eventHandler,
 	})
 	a.fiber = router.Setup()
