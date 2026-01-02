@@ -8,11 +8,12 @@ import (
 
 // DXRouter handles DX (Document Exchange) related routes
 type DXRouter struct {
-	healthHandler       *handler.HealthHandler
-	userHandler         *handler.UserHandler
-	userDetailHandler   *handler.UserDetailHandler
-	documentTypeHandler *handler.DocumentTypeHandler
-	eventHandler        *handler.EventHandler
+	healthHandler           *handler.HealthHandler
+	userHandler             *handler.UserHandler
+	userDetailHandler       *handler.UserDetailHandler
+	documentTypeHandler     *handler.DocumentTypeHandler
+	documentCategoryHandler *handler.DocumentCategoryHandler
+	eventHandler            *handler.EventHandler
 }
 
 // NewDXRouter creates a new DXRouter instance
@@ -21,14 +22,16 @@ func NewDXRouter(
 	userHandler *handler.UserHandler,
 	userDetailHandler *handler.UserDetailHandler,
 	documentTypeHandler *handler.DocumentTypeHandler,
+	documentCategoryHandler *handler.DocumentCategoryHandler,
 	eventHandler *handler.EventHandler,
 ) *DXRouter {
 	return &DXRouter{
-		healthHandler:       healthHandler,
-		userHandler:         userHandler,
-		userDetailHandler:   userDetailHandler,
-		documentTypeHandler: documentTypeHandler,
-		eventHandler:        eventHandler,
+		healthHandler:           healthHandler,
+		userHandler:             userHandler,
+		userDetailHandler:       userDetailHandler,
+		documentTypeHandler:     documentTypeHandler,
+		documentCategoryHandler: documentCategoryHandler,
+		eventHandler:            eventHandler,
 	}
 }
 
@@ -43,6 +46,7 @@ func (r *DXRouter) SetupRoutes(api fiber.Router) {
 	r.setupUserRoutes(api)
 	r.setupUserDetailRoutes(api)
 	r.setupDocumentTypeRoutes(api)
+	r.setupDocumentCategoryRoutes(api)
 	r.setupEventRoutes(api)
 }
 
@@ -56,6 +60,17 @@ func (r *DXRouter) setupDocumentTypeRoutes(api fiber.Router) {
 	docTypes.Post("/", r.documentTypeHandler.Create)
 	docTypes.Put("/:id", r.documentTypeHandler.Update)
 	docTypes.Delete("/:id", r.documentTypeHandler.Delete)
+}
+
+// setupDocumentCategoryRoutes configures document category routes
+func (r *DXRouter) setupDocumentCategoryRoutes(api fiber.Router) {
+	categories := api.Group("/document-categories")
+	categories.Get("/", r.documentCategoryHandler.GetAll)
+	categories.Get("/:id", r.documentCategoryHandler.GetByID)
+	categories.Get("/document-type/:documentTypeId", r.documentCategoryHandler.GetByDocumentTypeID)
+	categories.Post("/", r.documentCategoryHandler.Create)
+	categories.Put("/:id", r.documentCategoryHandler.Update)
+	categories.Delete("/:id", r.documentCategoryHandler.Delete)
 }
 
 // setupUserRoutes configures user routes

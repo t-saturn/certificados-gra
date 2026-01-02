@@ -18,23 +18,26 @@ type App struct {
 	nats  *nats.Conn
 
 	// Repositories
-	userRepo       repository.UserRepository
-	userDetailRepo repository.UserDetailRepository
-	docTypeRepo    repository.DocumentTypeRepository
-	eventRepo      repository.EventRepository
+	userRepo        repository.UserRepository
+	userDetailRepo  repository.UserDetailRepository
+	docTypeRepo     repository.DocumentTypeRepository
+	docCategoryRepo repository.DocumentCategoryRepository
+	eventRepo       repository.EventRepository
 
 	// Services
-	userService       *service.UserService
-	userDetailService *service.UserDetailService
-	docTypeService    *service.DocumentTypeService
-	eventService      *service.EventService
+	userService        *service.UserService
+	userDetailService  *service.UserDetailService
+	docTypeService     *service.DocumentTypeService
+	docCategoryService *service.DocumentCategoryService
+	eventService       *service.EventService
 
 	// Handlers
-	healthHandler     *handler.HealthHandler
-	userHandler       *handler.UserHandler
-	userDetailHandler *handler.UserDetailHandler
-	docTypeHandler    *handler.DocumentTypeHandler
-	eventHandler      *handler.EventHandler
+	healthHandler      *handler.HealthHandler
+	userHandler        *handler.UserHandler
+	userDetailHandler  *handler.UserDetailHandler
+	docTypeHandler     *handler.DocumentTypeHandler
+	docCategoryHandler *handler.DocumentCategoryHandler
+	eventHandler       *handler.EventHandler
 
 	// Fiber app
 	fiber *fiber.App
@@ -68,6 +71,7 @@ func (a *App) initRepositories() {
 	a.userRepo = repository.NewUserRepository(a.db)
 	a.userDetailRepo = repository.NewUserDetailRepository(a.db)
 	a.docTypeRepo = repository.NewDocumentTypeRepository(a.db)
+	a.docCategoryRepo = repository.NewDocumentCategoryRepository(a.db)
 	a.eventRepo = repository.NewEventRepository(a.db)
 }
 
@@ -76,6 +80,7 @@ func (a *App) initServices() {
 	a.userService = service.NewUserService(a.userRepo)
 	a.userDetailService = service.NewUserDetailService(a.userDetailRepo)
 	a.docTypeService = service.NewDocumentTypeService(a.docTypeRepo)
+	a.docCategoryService = service.NewDocumentCategoryService(a.docCategoryRepo)
 	a.eventService = service.NewEventService(a.eventRepo)
 }
 
@@ -85,17 +90,19 @@ func (a *App) initHandlers() {
 	a.userHandler = handler.NewUserHandler(a.userService)
 	a.userDetailHandler = handler.NewUserDetailHandler(a.userDetailService)
 	a.docTypeHandler = handler.NewDocumentTypeHandler(a.docTypeService)
+	a.docCategoryHandler = handler.NewDocumentCategoryHandler(a.docCategoryService)
 	a.eventHandler = handler.NewEventHandler(a.eventService)
 }
 
 // initRouter initializes the Fiber router
 func (a *App) initRouter() {
 	router := NewRouter(RouterConfig{
-		HealthHandler:       a.healthHandler,
-		UserHandler:         a.userHandler,
-		UserDetailHandler:   a.userDetailHandler,
-		DocumentTypeHandler: a.docTypeHandler,
-		EventHandler:        a.eventHandler,
+		HealthHandler:           a.healthHandler,
+		UserHandler:             a.userHandler,
+		UserDetailHandler:       a.userDetailHandler,
+		DocumentTypeHandler:     a.docTypeHandler,
+		DocumentCategoryHandler: a.docCategoryHandler,
+		EventHandler:            a.eventHandler,
 	})
 	a.fiber = router.Setup()
 }
