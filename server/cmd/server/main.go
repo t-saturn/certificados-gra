@@ -12,6 +12,7 @@ import (
 
 	"server/internal/config"
 	"server/internal/handler"
+	"server/internal/middleware"
 	"server/internal/repository"
 	"server/internal/router"
 	"server/internal/service"
@@ -32,6 +33,26 @@ func main() {
 		Str("environment", cfg.Server.Environment).
 		Str("version", cfg.Server.Version).
 		Msg("Starting cert-server")
+
+	// Validate Keycloak configuration (required)
+	if !cfg.IsKeycloakConfigured() {
+		log.Fatal().
+			Str("KEYCLOAK_SSO_URL", cfg.Keycloak.SSOURL).
+			Str("KEYCLOAK_REALM", cfg.Keycloak.Realm).
+			Msg("Keycloak configuration is required. Please set KEYCLOAK_SSO_URL and KEYCLOAK_REALM environment variables")
+	}
+
+	// Initialize Keycloak middleware (required)
+	err = middleware.InitKeycloakMiddleware(middleware.KeycloakConfig{
+		SSOURL: cfg.Keycloak.SSOURL,
+		Realm:  cfg.Keycloak.Realm,
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize Keycloak authentication")
+	}
+	log.Info().
+		Str("realm", cfg.Keycloak.Realm).
+		Msg("Keycloak authentication initialized")
 
 	// Initialize PostgreSQL
 	db, err := config.NewPostgresDB(cfg.Database)
@@ -81,7 +102,7 @@ func main() {
 		healthHandler = handler.NewHealthHandler(db, nil, nil)
 	}
 
-	// Initialize router
+	// Initialize router (auth always enabled)
 	r := router.NewRouter(healthHandler, docTypeHandler, userHandler)
 	app := r.Setup()
 
@@ -89,7 +110,7 @@ func main() {
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 
 	go func() {
-		log.Info().Str("addr", addr).Msg("Server starting")
+		log.Info().Str("addr", addr).Msg("Server starting (authentication enabled)")
 		if err := app.Listen(addr); err != nil {
 			log.Fatal().Err(err).Msg("Server failed to start")
 		}
@@ -105,7 +126,7 @@ func main() {
 	_, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Shutdown Fiber (v3 uses Shutdown instead of ShutdownWithContext)
+	// Shutdown Fiber
 	if err := app.Shutdown(); err != nil {
 		log.Error().Err(err).Msg("Server shutdown error")
 	}

@@ -2,7 +2,6 @@ package router
 
 import (
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 
@@ -37,15 +36,18 @@ func (r *Router) Setup() *fiber.App {
 	// Global middleware
 	app.Use(recover.New())
 	app.Use(requestid.New())
-	app.Use(cors.New())
+	app.Use(middleware.CORS())
 	app.Use(middleware.Logger())
 
-	// Health routes
+	// Health routes (public - no auth required)
 	app.Get("/health", r.healthHandler.Health)
 	app.Get("/ready", r.healthHandler.Ready)
 
-	// API v1 routes
+	// API v1 routes (protected)
 	api := app.Group("/api/v1")
+
+	// Apply authentication middleware to all API routes
+	api.Use(middleware.KeycloakAuth())
 
 	// Document types
 	docTypes := api.Group("/document-types")
