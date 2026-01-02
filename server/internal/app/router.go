@@ -11,39 +11,22 @@ import (
 
 // Router handles HTTP routing
 type Router struct {
-	app *fiber.App
-
-	// Sub-routers
+	app      *fiber.App
 	dxRouter *DXRouter
-	// fnRouter *FNRouter // Future: add fn_router here
+	// fnRouter *FNRouter // Future
 }
 
-// RouterConfig holds all handlers needed for routing
+// RouterConfig holds handler groups for each module
 type RouterConfig struct {
-	HealthHandler       *handler.HealthHandler
-	UserHandler         *handler.UserHandler
-	UserDetailHandler   *handler.UserDetailHandler
-	DocumentTypeHandler *handler.DocumentTypeHandler
-	DocumentCategoryHandler *handler.DocumentCategoryHandler
-	DocumentTemplateHandler *handler.DocumentTemplateHandler
-	EventHandler        *handler.EventHandler
-	EventParticipantHandler *handler.EventParticipantHandler
+	DX *DXHandlers
+	// FN *FNHandlers // Future
 }
 
 // NewRouter creates a new Router instance
 func NewRouter(cfg RouterConfig) *Router {
 	return &Router{
-		dxRouter: NewDXRouter(
-			cfg.HealthHandler,
-			cfg.UserHandler,
-			cfg.UserDetailHandler,
-			cfg.DocumentTypeHandler,
-			cfg.DocumentCategoryHandler,
-			cfg.DocumentTemplateHandler,
-			cfg.EventHandler,
-			cfg.EventParticipantHandler,
-		),
-		// fnRouter: NewFNRouter(...), // Future
+		dxRouter: NewDXRouter(cfg.DX),
+		// fnRouter: NewFNRouter(cfg.FN), // Future
 	}
 }
 

@@ -29,6 +29,7 @@ func (r *documentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		Preload("UserDetail").
 		Preload("Event").
 		Preload("Template").
+		Preload("CreatedByUser").
 		Preload("PDFs").
 		First(&doc, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -42,6 +43,7 @@ func (r *documentRepository) GetBySerialCode(ctx context.Context, serialCode str
 	err := r.db.WithContext(ctx).
 		Preload("UserDetail").
 		Preload("Event").
+		Preload("Template").
 		First(&doc, "serial_code = ?", serialCode).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -54,6 +56,7 @@ func (r *documentRepository) GetByVerificationCode(ctx context.Context, verifica
 	err := r.db.WithContext(ctx).
 		Preload("UserDetail").
 		Preload("Event").
+		Preload("Template").
 		First(&doc, "verification_code = ?", verificationCode).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -65,6 +68,7 @@ func (r *documentRepository) GetByEventID(ctx context.Context, eventID uuid.UUID
 	var docs []models.Document
 	err := r.db.WithContext(ctx).
 		Preload("UserDetail").
+		Preload("Template").
 		Where("event_id = ?", eventID).
 		Order("created_at DESC").
 		Find(&docs).Error
@@ -87,6 +91,7 @@ func (r *documentRepository) GetAll(ctx context.Context, limit, offset int) ([]m
 	err := r.db.WithContext(ctx).
 		Preload("UserDetail").
 		Preload("Event").
+		Preload("Template").
 		Limit(limit).
 		Offset(offset).
 		Order("created_at DESC").

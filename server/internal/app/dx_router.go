@@ -6,45 +6,33 @@ import (
 	"server/internal/handler"
 )
 
+// DXHandlers groups all handlers for the DX (Document Exchange) module
+type DXHandlers struct {
+	Health           *handler.HealthHandler
+	User             *handler.UserHandler
+	UserDetail       *handler.UserDetailHandler
+	DocumentType     *handler.DocumentTypeHandler
+	DocumentCategory *handler.DocumentCategoryHandler
+	DocumentTemplate *handler.DocumentTemplateHandler
+	Document         *handler.DocumentHandler
+	Event            *handler.EventHandler
+	EventParticipant *handler.EventParticipantHandler
+}
+
 // DXRouter handles DX (Document Exchange) related routes
 type DXRouter struct {
-	healthHandler           *handler.HealthHandler
-	userHandler             *handler.UserHandler
-	userDetailHandler       *handler.UserDetailHandler
-	documentTypeHandler     *handler.DocumentTypeHandler
-	documentCategoryHandler *handler.DocumentCategoryHandler
-	documentTemplateHandler *handler.DocumentTemplateHandler
-	eventHandler            *handler.EventHandler
-	eventParticipantHandler *handler.EventParticipantHandler
+	h *DXHandlers
 }
 
 // NewDXRouter creates a new DXRouter instance
-func NewDXRouter(
-	healthHandler *handler.HealthHandler,
-	userHandler *handler.UserHandler,
-	userDetailHandler *handler.UserDetailHandler,
-	documentTypeHandler *handler.DocumentTypeHandler,
-	documentCategoryHandler *handler.DocumentCategoryHandler,
-	documentTemplateHandler *handler.DocumentTemplateHandler,
-	eventHandler *handler.EventHandler,
-	eventParticipantHandler *handler.EventParticipantHandler,
-) *DXRouter {
-	return &DXRouter{
-		healthHandler:           healthHandler,
-		userHandler:             userHandler,
-		userDetailHandler:       userDetailHandler,
-		documentTypeHandler:     documentTypeHandler,
-		documentCategoryHandler: documentCategoryHandler,
-		documentTemplateHandler: documentTemplateHandler,
-		eventHandler:            eventHandler,
-		eventParticipantHandler: eventParticipantHandler,
-	}
+func NewDXRouter(handlers *DXHandlers) *DXRouter {
+	return &DXRouter{h: handlers}
 }
 
 // SetupHealthRoutes configures health check routes (public)
 func (r *DXRouter) SetupHealthRoutes(app *fiber.App) {
-	app.Get("/health", r.healthHandler.Health)
-	app.Get("/ready", r.healthHandler.Ready)
+	app.Get("/health", r.h.Health.Health)
+	app.Get("/ready", r.h.Health.Ready)
 }
 
 // SetupRoutes configures all DX routes (protected)
@@ -54,87 +42,102 @@ func (r *DXRouter) SetupRoutes(api fiber.Router) {
 	r.setupDocumentTypeRoutes(api)
 	r.setupDocumentCategoryRoutes(api)
 	r.setupDocumentTemplateRoutes(api)
+	r.setupDocumentRoutes(api)
 	r.setupEventRoutes(api)
 	r.setupEventParticipantRoutes(api)
 }
 
-// setupDocumentTypeRoutes configures document type routes
-func (r *DXRouter) setupDocumentTypeRoutes(api fiber.Router) {
-	docTypes := api.Group("/document-types")
-	docTypes.Get("/", r.documentTypeHandler.GetAll)
-	docTypes.Get("/active", r.documentTypeHandler.GetActive)
-	docTypes.Get("/:id", r.documentTypeHandler.GetByID)
-	docTypes.Get("/code/:code", r.documentTypeHandler.GetByCode)
-	docTypes.Post("/", r.documentTypeHandler.Create)
-	docTypes.Put("/:id", r.documentTypeHandler.Update)
-	docTypes.Delete("/:id", r.documentTypeHandler.Delete)
-}
-
-// setupDocumentCategoryRoutes configures document category routes
-func (r *DXRouter) setupDocumentCategoryRoutes(api fiber.Router) {
-	categories := api.Group("/document-categories")
-	categories.Get("/", r.documentCategoryHandler.GetAll)
-	categories.Get("/:id", r.documentCategoryHandler.GetByID)
-	categories.Get("/document-type/:documentTypeId", r.documentCategoryHandler.GetByDocumentTypeID)
-	categories.Post("/", r.documentCategoryHandler.Create)
-	categories.Put("/:id", r.documentCategoryHandler.Update)
-	categories.Delete("/:id", r.documentCategoryHandler.Delete)
-}
-
-// setupDocumentTemplateRoutes configures document template routes
-func (r *DXRouter) setupDocumentTemplateRoutes(api fiber.Router) {
-	templates := api.Group("/document-templates")
-	templates.Get("/", r.documentTemplateHandler.GetAll)
-	templates.Get("/active", r.documentTemplateHandler.GetActive)
-	templates.Get("/:id", r.documentTemplateHandler.GetByID)
-	templates.Get("/document-type/:documentTypeId", r.documentTemplateHandler.GetByDocumentTypeID)
-	templates.Post("/", r.documentTemplateHandler.Create)
-	templates.Put("/:id", r.documentTemplateHandler.Update)
-	templates.Delete("/:id", r.documentTemplateHandler.Delete)
-}
-
 // setupUserRoutes configures user routes
 func (r *DXRouter) setupUserRoutes(api fiber.Router) {
-	users := api.Group("/users")
-	users.Get("/", r.userHandler.GetAll)
-	users.Get("/:id", r.userHandler.GetByID)
-	users.Post("/", r.userHandler.Create)
-	users.Put("/:id", r.userHandler.Update)
-	users.Delete("/:id", r.userHandler.Delete)
+	g := api.Group("/users")
+	g.Get("/", r.h.User.GetAll)
+	g.Get("/:id", r.h.User.GetByID)
+	g.Post("/", r.h.User.Create)
+	g.Put("/:id", r.h.User.Update)
+	g.Delete("/:id", r.h.User.Delete)
 }
 
 // setupUserDetailRoutes configures user detail routes (beneficiaries)
 func (r *DXRouter) setupUserDetailRoutes(api fiber.Router) {
-	details := api.Group("/user-details")
-	details.Get("/", r.userDetailHandler.GetAll)
-	details.Get("/:id", r.userDetailHandler.GetByID)
-	details.Get("/dni/:nationalId", r.userDetailHandler.GetByNationalID)
-	details.Post("/", r.userDetailHandler.Create)
-	details.Put("/:id", r.userDetailHandler.Update)
-	details.Delete("/:id", r.userDetailHandler.Delete)
+	g := api.Group("/user-details")
+	g.Get("/", r.h.UserDetail.GetAll)
+	g.Get("/:id", r.h.UserDetail.GetByID)
+	g.Get("/dni/:nationalId", r.h.UserDetail.GetByNationalID)
+	g.Post("/", r.h.UserDetail.Create)
+	g.Put("/:id", r.h.UserDetail.Update)
+	g.Delete("/:id", r.h.UserDetail.Delete)
+}
+
+// setupDocumentTypeRoutes configures document type routes
+func (r *DXRouter) setupDocumentTypeRoutes(api fiber.Router) {
+	g := api.Group("/document-types")
+	g.Get("/", r.h.DocumentType.GetAll)
+	g.Get("/active", r.h.DocumentType.GetActive)
+	g.Get("/:id", r.h.DocumentType.GetByID)
+	g.Get("/code/:code", r.h.DocumentType.GetByCode)
+	g.Post("/", r.h.DocumentType.Create)
+	g.Put("/:id", r.h.DocumentType.Update)
+	g.Delete("/:id", r.h.DocumentType.Delete)
+}
+
+// setupDocumentCategoryRoutes configures document category routes
+func (r *DXRouter) setupDocumentCategoryRoutes(api fiber.Router) {
+	g := api.Group("/document-categories")
+	g.Get("/", r.h.DocumentCategory.GetAll)
+	g.Get("/:id", r.h.DocumentCategory.GetByID)
+	g.Get("/document-type/:documentTypeId", r.h.DocumentCategory.GetByDocumentTypeID)
+	g.Post("/", r.h.DocumentCategory.Create)
+	g.Put("/:id", r.h.DocumentCategory.Update)
+	g.Delete("/:id", r.h.DocumentCategory.Delete)
+}
+
+// setupDocumentTemplateRoutes configures document template routes
+func (r *DXRouter) setupDocumentTemplateRoutes(api fiber.Router) {
+	g := api.Group("/document-templates")
+	g.Get("/", r.h.DocumentTemplate.GetAll)
+	g.Get("/active", r.h.DocumentTemplate.GetActive)
+	g.Get("/:id", r.h.DocumentTemplate.GetByID)
+	g.Get("/document-type/:documentTypeId", r.h.DocumentTemplate.GetByDocumentTypeID)
+	g.Post("/", r.h.DocumentTemplate.Create)
+	g.Put("/:id", r.h.DocumentTemplate.Update)
+	g.Delete("/:id", r.h.DocumentTemplate.Delete)
+}
+
+// setupDocumentRoutes configures document routes
+func (r *DXRouter) setupDocumentRoutes(api fiber.Router) {
+	g := api.Group("/documents")
+	g.Get("/", r.h.Document.GetAll)
+	g.Get("/:id", r.h.Document.GetByID)
+	g.Get("/serial/:serialCode", r.h.Document.GetBySerialCode)
+	g.Get("/verify/:verificationCode", r.h.Document.GetByVerificationCode)
+	g.Get("/event/:eventId", r.h.Document.GetByEventID)
+	g.Get("/user-detail/:userDetailId", r.h.Document.GetByUserDetailID)
+	g.Post("/", r.h.Document.Create)
+	g.Put("/:id", r.h.Document.Update)
+	g.Delete("/:id", r.h.Document.Delete)
 }
 
 // setupEventRoutes configures event routes
 func (r *DXRouter) setupEventRoutes(api fiber.Router) {
-	events := api.Group("/events")
-	events.Get("/", r.eventHandler.GetAll)
-	events.Get("/public", r.eventHandler.GetPublic)
-	events.Get("/status/:status", r.eventHandler.GetByStatus)
-	events.Get("/:id", r.eventHandler.GetByID)
-	events.Get("/code/:code", r.eventHandler.GetByCode)
-	events.Post("/", r.eventHandler.Create)
-	events.Put("/:id", r.eventHandler.Update)
-	events.Delete("/:id", r.eventHandler.Delete)
+	g := api.Group("/events")
+	g.Get("/", r.h.Event.GetAll)
+	g.Get("/public", r.h.Event.GetPublic)
+	g.Get("/status/:status", r.h.Event.GetByStatus)
+	g.Get("/:id", r.h.Event.GetByID)
+	g.Get("/code/:code", r.h.Event.GetByCode)
+	g.Post("/", r.h.Event.Create)
+	g.Put("/:id", r.h.Event.Update)
+	g.Delete("/:id", r.h.Event.Delete)
 }
 
 // setupEventParticipantRoutes configures event participant routes
 func (r *DXRouter) setupEventParticipantRoutes(api fiber.Router) {
-	participants := api.Group("/event-participants")
-	participants.Get("/:id", r.eventParticipantHandler.GetByID)
-	participants.Get("/event/:eventId", r.eventParticipantHandler.GetByEventID)
-	participants.Get("/event/:eventId/count", r.eventParticipantHandler.CountByEventID)
-	participants.Get("/user-detail/:userDetailId", r.eventParticipantHandler.GetByUserDetailID)
-	participants.Post("/", r.eventParticipantHandler.Create)
-	participants.Put("/:id", r.eventParticipantHandler.Update)
-	participants.Delete("/:id", r.eventParticipantHandler.Delete)
+	g := api.Group("/event-participants")
+	g.Get("/:id", r.h.EventParticipant.GetByID)
+	g.Get("/event/:eventId", r.h.EventParticipant.GetByEventID)
+	g.Get("/event/:eventId/count", r.h.EventParticipant.CountByEventID)
+	g.Get("/user-detail/:userDetailId", r.h.EventParticipant.GetByUserDetailID)
+	g.Post("/", r.h.EventParticipant.Create)
+	g.Put("/:id", r.h.EventParticipant.Update)
+	g.Delete("/:id", r.h.EventParticipant.Delete)
 }

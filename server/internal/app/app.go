@@ -16,44 +16,14 @@ type App struct {
 	db    *gorm.DB
 	redis *redis.Client
 	nats  *nats.Conn
-
-	// Repositories
-	userRepo             repository.UserRepository
-	userDetailRepo       repository.UserDetailRepository
-	docTypeRepo          repository.DocumentTypeRepository
-	docCategoryRepo      repository.DocumentCategoryRepository
-	docTemplateRepo      repository.DocumentTemplateRepository
-	eventRepo            repository.EventRepository
-	eventParticipantRepo repository.EventParticipantRepository
-
-	// Services
-	userService             *service.UserService
-	userDetailService       *service.UserDetailService
-	docTypeService          *service.DocumentTypeService
-	docCategoryService      *service.DocumentCategoryService
-	docTemplateService      *service.DocumentTemplateService
-	eventService            *service.EventService
-	eventParticipantService *service.EventParticipantService
-
-	// Handlers
-	healthHandler           *handler.HealthHandler
-	userHandler             *handler.UserHandler
-	userDetailHandler       *handler.UserDetailHandler
-	docTypeHandler          *handler.DocumentTypeHandler
-	docCategoryHandler      *handler.DocumentCategoryHandler
-	docTemplateHandler      *handler.DocumentTemplateHandler
-	eventHandler            *handler.EventHandler
-	eventParticipantHandler *handler.EventParticipantHandler
-
-	// Fiber app
 	fiber *fiber.App
 }
 
 // Config holds the connection dependencies
 type Config struct {
 	DB    *gorm.DB
-	Redis *redis.Client // Can be nil if Redis is not available
-	NATS  *nats.Conn    // Can be nil if NATS is not available
+	Redis *redis.Client
+	NATS  *nats.Conn
 }
 
 // New creates a new App instance with all dependencies initialized
@@ -64,61 +34,53 @@ func New(cfg Config) *App {
 		nats:  cfg.NATS,
 	}
 
-	app.initRepositories()
-	app.initServices()
-	app.initHandlers()
 	app.initRouter()
-
 	return app
 }
 
-// initRepositories initializes all repositories
-func (a *App) initRepositories() {
-	a.userRepo = repository.NewUserRepository(a.db)
-	a.userDetailRepo = repository.NewUserDetailRepository(a.db)
-	a.docTypeRepo = repository.NewDocumentTypeRepository(a.db)
-	a.docCategoryRepo = repository.NewDocumentCategoryRepository(a.db)
-	a.docTemplateRepo = repository.NewDocumentTemplateRepository(a.db)
-	a.eventRepo = repository.NewEventRepository(a.db)
-	a.eventParticipantRepo = repository.NewEventParticipantRepository(a.db)
-}
-
-// initServices initializes all services
-func (a *App) initServices() {
-	a.userService = service.NewUserService(a.userRepo)
-	a.userDetailService = service.NewUserDetailService(a.userDetailRepo)
-	a.docTypeService = service.NewDocumentTypeService(a.docTypeRepo)
-	a.docCategoryService = service.NewDocumentCategoryService(a.docCategoryRepo)
-	a.docTemplateService = service.NewDocumentTemplateService(a.docTemplateRepo)
-	a.eventService = service.NewEventService(a.eventRepo)
-	a.eventParticipantService = service.NewEventParticipantService(a.eventParticipantRepo)
-}
-
-// initHandlers initializes all handlers
-func (a *App) initHandlers() {
-	a.healthHandler = handler.NewHealthHandler(a.db, a.redis, a.nats)
-	a.userHandler = handler.NewUserHandler(a.userService)
-	a.userDetailHandler = handler.NewUserDetailHandler(a.userDetailService)
-	a.docTypeHandler = handler.NewDocumentTypeHandler(a.docTypeService)
-	a.docCategoryHandler = handler.NewDocumentCategoryHandler(a.docCategoryService)
-	a.docTemplateHandler = handler.NewDocumentTemplateHandler(a.docTemplateService)
-	a.eventHandler = handler.NewEventHandler(a.eventService)
-	a.eventParticipantHandler = handler.NewEventParticipantHandler(a.eventParticipantService)
-}
-
-// initRouter initializes the Fiber router
+// initRouter initializes the Fiber router with all dependencies
 func (a *App) initRouter() {
 	router := NewRouter(RouterConfig{
-		HealthHandler:           a.healthHandler,
-		UserHandler:             a.userHandler,
-		UserDetailHandler:       a.userDetailHandler,
-		DocumentTypeHandler:     a.docTypeHandler,
-		DocumentCategoryHandler: a.docCategoryHandler,
-		DocumentTemplateHandler: a.docTemplateHandler,
-		EventHandler:            a.eventHandler,
-		EventParticipantHandler: a.eventParticipantHandler,
+		DX: a.buildDXHandlers(),
+		// FN: a.buildFNHandlers(), // Future
 	})
 	a.fiber = router.Setup()
+}
+
+// buildDXHandlers creates all DX module handlers with their dependencies
+func (a *App) buildDXHandlers() *DXHandlers {
+	// Repositories
+	userRepo := repository.NewUserRepository(a.db)
+	userDetailRepo := repository.NewUserDetailRepository(a.db)
+	docTypeRepo := repository.NewDocumentTypeRepository(a.db)
+	docCategoryRepo := repository.NewDocumentCategoryRepository(a.db)
+	docTemplateRepo := repository.NewDocumentTemplateRepository(a.db)
+	documentRepo := repository.NewDocumentRepository(a.db)
+	eventRepo := repository.NewEventRepository(a.db)
+	eventParticipantRepo := repository.NewEventParticipantRepository(a.db)
+
+	// Services
+	userSvc := service.NewUserService(userRepo)
+	userDetailSvc := service.NewUserDetailService(userDetailRepo)
+	docTypeSvc := service.NewDocumentTypeService(docTypeRepo)
+	docCategorySvc := service.NewDocumentCategoryService(docCategoryRepo)
+	docTemplateSvc := service.NewDocumentTemplateService(docTemplateRepo)
+	documentSvc := service.NewDocumentService(documentRepo)
+	eventSvc := service.NewEventService(eventRepo)
+	eventParticipantSvc := service.NewEventParticipantService(eventParticipantRepo)
+
+	// Return handlers
+	return &DXHandlers{
+		Health:           handler.NewHealthHandler(a.db, a.redis, a.nats),
+		User:             handler.NewUserHandler(userSvc),
+		UserDetail:       handler.NewUserDetailHandler(userDetailSvc),
+		DocumentType:     handler.NewDocumentTypeHandler(docTypeSvc),
+		DocumentCategory: handler.NewDocumentCategoryHandler(docCategorySvc),
+		DocumentTemplate: handler.NewDocumentTemplateHandler(docTemplateSvc),
+		Document:         handler.NewDocumentHandler(documentSvc),
+		Event:            handler.NewEventHandler(eventSvc),
+		EventParticipant: handler.NewEventParticipantHandler(eventParticipantSvc),
+	}
 }
 
 // Fiber returns the Fiber app instance
@@ -128,27 +90,22 @@ func (a *App) Fiber() *fiber.App {
 
 // Shutdown gracefully shuts down all connections
 func (a *App) Shutdown() error {
-	// Shutdown Fiber
 	if a.fiber != nil {
 		if err := a.fiber.Shutdown(); err != nil {
 			return err
 		}
 	}
 
-	// Close NATS
 	if a.nats != nil {
 		a.nats.Close()
 	}
 
-	// Close Redis
 	if a.redis != nil {
 		_ = a.redis.Close()
 	}
 
-	// Close PostgreSQL
 	if a.db != nil {
-		sqlDB, _ := a.db.DB()
-		if sqlDB != nil {
+		if sqlDB, err := a.db.DB(); err == nil && sqlDB != nil {
 			_ = sqlDB.Close()
 		}
 	}
