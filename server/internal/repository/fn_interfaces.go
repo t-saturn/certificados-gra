@@ -60,3 +60,31 @@ type FNUserDetailRepository interface {
 	GetByNationalID(ctx context.Context, nationalID string) (*models.UserDetail, error)
 	Create(ctx context.Context, userDetail *models.UserDetail) error
 }
+
+// -- fn document repository
+
+// FNDocumentRepository defines the interface for document data access
+type FNDocumentRepository interface {
+	Create(ctx context.Context, doc *models.Document) error
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Document, error)
+	GetBySerialCode(ctx context.Context, serialCode string) (*models.Document, error)
+	GetByEventAndUserDetail(ctx context.Context, eventID, userDetailID uuid.UUID) (*models.Document, error)
+	List(ctx context.Context, params dto.DocumentListQuery) ([]models.Document, int64, error)
+	Update(ctx context.Context, doc *models.Document) error
+	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdatePDFJobID(ctx context.Context, id uuid.UUID, pdfJobID uuid.UUID) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetNextSerialNumber(ctx context.Context, prefix string) (int64, error)
+	GetDocumentsByPDFJobID(ctx context.Context, pdfJobID uuid.UUID) ([]models.Document, error)
+	GetDocumentByUserIDAndPDFJobID(ctx context.Context, userDetailID, pdfJobID uuid.UUID) (*models.Document, error)
+	BulkUpdateStatus(ctx context.Context, ids []uuid.UUID, status string) error
+}
+
+// -- fn document pdf repository
+
+// FNDocumentPDFRepository defines the interface for document pdf data access
+type FNDocumentPDFRepository interface {
+	Create(ctx context.Context, pdf *models.DocumentPDF) error
+	GetByDocumentID(ctx context.Context, documentID uuid.UUID) ([]models.DocumentPDF, error)
+	GetLatestByDocumentID(ctx context.Context, documentID uuid.UUID) (*models.DocumentPDF, error)
+}

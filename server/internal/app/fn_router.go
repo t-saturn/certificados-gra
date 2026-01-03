@@ -10,6 +10,7 @@ import (
 type FNHandlers struct {
 	DocumentTemplate *handler.FNDocumentTemplateHandler
 	Event            *handler.FNEventHandler
+	DocumentAction   *handler.FNDocumentActionHandler
 }
 
 // FNRouter handles FN (Functional) related routes
@@ -28,9 +29,9 @@ func (r *FNRouter) SetupRoutes(api fiber.Router) {
 
 	r.setupDocumentTemplateRoutes(fn)
 	r.setupEventRoutes(fn)
+	r.setupDocumentRoutes(fn)
 }
 
-// setupDocumentTemplateRoutes configures document template routes with nested data
 func (r *FNRouter) setupDocumentTemplateRoutes(fn fiber.Router) {
 	g := fn.Group("/document-templates")
 
@@ -44,7 +45,6 @@ func (r *FNRouter) setupDocumentTemplateRoutes(fn fiber.Router) {
 	g.Delete("/:id", r.h.DocumentTemplate.Delete)
 }
 
-// setupEventRoutes configures event routes with nested data
 func (r *FNRouter) setupEventRoutes(fn fiber.Router) {
 	g := fn.Group("/events")
 
@@ -54,4 +54,13 @@ func (r *FNRouter) setupEventRoutes(fn fiber.Router) {
 	g.Post("/", r.h.Event.Create)
 	g.Put("/:id", r.h.Event.Update)
 	g.Delete("/:id", r.h.Event.Delete)
+}
+
+func (r *FNRouter) setupDocumentRoutes(fn fiber.Router) {
+	g := fn.Group("/documents")
+
+	g.Get("/", r.h.DocumentAction.List)
+	g.Get("/:id", r.h.DocumentAction.GetByID)
+	g.Get("/serial/:serial_code", r.h.DocumentAction.GetBySerialCode)
+	g.Post("/actions", r.h.DocumentAction.ExecuteAction)
 }

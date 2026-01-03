@@ -1,21 +1,26 @@
 package app
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 
 	"server/internal/handler"
 	"server/internal/repository"
 	"server/internal/service"
+	"server/internal/worker"
 )
 
 type App struct {
-	db    *gorm.DB
-	redis *redis.Client
-	nats  *nats.Conn
-	fiber *fiber.App
+	db        *gorm.DB
+	redis     *redis.Client
+	nats      *nats.Conn
+	fiber     *fiber.App
+	pdfWorker *worker.FNPDFWorker
 }
 
 type Config struct {
@@ -32,6 +37,8 @@ func New(cfg Config) *App {
 	}
 
 	app.initRouter()
+	app.initWorkers()
+
 	return app
 }
 
@@ -43,7 +50,38 @@ func (a *App) initRouter() {
 	a.fiber = router.Setup()
 }
 
+func (a *App) initWorkers() {
+	// build fn services for workers
+	fnDocRepo := repository.NewFNDocumentRepository(a.db)
+	fnDocPDFRepo := repository.NewFNDocumentPDFRepository(a.db)
+	fnEventRepo := repository.NewFNEventRepository(a.db)
+	fnUserDetailRepo := repository.NewFNUserDetailRepository(a.db)
+
+	fnDocActionSvc := service.NewFNDocumentActionService(
+		fnDocRepo,
+		fnDocPDFRepo,
+		fnEventRepo,
+		fnUserDetailRepo,
+		a.nats,
+	)
+
+	// create and store pdf worker
+	a.pdfWorker = worker.NewFNPDFWorker(a.nats, fnDocActionSvc)
+}
+
+func (a *App) StartWorkers(ctx context.Context) error {
+	if a.pdfWorker != nil {
+		if err := a.pdfWorker.Start(ctx); err != nil {
+			log.Error().Err(err).Msg("failed to start PDF worker")
+			return err
+		}
+		log.Info().Msg("PDF worker started successfully")
+	}
+	return nil
+}
+
 func (a *App) buildDXHandlers() *DXHandlers {
+	// dx repositories
 	userRepo := repository.NewUserRepository(a.db)
 	userDetailRepo := repository.NewUserDetailRepository(a.db)
 	docTypeRepo := repository.NewDocumentTypeRepository(a.db)
@@ -56,6 +94,7 @@ func (a *App) buildDXHandlers() *DXHandlers {
 	evaluationRepo := repository.NewEvaluationRepository(a.db)
 	studyMaterialRepo := repository.NewStudyMaterialRepository(a.db)
 
+	// dx services
 	userSvc := service.NewUserService(userRepo)
 	userDetailSvc := service.NewUserDetailService(userDetailRepo)
 	docTypeSvc := service.NewDocumentTypeService(docTypeRepo)
@@ -89,14 +128,24 @@ func (a *App) buildFNHandlers() *FNHandlers {
 	fnDocTemplateRepo := repository.NewFNDocumentTemplateRepository(a.db)
 	fnEventRepo := repository.NewFNEventRepository(a.db)
 	fnUserDetailRepo := repository.NewFNUserDetailRepository(a.db)
+	fnDocRepo := repository.NewFNDocumentRepository(a.db)
+	fnDocPDFRepo := repository.NewFNDocumentPDFRepository(a.db)
 
 	// fn services
 	fnDocTemplateSvc := service.NewFNDocumentTemplateService(fnDocTemplateRepo)
 	fnEventSvc := service.NewFNEventService(fnEventRepo, fnUserDetailRepo)
+	fnDocActionSvc := service.NewFNDocumentActionService(
+		fnDocRepo,
+		fnDocPDFRepo,
+		fnEventRepo,
+		fnUserDetailRepo,
+		a.nats,
+	)
 
 	return &FNHandlers{
 		DocumentTemplate: handler.NewFNDocumentTemplateHandler(fnDocTemplateSvc),
 		Event:            handler.NewFNEventHandler(fnEventSvc),
+		DocumentAction:   handler.NewFNDocumentActionHandler(fnDocActionSvc),
 	}
 }
 
