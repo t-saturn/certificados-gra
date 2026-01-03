@@ -42,7 +42,7 @@ func New(cfg Config) *App {
 func (a *App) initRouter() {
 	router := NewRouter(RouterConfig{
 		DX: a.buildDXHandlers(),
-		// FN: a.buildFNHandlers(), // Future
+		FN: a.buildFNHandlers(),
 	})
 	a.fiber = router.Setup()
 }
@@ -89,6 +89,20 @@ func (a *App) buildDXHandlers() *DXHandlers {
 		Notification:     handler.NewNotificationHandler(notificationSvc),
 		Evaluation:       handler.NewEvaluationHandler(evaluationSvc),
 		StudyMaterial:    handler.NewStudyMaterialHandler(studyMaterialSvc),
+	}
+}
+
+// buildFNHandlers creates all FN module handlers with their dependencies
+func (a *App) buildFNHandlers() *FNHandlers {
+	// Repositories (FN uses enriched repositories with nested data)
+	fnDocTemplateRepo := repository.NewFNDocumentTemplateRepository(a.db)
+
+	// Services
+	fnDocTemplateSvc := service.NewFNDocumentTemplateService(fnDocTemplateRepo)
+
+	// Return handlers
+	return &FNHandlers{
+		DocumentTemplate: handler.NewFNDocumentTemplateHandler(fnDocTemplateSvc),
 	}
 }
 

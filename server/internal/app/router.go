@@ -13,20 +13,20 @@ import (
 type Router struct {
 	app      *fiber.App
 	dxRouter *DXRouter
-	// fnRouter *FNRouter // Future
+	fnRouter *FNRouter
 }
 
 // RouterConfig holds handler groups for each module
 type RouterConfig struct {
 	DX *DXHandlers
-	// FN *FNHandlers // Future
+	FN *FNHandlers
 }
 
 // NewRouter creates a new Router instance
 func NewRouter(cfg RouterConfig) *Router {
 	return &Router{
 		dxRouter: NewDXRouter(cfg.DX),
-		// fnRouter: NewFNRouter(cfg.FN), // Future
+		fnRouter: NewFNRouter(cfg.FN),
 	}
 }
 
@@ -50,8 +50,8 @@ func (r *Router) Setup() *fiber.App {
 	api.Use(middleware.KeycloakAuth())
 
 	// Setup sub-routers
-	r.dxRouter.SetupRoutes(api)
-	// r.fnRouter.SetupRoutes(api) // Future
+	r.dxRouter.SetupRoutes(api) // DX: Basic CRUD operations
+	r.fnRouter.SetupRoutes(api) // FN: Functional endpoints with nested data
 
 	r.app = app
 	return app
