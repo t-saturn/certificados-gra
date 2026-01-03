@@ -11,7 +11,6 @@ import (
 	"server/internal/service"
 )
 
-// App holds all application dependencies
 type App struct {
 	db    *gorm.DB
 	redis *redis.Client
@@ -19,14 +18,12 @@ type App struct {
 	fiber *fiber.App
 }
 
-// Config holds the connection dependencies
 type Config struct {
 	DB    *gorm.DB
 	Redis *redis.Client
 	NATS  *nats.Conn
 }
 
-// New creates a new App instance with all dependencies initialized
 func New(cfg Config) *App {
 	app := &App{
 		db:    cfg.DB,
@@ -38,7 +35,6 @@ func New(cfg Config) *App {
 	return app
 }
 
-// initRouter initializes the Fiber router with all dependencies
 func (a *App) initRouter() {
 	router := NewRouter(RouterConfig{
 		DX: a.buildDXHandlers(),
@@ -47,9 +43,7 @@ func (a *App) initRouter() {
 	a.fiber = router.Setup()
 }
 
-// buildDXHandlers creates all DX module handlers with their dependencies
 func (a *App) buildDXHandlers() *DXHandlers {
-	// Repositories
 	userRepo := repository.NewUserRepository(a.db)
 	userDetailRepo := repository.NewUserDetailRepository(a.db)
 	docTypeRepo := repository.NewDocumentTypeRepository(a.db)
@@ -62,7 +56,6 @@ func (a *App) buildDXHandlers() *DXHandlers {
 	evaluationRepo := repository.NewEvaluationRepository(a.db)
 	studyMaterialRepo := repository.NewStudyMaterialRepository(a.db)
 
-	// Services
 	userSvc := service.NewUserService(userRepo)
 	userDetailSvc := service.NewUserDetailService(userDetailRepo)
 	docTypeSvc := service.NewDocumentTypeService(docTypeRepo)
@@ -75,7 +68,6 @@ func (a *App) buildDXHandlers() *DXHandlers {
 	evaluationSvc := service.NewEvaluationService(evaluationRepo)
 	studyMaterialSvc := service.NewStudyMaterialService(studyMaterialRepo)
 
-	// Return handlers
 	return &DXHandlers{
 		Health:           handler.NewHealthHandler(a.db, a.redis, a.nats),
 		User:             handler.NewUserHandler(userSvc),
@@ -92,26 +84,26 @@ func (a *App) buildDXHandlers() *DXHandlers {
 	}
 }
 
-// buildFNHandlers creates all FN module handlers with their dependencies
 func (a *App) buildFNHandlers() *FNHandlers {
-	// Repositories (FN uses enriched repositories with nested data)
+	// fn repositories
 	fnDocTemplateRepo := repository.NewFNDocumentTemplateRepository(a.db)
+	fnEventRepo := repository.NewFNEventRepository(a.db)
+	fnUserDetailRepo := repository.NewFNUserDetailRepository(a.db)
 
-	// Services
+	// fn services
 	fnDocTemplateSvc := service.NewFNDocumentTemplateService(fnDocTemplateRepo)
+	fnEventSvc := service.NewFNEventService(fnEventRepo, fnUserDetailRepo)
 
-	// Return handlers
 	return &FNHandlers{
 		DocumentTemplate: handler.NewFNDocumentTemplateHandler(fnDocTemplateSvc),
+		Event:            handler.NewFNEventHandler(fnEventSvc),
 	}
 }
 
-// Fiber returns the Fiber app instance
 func (a *App) Fiber() *fiber.App {
 	return a.fiber
 }
 
-// Shutdown gracefully shuts down all connections
 func (a *App) Shutdown() error {
 	if a.fiber != nil {
 		if err := a.fiber.Shutdown(); err != nil {
