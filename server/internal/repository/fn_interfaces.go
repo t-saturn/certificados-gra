@@ -18,12 +18,23 @@ type FNDocumentTemplateRepository interface {
 	GetByCode(ctx context.Context, code string) (*models.DocumentTemplate, error)
 	List(ctx context.Context, params dto.DocumentTemplateListQuery) ([]models.DocumentTemplate, int64, error)
 	Update(ctx context.Context, template *models.DocumentTemplate) error
-	SetActive(ctx context.Context, id uuid.UUID, active bool) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	SetActive(ctx context.Context, id uuid.UUID, active bool) error
 	ExistsByCode(ctx context.Context, code string) (bool, error)
+	ExistsByCodeExcludingID(ctx context.Context, code string, excludeID uuid.UUID) (bool, error)
 	GetDocumentTypeByCode(ctx context.Context, code string) (*models.DocumentType, error)
 	GetCategoryByCodeAndTypeID(ctx context.Context, code string, typeID uuid.UUID) (*models.DocumentCategory, error)
 	CountFieldsByTemplateID(ctx context.Context, templateID uuid.UUID) (int64, error)
+
+	// field operations
+	CreateField(ctx context.Context, field *models.DocumentTemplateField) error
+	UpdateField(ctx context.Context, field *models.DocumentTemplateField) error
+	DeleteField(ctx context.Context, id uuid.UUID) error
+	GetFieldByID(ctx context.Context, id uuid.UUID) (*models.DocumentTemplateField, error)
+	GetFieldsByTemplateID(ctx context.Context, templateID uuid.UUID) ([]models.DocumentTemplateField, error)
+	DeleteFieldsByTemplateID(ctx context.Context, templateID uuid.UUID) error
+	FieldExistsByKeyAndTemplateID(ctx context.Context, key string, templateID uuid.UUID) (bool, error)
+	FieldExistsByKeyAndTemplateIDExcludingID(ctx context.Context, key string, templateID uuid.UUID, excludeID uuid.UUID) (bool, error)
 }
 
 // -- fn event repository

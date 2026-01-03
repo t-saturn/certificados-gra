@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"math"
 	"strings"
 
 	"github.com/google/uuid"
@@ -29,7 +28,6 @@ func (r *fnDocumentTemplateRepository) Create(ctx context.Context, template *mod
 		}
 
 		if len(fields) > 0 {
-			// Set template ID for all fields
 			for i := range fields {
 				fields[i].TemplateID = template.ID
 			}
@@ -47,7 +45,9 @@ func (r *fnDocumentTemplateRepository) GetByID(ctx context.Context, id uuid.UUID
 	err := r.db.WithContext(ctx).
 		Preload("DocumentType").
 		Preload("Category").
-		Preload("Fields").
+		Preload("Fields", func(db *gorm.DB) *gorm.DB {
+			return db.Order("document_template_fields.created_at ASC")
+		}).
 		Preload("User").
 		First(&template, "id = ?", id).Error
 
@@ -65,7 +65,9 @@ func (r *fnDocumentTemplateRepository) GetByCode(ctx context.Context, code strin
 	err := r.db.WithContext(ctx).
 		Preload("DocumentType").
 		Preload("Category").
-		Preload("Fields").
+		Preload("Fields", func(db *gorm.DB) *gorm.DB {
+			return db.Order("document_template_fields.created_at ASC")
+		}).
 		First(&template, "code = ?", code).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -81,7 +83,6 @@ func (r *fnDocumentTemplateRepository) List(ctx context.Context, params dto.Docu
 	var templates []models.DocumentTemplate
 	var total int64
 
-	// Set defaults
 	page := params.Page
 	if page < 1 {
 		page = 1
@@ -96,7 +97,6 @@ func (r *fnDocumentTemplateRepository) List(ctx context.Context, params dto.Docu
 
 	query := r.db.WithContext(ctx).Model(&models.DocumentTemplate{})
 
-	// Apply filters
 	if params.IsActive != nil {
 		query = query.Where("document_templates.is_active = ?", *params.IsActive)
 	}
@@ -116,7 +116,6 @@ func (r *fnDocumentTemplateRepository) List(ctx context.Context, params dto.Docu
 			Where("dc.code = ?", strings.TrimSpace(*params.TemplateCategoryCode))
 	}
 
-	// Count total
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -125,10 +124,8 @@ func (r *fnDocumentTemplateRepository) List(ctx context.Context, params dto.Docu
 		return []models.DocumentTemplate{}, 0, nil
 	}
 
-	// Calculate offset
 	offset := (page - 1) * pageSize
 
-	// Fetch with preloads
 	err := r.db.WithContext(ctx).
 		Preload("DocumentType").
 		Preload("Category").
@@ -149,6 +146,15 @@ func (r *fnDocumentTemplateRepository) Update(ctx context.Context, template *mod
 	return r.db.WithContext(ctx).Save(template).Error
 }
 
+func (r *fnDocumentTemplateRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("template_id = ?", id).Delete(&models.DocumentTemplateField{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.DocumentTemplate{}, "id = ?", id).Error
+	})
+}
+
 func (r *fnDocumentTemplateRepository) SetActive(ctx context.Context, id uuid.UUID, active bool) error {
 	return r.db.WithContext(ctx).
 		Model(&models.DocumentTemplate{}).
@@ -156,15 +162,20 @@ func (r *fnDocumentTemplateRepository) SetActive(ctx context.Context, id uuid.UU
 		Update("is_active", active).Error
 }
 
-func (r *fnDocumentTemplateRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&models.DocumentTemplate{}, "id = ?", id).Error
-}
-
 func (r *fnDocumentTemplateRepository) ExistsByCode(ctx context.Context, code string) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).
 		Model(&models.DocumentTemplate{}).
 		Where("code = ?", code).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *fnDocumentTemplateRepository) ExistsByCodeExcludingID(ctx context.Context, code string, excludeID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&models.DocumentTemplate{}).
+		Where("code = ? AND id != ?", code, excludeID).
 		Count(&count).Error
 	return count > 0, err
 }
@@ -204,7 +215,59 @@ func (r *fnDocumentTemplateRepository) CountFieldsByTemplateID(ctx context.Conte
 	return count, err
 }
 
-// Helper function for pagination calculation
-func CalculateTotalPages(total int64, pageSize int) int {
-	return int(math.Ceil(float64(total) / float64(pageSize)))
+// -- field operations
+
+func (r *fnDocumentTemplateRepository) CreateField(ctx context.Context, field *models.DocumentTemplateField) error {
+	return r.db.WithContext(ctx).Create(field).Error
+}
+
+func (r *fnDocumentTemplateRepository) UpdateField(ctx context.Context, field *models.DocumentTemplateField) error {
+	return r.db.WithContext(ctx).Save(field).Error
+}
+
+func (r *fnDocumentTemplateRepository) DeleteField(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&models.DocumentTemplateField{}, "id = ?", id).Error
+}
+
+func (r *fnDocumentTemplateRepository) GetFieldByID(ctx context.Context, id uuid.UUID) (*models.DocumentTemplateField, error) {
+	var field models.DocumentTemplateField
+	err := r.db.WithContext(ctx).First(&field, "id = ?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &field, nil
+}
+
+func (r *fnDocumentTemplateRepository) GetFieldsByTemplateID(ctx context.Context, templateID uuid.UUID) ([]models.DocumentTemplateField, error) {
+	var fields []models.DocumentTemplateField
+	err := r.db.WithContext(ctx).
+		Where("template_id = ?", templateID).
+		Order("created_at ASC").
+		Find(&fields).Error
+	return fields, err
+}
+
+func (r *fnDocumentTemplateRepository) DeleteFieldsByTemplateID(ctx context.Context, templateID uuid.UUID) error {
+	return r.db.WithContext(ctx).Where("template_id = ?", templateID).Delete(&models.DocumentTemplateField{}).Error
+}
+
+func (r *fnDocumentTemplateRepository) FieldExistsByKeyAndTemplateID(ctx context.Context, key string, templateID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&models.DocumentTemplateField{}).
+		Where("key = ? AND template_id = ?", key, templateID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *fnDocumentTemplateRepository) FieldExistsByKeyAndTemplateIDExcludingID(ctx context.Context, key string, templateID uuid.UUID, excludeID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&models.DocumentTemplateField{}).
+		Where("key = ? AND template_id = ? AND id != ?", key, templateID, excludeID).
+		Count(&count).Error
+	return count > 0, err
 }

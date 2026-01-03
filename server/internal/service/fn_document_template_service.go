@@ -35,13 +35,11 @@ func NewFNDocumentTemplateService(repo repository.FNDocumentTemplateRepository) 
 }
 
 func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID, req dto.DocumentTemplateCreateRequest) (*dto.DocumentTemplateResponse, error) {
-	// Validate code
 	code := strings.TrimSpace(req.Code)
 	if code == "" {
 		return nil, fmt.Errorf("template code is required")
 	}
 
-	// Check code uniqueness
 	exists, err := s.repo.ExistsByCode(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("error checking template code: %w", err)
@@ -50,7 +48,6 @@ func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID
 		return nil, fmt.Errorf("template with code '%s' already exists", code)
 	}
 
-	// Get document type
 	docType, err := s.repo.GetDocumentTypeByCode(ctx, req.DocTypeCode)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching document type: %w", err)
@@ -59,7 +56,6 @@ func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID
 		return nil, fmt.Errorf("document type with code '%s' not found", req.DocTypeCode)
 	}
 
-	// Get category (optional)
 	var categoryID *uint
 	if req.DocCategoryCode != nil && strings.TrimSpace(*req.DocCategoryCode) != "" {
 		catCode := strings.TrimSpace(*req.DocCategoryCode)
@@ -73,7 +69,6 @@ func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID
 		categoryID = &category.ID
 	}
 
-	// Parse UUIDs
 	fileID, err := uuid.Parse(req.FileID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid file_id: must be a valid UUID")
@@ -89,7 +84,6 @@ func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID
 		isActive = *req.IsActive
 	}
 
-	// Build template
 	template := &models.DocumentTemplate{
 		ID:             uuid.New(),
 		DocumentTypeID: docType.ID,
@@ -104,7 +98,6 @@ func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID
 		UpdatedAt:      now,
 	}
 
-	// Build fields
 	var fields []models.DocumentTemplateField
 	if len(req.Fields) > 0 {
 		seen := make(map[string]struct{})
@@ -146,12 +139,10 @@ func (s *fnDocumentTemplateService) Create(ctx context.Context, userID uuid.UUID
 		}
 	}
 
-	// Create in repository
 	if err := s.repo.Create(ctx, template, fields); err != nil {
 		return nil, fmt.Errorf("error creating template: %w", err)
 	}
 
-	// Fetch complete template with relations
 	created, err := s.repo.GetByID(ctx, template.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching created template: %w", err)
@@ -183,7 +174,6 @@ func (s *fnDocumentTemplateService) GetByCode(ctx context.Context, code string) 
 }
 
 func (s *fnDocumentTemplateService) List(ctx context.Context, params dto.DocumentTemplateListQuery) ([]dto.DocumentTemplateListItem, int64, error) {
-	// Normalize params
 	if params.Page < 1 {
 		params.Page = 1
 	}
@@ -199,10 +189,8 @@ func (s *fnDocumentTemplateService) List(ctx context.Context, params dto.Documen
 		return nil, 0, fmt.Errorf("error listing templates: %w", err)
 	}
 
-	// Build items
 	items := make([]dto.DocumentTemplateListItem, 0, len(templates))
 	for _, t := range templates {
-		// Count fields for each template
 		fieldsCount, _ := s.repo.CountFieldsByTemplateID(ctx, t.ID)
 
 		item := dto.DocumentTemplateListItem{
@@ -235,7 +223,6 @@ func (s *fnDocumentTemplateService) List(ctx context.Context, params dto.Documen
 }
 
 func (s *fnDocumentTemplateService) Update(ctx context.Context, id uuid.UUID, req dto.DocumentTemplateUpdateRequest) (*dto.DocumentTemplateResponse, error) {
-	// Get existing
 	template, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching template: %w", err)
@@ -244,11 +231,13 @@ func (s *fnDocumentTemplateService) Update(ctx context.Context, id uuid.UUID, re
 		return nil, fmt.Errorf("template not found")
 	}
 
-	// Apply updates
+	now := time.Now().UTC()
+
+	// update template fields
 	if req.Code != nil {
 		code := strings.TrimSpace(*req.Code)
 		if code != "" && code != template.Code {
-			exists, err := s.repo.ExistsByCode(ctx, code)
+			exists, err := s.repo.ExistsByCodeExcludingID(ctx, code, id)
 			if err != nil {
 				return nil, fmt.Errorf("error checking code: %w", err)
 			}
@@ -283,19 +272,133 @@ func (s *fnDocumentTemplateService) Update(ctx context.Context, id uuid.UUID, re
 		template.IsActive = *req.IsActive
 	}
 
-	template.UpdatedAt = time.Now().UTC()
+	template.UpdatedAt = now
 
 	if err := s.repo.Update(ctx, template); err != nil {
 		return nil, fmt.Errorf("error updating template: %w", err)
 	}
 
-	// Fetch updated
+	// process fields if provided
+	if req.Fields != nil {
+		if err := s.processFieldsUpdate(ctx, template.ID, req.Fields, now); err != nil {
+			return nil, err
+		}
+	}
+
 	updated, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching updated template: %w", err)
 	}
 
 	return s.toResponse(updated), nil
+}
+
+func (s *fnDocumentTemplateService) processFieldsUpdate(ctx context.Context, templateID uuid.UUID, fields []dto.DocumentTemplateFieldUpdateRequest, now time.Time) error {
+	seenKeys := make(map[string]struct{})
+
+	for _, f := range fields {
+		key := strings.TrimSpace(f.Key)
+		if key == "" {
+			return fmt.Errorf("field key is required")
+		}
+
+		if _, ok := seenKeys[key]; ok {
+			return fmt.Errorf("duplicate field key in request: '%s'", key)
+		}
+		seenKeys[key] = struct{}{}
+
+		label := strings.TrimSpace(f.Label)
+		if label == "" {
+			return fmt.Errorf("field label is required for key '%s'", key)
+		}
+
+		fieldType := "text"
+		if f.FieldType != nil && strings.TrimSpace(*f.FieldType) != "" {
+			fieldType = strings.TrimSpace(*f.FieldType)
+		}
+
+		required := false
+		if f.Required != nil {
+			required = *f.Required
+		}
+
+		// delete field
+		if f.Delete != nil && *f.Delete {
+			if f.ID != nil && *f.ID != "" {
+				fieldID, err := uuid.Parse(*f.ID)
+				if err != nil {
+					return fmt.Errorf("invalid field id for deletion")
+				}
+				if err := s.repo.DeleteField(ctx, fieldID); err != nil {
+					return fmt.Errorf("error deleting field: %w", err)
+				}
+			}
+			continue
+		}
+
+		// update existing field
+		if f.ID != nil && *f.ID != "" {
+			fieldID, err := uuid.Parse(*f.ID)
+			if err != nil {
+				return fmt.Errorf("invalid field id")
+			}
+
+			existingField, err := s.repo.GetFieldByID(ctx, fieldID)
+			if err != nil {
+				return fmt.Errorf("error fetching field: %w", err)
+			}
+			if existingField == nil {
+				return fmt.Errorf("field with id '%s' not found", *f.ID)
+			}
+
+			// check key uniqueness excluding current field
+			if key != existingField.Key {
+				exists, err := s.repo.FieldExistsByKeyAndTemplateIDExcludingID(ctx, key, templateID, fieldID)
+				if err != nil {
+					return fmt.Errorf("error checking field key: %w", err)
+				}
+				if exists {
+					return fmt.Errorf("field with key '%s' already exists in this template", key)
+				}
+			}
+
+			existingField.Key = key
+			existingField.Label = label
+			existingField.FieldType = fieldType
+			existingField.Required = required
+			existingField.UpdatedAt = now
+
+			if err := s.repo.UpdateField(ctx, existingField); err != nil {
+				return fmt.Errorf("error updating field: %w", err)
+			}
+		} else {
+			// create new field
+			exists, err := s.repo.FieldExistsByKeyAndTemplateID(ctx, key, templateID)
+			if err != nil {
+				return fmt.Errorf("error checking field key: %w", err)
+			}
+			if exists {
+				return fmt.Errorf("field with key '%s' already exists in this template", key)
+			}
+
+			newField := &models.DocumentTemplateField{
+				ID:         uuid.New(),
+				TemplateID: templateID,
+				Key:        key,
+				Label:      label,
+				FieldType:  fieldType,
+				Required:   required,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+
+			if err := s.repo.CreateField(ctx, newField); err != nil {
+				return fmt.Errorf("error creating field: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *fnDocumentTemplateService) Enable(ctx context.Context, id uuid.UUID) error {
@@ -334,7 +437,6 @@ func (s *fnDocumentTemplateService) Delete(ctx context.Context, id uuid.UUID) er
 	return s.repo.Delete(ctx, id)
 }
 
-// toResponse converts a model to DTO response
 func (s *fnDocumentTemplateService) toResponse(t *models.DocumentTemplate) *dto.DocumentTemplateResponse {
 	if t == nil {
 		return nil
@@ -356,6 +458,7 @@ func (s *fnDocumentTemplateService) toResponse(t *models.DocumentTemplate) *dto.
 			Name:     t.DocumentType.Name,
 			IsActive: t.DocumentType.IsActive,
 		},
+		Fields: make([]dto.DocumentTemplateFieldResponse, 0),
 	}
 
 	if t.Category != nil {
@@ -367,17 +470,16 @@ func (s *fnDocumentTemplateService) toResponse(t *models.DocumentTemplate) *dto.
 		}
 	}
 
-	if len(t.Fields) > 0 {
-		resp.Fields = make([]dto.DocumentTemplateFieldResponse, 0, len(t.Fields))
-		for _, f := range t.Fields {
-			resp.Fields = append(resp.Fields, dto.DocumentTemplateFieldResponse{
-				ID:        f.ID,
-				Key:       f.Key,
-				Label:     f.Label,
-				FieldType: f.FieldType,
-				Required:  f.Required,
-			})
-		}
+	for _, f := range t.Fields {
+		resp.Fields = append(resp.Fields, dto.DocumentTemplateFieldResponse{
+			ID:        f.ID,
+			Key:       f.Key,
+			Label:     f.Label,
+			FieldType: f.FieldType,
+			Required:  f.Required,
+			CreatedAt: f.CreatedAt,
+			UpdatedAt: f.UpdatedAt,
+		})
 	}
 
 	return resp

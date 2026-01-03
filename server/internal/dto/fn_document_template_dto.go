@@ -30,11 +30,22 @@ type DocumentTemplateFieldCreateRequest struct {
 
 // DocumentTemplateUpdateRequest represents the request to update a document template
 type DocumentTemplateUpdateRequest struct {
-	Code       *string `json:"code,omitempty" validate:"omitempty,min=1,max=50"`
-	Name       *string `json:"name,omitempty" validate:"omitempty,min=1,max=150"`
-	FileID     *string `json:"file_id,omitempty" validate:"omitempty,uuid"`
-	PrevFileID *string `json:"prev_file_id,omitempty" validate:"omitempty,uuid"`
-	IsActive   *bool   `json:"is_active,omitempty"`
+	Code       *string                               `json:"code,omitempty" validate:"omitempty,min=1,max=50"`
+	Name       *string                               `json:"name,omitempty" validate:"omitempty,min=1,max=150"`
+	FileID     *string                               `json:"file_id,omitempty" validate:"omitempty,uuid"`
+	PrevFileID *string                               `json:"prev_file_id,omitempty" validate:"omitempty,uuid"`
+	IsActive   *bool                                 `json:"is_active,omitempty"`
+	Fields     []DocumentTemplateFieldUpdateRequest  `json:"fields,omitempty"`
+}
+
+// DocumentTemplateFieldUpdateRequest represents a field in template update
+type DocumentTemplateFieldUpdateRequest struct {
+	ID        *string `json:"id,omitempty"`
+	Key       string  `json:"key" validate:"required,min=1,max=120"`
+	Label     string  `json:"label" validate:"required,min=1,max=200"`
+	FieldType *string `json:"field_type,omitempty"`
+	Required  *bool   `json:"required,omitempty"`
+	Delete    *bool   `json:"_delete,omitempty"`
 }
 
 // DocumentTemplateListQuery represents query parameters for listing templates
@@ -62,7 +73,7 @@ type DocumentTemplateResponse struct {
 	UpdatedAt    time.Time                       `json:"updated_at"`
 	DocumentType DocumentTypeEmbedded            `json:"document_type"`
 	Category     *DocumentCategoryEmbedded       `json:"category,omitempty"`
-	Fields       []DocumentTemplateFieldResponse `json:"fields,omitempty"`
+	Fields       []DocumentTemplateFieldResponse `json:"fields"`
 }
 
 // DocumentTypeEmbedded represents embedded document type info
@@ -88,6 +99,8 @@ type DocumentTemplateFieldResponse struct {
 	Label     string    `json:"label"`
 	FieldType string    `json:"field_type"`
 	Required  bool      `json:"required"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // DocumentTemplateListItem represents a template item in list response
