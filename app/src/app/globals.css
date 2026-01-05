@@ -68,6 +68,8 @@
   --input: #ececed;
   --input-background: #f8f9fa;
   --switch-background: #dadce0;
+  --font-sans: var(--font-poppins), system-ui, sans-serif;
+  --font-heading: var(--font-montserrat), system-ui, sans-serif;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --ring: #f16d4c;
@@ -191,7 +193,7 @@ html {
 body {
   background-color: var(--color-background);
   color: var(--color-text-primary);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-poppins), system-ui, sans-serif;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -204,7 +206,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
   font-weight: 700;
   line-height: 1.2;
   color: var(--color-text-primary);

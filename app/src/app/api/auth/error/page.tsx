@@ -1,7 +1,7 @@
 'use client';
 
 import type { FC, JSX } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Suspense } from 'react';
@@ -43,6 +43,8 @@ const errorMessages: Record<string, { title: string; description: string }> = {
 
 const AuthErrorContent: FC = (): JSX.Element => {
   const searchParams = useSearchParams();
+  const router = useRouter();
+
   const error = searchParams.get('error') ?? 'Default';
   const errorInfo = errorMessages[error] ?? errorMessages.Default;
 
@@ -100,7 +102,7 @@ const AuthErrorContent: FC = (): JSX.Element => {
 
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => router.push('/main')}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-transparent px-8 py-4 text-base font-semibold text-foreground transition-all duration-200 hover:border-primary hover:text-primary hover:bg-primary/5 active:scale-95"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
