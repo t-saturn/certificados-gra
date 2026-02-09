@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 type Response struct {
@@ -10,6 +10,15 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 	Error   *ErrorInfo  `json:"error,omitempty"`
 	Meta    *Meta       `json:"meta,omitempty"`
+}
+
+// ResponseFN represents the standard response structure for FN module
+type ResponseFN struct {
+	Status  string      `json:"status"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   *ErrorInfo  `json:"error,omitempty"`
+	Meta    *MetaFN     `json:"meta,omitempty"`
 }
 
 type ErrorInfo struct {
@@ -24,7 +33,27 @@ type Meta struct {
 	TotalPages int   `json:"total_pages,omitempty"`
 }
 
-func SuccessResponse(c *fiber.Ctx, message string, data interface{}) error {
+// MetaFN represents pagination and filter metadata for FN module responses
+type MetaFN struct {
+	// Fixed fields - always present
+	Total       int64  `json:"total"`
+	Page        int    `json:"page"`
+	PageSize    int    `json:"page_size"`
+	HasPrevPage bool   `json:"has_prev_page"`
+	HasNextPage bool   `json:"has_next_page"`
+	SearchQuery string `json:"search_query"`
+
+	// Variable filters - changes per endpoint
+	Others []MetaFNFilter `json:"others,omitempty"`
+}
+
+// MetaFNFilter represents a key-value pair for variable filters
+type MetaFNFilter struct {
+	Key   string      `json:"key"`
+	Value interface{} `json:"value"`
+}
+
+func SuccessResponse(c fiber.Ctx, message string, data interface{}) error {
 	return c.JSON(Response{
 		Status:  "success",
 		Message: message,
@@ -32,7 +61,7 @@ func SuccessResponse(c *fiber.Ctx, message string, data interface{}) error {
 	})
 }
 
-func SuccessWithMeta(c *fiber.Ctx, data interface{}, meta *Meta) error {
+func SuccessWithMeta(c fiber.Ctx, data interface{}, meta *Meta) error {
 	return c.JSON(Response{
 		Status: "success",
 		Data:   data,
@@ -40,7 +69,16 @@ func SuccessWithMeta(c *fiber.Ctx, data interface{}, meta *Meta) error {
 	})
 }
 
-func CreatedResponse(c *fiber.Ctx, message string, data interface{}) error {
+// SuccessWithMetaFN returns a success response with FN metadata (pagination + filters)
+func SuccessWithMetaFN(c fiber.Ctx, data interface{}, meta *MetaFN) error {
+	return c.JSON(ResponseFN{
+		Status: "success",
+		Data:   data,
+		Meta:   meta,
+	})
+}
+
+func CreatedResponse(c fiber.Ctx, message string, data interface{}) error {
 	return c.Status(fiber.StatusCreated).JSON(Response{
 		Status:  "success",
 		Message: message,
@@ -48,11 +86,11 @@ func CreatedResponse(c *fiber.Ctx, message string, data interface{}) error {
 	})
 }
 
-func NoContentResponse(c *fiber.Ctx) error {
+func NoContentResponse(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func ErrorResponse(c *fiber.Ctx, status int, code string, message string) error {
+func ErrorResponse(c fiber.Ctx, status int, code string, message string) error {
 	return c.Status(status).JSON(Response{
 		Status: "error",
 		Error: &ErrorInfo{
@@ -62,20 +100,32 @@ func ErrorResponse(c *fiber.Ctx, status int, code string, message string) error 
 	})
 }
 
-func BadRequestResponse(c *fiber.Ctx, code string, message string) error {
+func BadRequestResponse(c fiber.Ctx, code string, message string) error {
 	return ErrorResponse(c, fiber.StatusBadRequest, code, message)
 }
 
-func NotFoundResponse(c *fiber.Ctx, message string) error {
+func UnauthorizedResponse(c fiber.Ctx, message string) error {
+	return ErrorResponse(c, fiber.StatusUnauthorized, "UNAUTHORIZED", message)
+}
+
+func ForbiddenResponse(c fiber.Ctx, message string) error {
+	return ErrorResponse(c, fiber.StatusForbidden, "FORBIDDEN", message)
+}
+
+func NotFoundResponse(c fiber.Ctx, message string) error {
 	return ErrorResponse(c, fiber.StatusNotFound, "NOT_FOUND", message)
 }
 
-func InternalErrorResponse(c *fiber.Ctx, message string) error {
+func ConflictResponse(c fiber.Ctx, message string) error {
+	return ErrorResponse(c, fiber.StatusConflict, "CONFLICT", message)
+}
+
+func InternalErrorResponse(c fiber.Ctx, message string) error {
 	return ErrorResponse(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", message)
 }
 
 // ErrorHandler is the global error handler for Fiber
-func ErrorHandler(c *fiber.Ctx, err error) error {
+func ErrorHandler(c fiber.Ctx, err error) error {
 	code := fiber.StatusInternalServerError
 	message := "Internal Server Error"
 

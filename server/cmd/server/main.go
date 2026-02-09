@@ -8,13 +8,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 
+	"server/internal/app"
 	"server/internal/config"
-	"server/internal/handler"
-	"server/internal/repository"
-	"server/internal/router"
-	"server/internal/service"
+	"server/internal/middleware"
 	"server/pkg/shared/logger"
 )
 
@@ -22,78 +23,103 @@ func main() {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load configuration")
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Initialize logger
+	// Initialize logger (must be first after config)
 	logger.Init(cfg.Server.Environment)
 
-	log.Info().
-		Str("environment", cfg.Server.Environment).
-		Str("version", cfg.Server.Version).
-		Msg("Starting cert-server")
+	// Validate Keycloak configuration (required)
+	if !cfg.IsKeycloakConfigured() {
+		log.Fatal().
+			Str("KEYCLOAK_SSO_URL", cfg.Keycloak.SSOURL).
+			Str("KEYCLOAK_REALM", cfg.Keycloak.Realm).
+			Msg("Keycloak configuration is required")
+	}
 
-	// Initialize PostgreSQL
+	// Initialize Keycloak middleware (required)
+	if err := initKeycloak(cfg); err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize Keycloak")
+	}
+
+	// Initialize connections
+	conn := initConnections(cfg)
+
+	// Initialize application
+	application := app.New(app.Config{
+		DB:    conn.db,
+		Redis: conn.redis,
+		NATS:  conn.nats,
+	})
+
+	// Start server
+	go startServer(application, cfg)
+
+	// Wait for shutdown signal
+	waitForShutdown(application)
+}
+
+// initKeycloak initializes Keycloak authentication
+func initKeycloak(cfg *config.Config) error {
+	return middleware.InitKeycloakMiddleware(middleware.KeycloakConfig{
+		SSOURL: cfg.Keycloak.SSOURL,
+		Realm:  cfg.Keycloak.Realm,
+	})
+}
+
+// connections holds all database/service connections
+type connections struct {
+	db    *gorm.DB
+	redis *redis.Client
+	nats  *nats.Conn
+}
+
+// initConnections initializes all external connections
+func initConnections(cfg *config.Config) *connections {
+	conn := &connections{}
+
+	// PostgreSQL (required)
 	db, err := config.NewPostgresDB(cfg.Database)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to PostgreSQL")
 	}
+	conn.db = db
 	log.Info().Str("host", cfg.Database.Host).Msg("PostgreSQL connected")
 
-	// Initialize Redis (optional)
+	// Redis (optional)
 	redisClient, err := config.NewRedisClient(cfg.Redis)
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to connect to Redis, continuing without cache")
+		log.Warn().Err(err).Msg("Redis unavailable, continuing without cache")
 	} else {
+		conn.redis = redisClient.Client
 		log.Info().Str("host", cfg.Redis.Host).Msg("Redis connected")
 	}
 
-	// Initialize NATS (optional)
+	// NATS (optional)
 	natsClient, err := config.NewNATSClient(cfg.NATS)
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to connect to NATS, continuing without messaging")
+		log.Warn().Err(err).Msg("NATS unavailable, continuing without messaging")
 	} else {
+		conn.nats = natsClient.Conn
 		log.Info().Str("url", cfg.NATS.URL).Msg("NATS connected")
 	}
 
-	// Initialize repositories
-	userRepo := repository.NewUserRepository(db)
-	docTypeRepo := repository.NewDocumentTypeRepository(db)
+	return conn
+}
 
-	// Initialize services
-	userService := service.NewUserService(userRepo)
-	docTypeService := service.NewDocumentTypeService(docTypeRepo)
-
-	// Initialize handlers
-	userHandler := handler.NewUserHandler(userService)
-	docTypeHandler := handler.NewDocumentTypeHandler(docTypeService)
-
-	var healthHandler *handler.HealthHandler
-	if redisClient != nil && natsClient != nil {
-		healthHandler = handler.NewHealthHandler(db, redisClient.Client, natsClient.Conn)
-	} else if redisClient != nil {
-		healthHandler = handler.NewHealthHandler(db, redisClient.Client, nil)
-	} else if natsClient != nil {
-		healthHandler = handler.NewHealthHandler(db, nil, natsClient.Conn)
-	} else {
-		healthHandler = handler.NewHealthHandler(db, nil, nil)
-	}
-
-	// Initialize router
-	r := router.New(userHandler, docTypeHandler, healthHandler)
-	app := r.Setup("cert-server")
-
-	// Start server
+// startServer starts the HTTP server
+func startServer(application *app.App, cfg *config.Config) {
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
+	log.Info().Str("addr", addr).Msg("Server starting")
 
-	go func() {
-		log.Info().Str("addr", addr).Msg("Server starting")
-		if err := app.Listen(addr); err != nil {
-			log.Fatal().Err(err).Msg("Server failed to start")
-		}
-	}()
+	if err := application.Fiber().Listen(addr); err != nil {
+		log.Fatal().Err(err).Msg("Server failed")
+	}
+}
 
-	// Graceful shutdown
+// waitForShutdown waits for interrupt signal and performs graceful shutdown
+func waitForShutdown(application *app.App) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -103,26 +129,19 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Shutdown Fiber
-	if err := app.ShutdownWithContext(ctx); err != nil {
-		log.Error().Err(err).Msg("Server shutdown error")
-	}
+	// Use context for shutdown timeout tracking
+	done := make(chan struct{})
+	go func() {
+		if err := application.Shutdown(); err != nil {
+			log.Error().Err(err).Msg("Shutdown error")
+		}
+		close(done)
+	}()
 
-	// Close NATS
-	if natsClient != nil {
-		natsClient.Close()
+	select {
+	case <-done:
+		log.Info().Msg("Server shutdown complete")
+	case <-ctx.Done():
+		log.Warn().Msg("Shutdown timeout exceeded")
 	}
-
-	// Close Redis
-	if redisClient != nil {
-		_ = redisClient.Close()
-	}
-
-	// Close PostgreSQL
-	sqlDB, _ := db.DB()
-	if sqlDB != nil {
-		_ = sqlDB.Close()
-	}
-
-	log.Info().Msg("Server shutdown complete")
 }

@@ -1,0 +1,550 @@
+{
+  "name": "FN Module - Cert Server",
+  "version": "1",
+  "type": "collection",
+  "environments": [
+    {
+      "name": "local",
+      "variables": [
+        {"name": "base_url", "value": "http://localhost:8002", "enabled": true, "secret": false},
+        {"name": "api_prefix", "value": "/api/v1/fn", "enabled": true, "secret": false},
+        {"name": "token", "value": "", "enabled": true, "secret": true},
+        {"name": "template_id", "value": "", "enabled": true, "secret": false},
+        {"name": "template_code", "value": "", "enabled": true, "secret": false},
+        {"name": "event_id", "value": "", "enabled": true, "secret": false},
+        {"name": "event_code", "value": "", "enabled": true, "secret": false},
+        {"name": "document_id", "value": "", "enabled": true, "secret": false},
+        {"name": "serial_code", "value": "", "enabled": true, "secret": false},
+        {"name": "user_detail_id", "value": "", "enabled": true, "secret": false}
+      ]
+    },
+    {
+      "name": "production",
+      "variables": [
+        {"name": "base_url", "value": "https://api.example.com", "enabled": true, "secret": false},
+        {"name": "api_prefix", "value": "/api/v1/fn", "enabled": true, "secret": false},
+        {"name": "token", "value": "", "enabled": true, "secret": true},
+        {"name": "template_id", "value": "", "enabled": true, "secret": false},
+        {"name": "template_code", "value": "", "enabled": true, "secret": false},
+        {"name": "event_id", "value": "", "enabled": true, "secret": false},
+        {"name": "event_code", "value": "", "enabled": true, "secret": false},
+        {"name": "document_id", "value": "", "enabled": true, "secret": false},
+        {"name": "serial_code", "value": "", "enabled": true, "secret": false},
+        {"name": "user_detail_id", "value": "", "enabled": true, "secret": false}
+      ]
+    }
+  ],
+  "items": [
+    {
+      "name": "Document Templates",
+      "type": "folder",
+      "items": [
+        {
+          "name": "List Templates",
+          "type": "http",
+          "seq": 1,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/document-templates",
+            "params": [
+              {"name": "page", "value": "1", "enabled": true},
+              {"name": "page_size", "value": "10", "enabled": true},
+              {"name": "q", "value": "", "enabled": false},
+              {"name": "is_active", "value": "true", "enabled": false},
+              {"name": "type_code", "value": "", "enabled": false},
+              {"name": "category_code", "value": "", "enabled": false}
+            ],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "List document templates with filters and pagination.\n\nQuery Parameters:\n- page: Page number (default: 1)\n- page_size: Items per page (default: 10, max: 100)\n- q: Search by name or code\n- is_active: Filter by active status\n- type_code: Filter by document type code\n- category_code: Filter by category code"
+        },
+        {
+          "name": "Get Template by ID",
+          "type": "http",
+          "seq": 2,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Get document template by ID with nested relations (document_type, category, fields)."
+        },
+        {
+          "name": "Get Template by Code",
+          "type": "http",
+          "seq": 3,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/document-templates/code/{{template_code}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Get document template by code with nested relations."
+        },
+        {
+          "name": "Create Template",
+          "type": "http",
+          "seq": 4,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/document-templates",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"code\": \"CERT-PART-001\",\n  \"name\": \"Certificado de Participación\",\n  \"doc_type_code\": \"CERTIFICADO\",\n  \"doc_category_code\": \"PARTICIPACION\",\n  \"file_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"prev_file_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"is_active\": true,\n  \"fields\": [\n    {\n      \"key\": \"nombre_participante\",\n      \"label\": \"Nombre del Participante\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"dni\",\n      \"label\": \"Documento de Identidad\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"fecha_evento\",\n      \"label\": \"Fecha del Evento\",\n      \"field_type\": \"date\",\n      \"required\": true\n    },\n    {\n      \"key\": \"nombre_evento\",\n      \"label\": \"Nombre del Evento\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"horas\",\n      \"label\": \"Horas Académicas\",\n      \"field_type\": \"number\",\n      \"required\": false\n    }\n  ]\n}"
+            }
+          },
+          "script": {
+            "postResponse": "if (res.body.data && res.body.data.id) {\n  bru.setVar('template_id', res.body.data.id);\n  bru.setVar('template_code', res.body.data.code);\n}"
+          },
+          "docs": "Create a new document template with fields.\n\nRequired fields:\n- code: Unique template code\n- name: Template name\n- doc_type_code: Document type code\n- file_id: UUID of the template file\n- prev_file_id: UUID of the preview file\n\nOptional fields:\n- doc_category_code: Category code\n- is_active: Active status (default: true)\n- fields: Array of template fields"
+        },
+        {
+          "name": "Update Template",
+          "type": "http",
+          "seq": 5,
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"name\": \"Certificado de Participación (Actualizado)\",\n  \"is_active\": true,\n  \"fields\": [\n    {\n      \"id\": \"existing-field-uuid\",\n      \"key\": \"nombre_participante\",\n      \"label\": \"Nombre Completo del Participante\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"institucion\",\n      \"label\": \"Institución\",\n      \"field_type\": \"text\",\n      \"required\": false\n    },\n    {\n      \"id\": \"field-to-delete-uuid\",\n      \"key\": \"old_field\",\n      \"label\": \"Campo a Eliminar\",\n      \"_delete\": true\n    }\n  ]\n}"
+            }
+          },
+          "docs": "Update document template and its fields.\n\nField operations:\n- Update existing: Include \"id\" field\n- Create new: Omit \"id\" field\n- Delete: Include \"id\" and \"_delete\": true"
+        },
+        {
+          "name": "Enable Template",
+          "type": "http",
+          "seq": 6,
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}/enable",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Enable a document template (set is_active to true)."
+        },
+        {
+          "name": "Disable Template",
+          "type": "http",
+          "seq": 7,
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}/disable",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Disable a document template (set is_active to false)."
+        },
+        {
+          "name": "Delete Template",
+          "type": "http",
+          "seq": 8,
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Delete a document template and its fields."
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "type": "folder",
+      "items": [
+        {
+          "name": "List Events",
+          "type": "http",
+          "seq": 1,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/events",
+            "params": [
+              {"name": "page", "value": "1", "enabled": true},
+              {"name": "page_size", "value": "10", "enabled": true},
+              {"name": "q", "value": "", "enabled": false},
+              {"name": "is_public", "value": "", "enabled": false},
+              {"name": "status", "value": "", "enabled": false},
+              {"name": "template_id", "value": "", "enabled": false}
+            ],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "List events with filters and pagination.\n\nQuery Parameters:\n- page: Page number (default: 1)\n- page_size: Items per page (default: 10, max: 100)\n- q: Search by title or code\n- is_public: Filter by public status\n- status: Filter by status (SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED)\n- template_id: Filter by template ID"
+        },
+        {
+          "name": "Get Event by ID",
+          "type": "http",
+          "seq": 2,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/events/{{event_id}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Get event by ID with nested relations (template, schedules, participants)."
+        },
+        {
+          "name": "Get Event by Code",
+          "type": "http",
+          "seq": 3,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/events/code/{{event_code}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Get event by code with nested relations."
+        },
+        {
+          "name": "Create Event",
+          "type": "http",
+          "seq": 4,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/events",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"code\": \"EVT-2026-001\",\n  \"title\": \"Curso de Capacitación en Go\",\n  \"description\": \"Curso intensivo de Go para desarrolladores backend\",\n  \"location\": \"Sala de Conferencias A - Piso 3\",\n  \"is_public\": true,\n  \"certificate_series\": \"CERT-GO\",\n  \"organizational_units_path\": \"/OGTI/DSI\",\n  \"template_id\": \"{{template_id}}\",\n  \"max_participants\": 50,\n  \"registration_open_at\": \"2026-01-10T08:00:00Z\",\n  \"registration_close_at\": \"2026-01-15T18:00:00Z\",\n  \"status\": \"SCHEDULED\",\n  \"schedules\": [\n    {\n      \"start_datetime\": \"2026-01-20T09:00:00Z\",\n      \"end_datetime\": \"2026-01-20T13:00:00Z\"\n    },\n    {\n      \"start_datetime\": \"2026-01-21T09:00:00Z\",\n      \"end_datetime\": \"2026-01-21T13:00:00Z\"\n    },\n    {\n      \"start_datetime\": \"2026-01-22T09:00:00Z\",\n      \"end_datetime\": \"2026-01-22T13:00:00Z\"\n    }\n  ],\n  \"participants\": [\n    {\n      \"national_id\": \"12345678\",\n      \"first_name\": \"Juan Carlos\",\n      \"last_name\": \"Pérez García\",\n      \"email\": \"juan.perez@example.com\",\n      \"phone\": \"999888777\",\n      \"registration_source\": \"WEB\",\n      \"registration_status\": \"REGISTERED\",\n      \"attendance_status\": \"PENDING\"\n    },\n    {\n      \"national_id\": \"87654321\",\n      \"first_name\": \"María Elena\",\n      \"last_name\": \"García López\",\n      \"email\": \"maria.garcia@example.com\",\n      \"phone\": \"999777666\"\n    }\n  ]\n}"
+            }
+          },
+          "script": {
+            "postResponse": "if (res.body.data && res.body.data.id) {\n  bru.setVar('event_id', res.body.data.id);\n  bru.setVar('event_code', res.body.data.code);\n}"
+          },
+          "docs": "Create a new event with schedules and participants.\n\nRequired fields:\n- code: Unique event code\n- title: Event title\n- location: Event location\n\nOptional fields:\n- description: Event description\n- is_public: Public status (default: true)\n- certificate_series: Series for certificates\n- organizational_units_path: Organization path\n- template_id: Associated template UUID\n- max_participants: Maximum participants\n- registration_open_at: Registration start\n- registration_close_at: Registration end\n- status: Event status (default: SCHEDULED)\n- schedules: Array of schedules\n- participants: Array of participants (will create user_detail if not exists)"
+        },
+        {
+          "name": "Create Event (Minimal)",
+          "type": "http",
+          "seq": 5,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/events",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"code\": \"EVT-2026-002\",\n  \"title\": \"Taller de Docker\",\n  \"location\": \"Laboratorio de Cómputo\",\n  \"is_public\": true,\n  \"template_id\": \"{{template_id}}\"\n}"
+            }
+          },
+          "docs": "Create event with minimal required fields."
+        },
+        {
+          "name": "Update Event",
+          "type": "http",
+          "seq": 6,
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}{{api_prefix}}/events/{{event_id}}",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"title\": \"Curso de Capacitación en Go (Actualizado)\",\n  \"description\": \"Curso intensivo de Go para desarrolladores - Edición actualizada\",\n  \"max_participants\": 60,\n  \"status\": \"IN_PROGRESS\"\n}"
+            }
+          },
+          "docs": "Update event fields.\n\nAll fields are optional - only provided fields will be updated."
+        },
+        {
+          "name": "Delete Event",
+          "type": "http",
+          "seq": 7,
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}{{api_prefix}}/events/{{event_id}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Delete an event."
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "type": "folder",
+      "items": [
+        {
+          "name": "List Documents",
+          "type": "http",
+          "seq": 1,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/documents",
+            "params": [
+              {"name": "page", "value": "1", "enabled": true},
+              {"name": "page_size", "value": "10", "enabled": true},
+              {"name": "q", "value": "", "enabled": false},
+              {"name": "event_id", "value": "", "enabled": false},
+              {"name": "template_id", "value": "", "enabled": false},
+              {"name": "status", "value": "", "enabled": false}
+            ],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "List documents with filters and pagination.\n\nQuery Parameters:\n- page: Page number (default: 1)\n- page_size: Items per page (default: 10, max: 100)\n- q: Search by serial_code, name, or national_id\n- event_id: Filter by event ID\n- template_id: Filter by template ID\n- status: Filter by status (CREATED, PDF.PENDING, PDF.COMPLETED, PDF.FAILED, REJECTED, RENEW)"
+        },
+        {
+          "name": "Get Document by ID",
+          "type": "http",
+          "seq": 2,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/documents/{{document_id}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Get document by ID with all details (user_detail, event, template, pdfs)."
+        },
+        {
+          "name": "Get Document by Serial Code",
+          "type": "http",
+          "seq": 3,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/documents/serial/{{serial_code}}",
+            "params": [],
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {"type": "none"}
+          },
+          "docs": "Get document by serial code (useful for verification)."
+        },
+        {
+          "name": "Action - reg_doc",
+          "type": "http",
+          "seq": 4,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/documents/actions",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"action\": \"reg_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\n      \"user_detail_id\": \"{{user_detail_id}}\"\n    }\n  ]\n}"
+            }
+          },
+          "script": {
+            "postResponse": "if (res.body.data && res.body.data.results && res.body.data.results.length > 0) {\n  var firstResult = res.body.data.results[0];\n  bru.setVar('document_id', firstResult.document_id);\n  bru.setVar('serial_code', firstResult.serial_code);\n}"
+          },
+          "docs": "Register a single document for a participant.\n\nAction: reg_doc\n- Creates a new document record for the participant\n- Generates serial_code and verification_code\n- Sets initial status to CREATED\n- Fails if document already exists for this event+participant"
+        },
+        {
+          "name": "Action - sync_doc",
+          "type": "http",
+          "seq": 5,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/documents/actions",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"action\": \"sync_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\"user_detail_id\": \"00000000-0000-0000-0000-000000000001\"},\n    {\"user_detail_id\": \"00000000-0000-0000-0000-000000000002\"},\n    {\"user_detail_id\": \"00000000-0000-0000-0000-000000000003\"}\n  ]\n}"
+            }
+          },
+          "docs": "Sync documents for multiple participants.\n\nAction: sync_doc\n- Creates document if not exists\n- If exists, resets pdf_job_id to null\n- Useful for batch synchronization of all event participants"
+        },
+        {
+          "name": "Action - gen_doc",
+          "type": "http",
+          "seq": 6,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/documents/actions",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"action\": \"gen_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\n      \"user_detail_id\": \"{{user_detail_id}}\",\n      \"template_data\": {\n        \"nombre_participante\": \"JUAN CARLOS PÉREZ GARCÍA\",\n        \"dni\": \"12345678\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    }\n  ],\n  \"qr_config\": {\n    \"base_url\": \"https://verify.example.com/cert\",\n    \"qr_size_cm\": 2.5,\n    \"qr_margin_y_cm\": 1.0,\n    \"qr_page\": 0\n  }\n}"
+            }
+          },
+          "docs": "Generate PDF for a single document.\n\nAction: gen_doc\n- Requires document to exist (run sync_doc first)\n- Requires qr_config for QR code placement\n- Sends event to pdf-svc via NATS\n- Sets status to PDF.PENDING\n- Returns pdf_job_id for tracking\n\nValid source statuses: CREATED, RENEW, PDF.FAILED\n\nqr_config:\n- base_url: Base URL for verification link\n- qr_size_cm: QR code size in centimeters\n- qr_margin_y_cm: Bottom margin in centimeters\n- qr_page: Page index (0 = first page)"
+        },
+        {
+          "name": "Action - gen_doc (Multiple)",
+          "type": "http",
+          "seq": 7,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/documents/actions",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"action\": \"gen_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\n      \"user_detail_id\": \"00000000-0000-0000-0000-000000000001\",\n      \"template_data\": {\n        \"nombre_participante\": \"JUAN CARLOS PÉREZ GARCÍA\",\n        \"dni\": \"12345678\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    },\n    {\n      \"user_detail_id\": \"00000000-0000-0000-0000-000000000002\",\n      \"template_data\": {\n        \"nombre_participante\": \"MARÍA ELENA GARCÍA LÓPEZ\",\n        \"dni\": \"87654321\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    },\n    {\n      \"user_detail_id\": \"00000000-0000-0000-0000-000000000003\",\n      \"template_data\": {\n        \"nombre_participante\": \"PEDRO ANTONIO RODRIGUEZ SILVA\",\n        \"dni\": \"11223344\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    }\n  ],\n  \"qr_config\": {\n    \"base_url\": \"https://verify.example.com/cert\",\n    \"qr_size_cm\": 2.5,\n    \"qr_margin_y_cm\": 1.0,\n    \"qr_page\": 0\n  }\n}"
+            }
+          },
+          "docs": "Generate PDFs for multiple documents in batch.\n\nAll documents share the same:\n- pdf_job_id (for batch tracking)\n- qr_config (QR placement settings)\n\nEach participant has individual:\n- template_data (PDF field values)"
+        },
+        {
+          "name": "Action - doc_reject",
+          "type": "http",
+          "seq": 8,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/documents/actions",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"action\": \"doc_reject\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\"user_detail_id\": \"{{user_detail_id}}\"}\n  ]\n}"
+            }
+          },
+          "docs": "Reject documents (set status to REJECTED).\n\nAction: doc_reject\n- Marks document as rejected\n- Document cannot be used until renewed\n- Use doc_renew to allow re-generation\n\nValid source statuses: CREATED, PDF.PENDING, PDF.COMPLETED, PDF.FAILED, RENEW"
+        },
+        {
+          "name": "Action - doc_renew",
+          "type": "http",
+          "seq": 9,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/documents/actions",
+            "params": [],
+            "headers": [
+              {"name": "Content-Type", "value": "application/json", "enabled": true}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": {"token": "{{token}}"}
+            },
+            "body": {
+              "type": "json",
+              "json": "{\n  \"action\": \"doc_renew\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\"user_detail_id\": \"{{user_detail_id}}\"}\n  ]\n}"
+            }
+          },
+          "docs": "Renew documents (set status to RENEW).\n\nAction: doc_renew\n- Allows re-generation of PDF\n- Use after rejection or failed generation\n- After renew, can run gen_doc again\n\nValid source statuses: REJECTED, PDF.FAILED, PDF.COMPLETED"
+        }
+      ]
+    }
+  ]
+}

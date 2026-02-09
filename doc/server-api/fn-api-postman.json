@@ -1,0 +1,573 @@
+{
+  "info": {
+    "_postman_id": "fn-module-collection",
+    "name": "FN Module - Cert Server",
+    "description": "Functional module endpoints with nested data responses",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8002",
+      "type": "string"
+    },
+    {
+      "key": "api_prefix",
+      "value": "/api/v1/fn",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "template_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "template_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "event_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "event_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "document_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serial_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_detail_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Document Templates",
+      "item": [
+        {
+          "name": "List Templates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates?page=1&page_size=10&q=&is_active=true&type_code=&category_code=",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "page_size", "value": "10"},
+                {"key": "q", "value": "", "description": "Search by name or code"},
+                {"key": "is_active", "value": "true"},
+                {"key": "type_code", "value": "", "description": "Filter by document type code"},
+                {"key": "category_code", "value": "", "description": "Filter by category code"}
+              ]
+            },
+            "description": "List document templates with filters and pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Template by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates", "{{template_id}}"]
+            },
+            "description": "Get document template by ID with nested relations"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Template by Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates/code/{{template_code}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates", "code", "{{template_code}}"]
+            },
+            "description": "Get document template by code with nested relations"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Template",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('template_id', jsonData.data.id);",
+                  "    pm.collectionVariables.set('template_code', jsonData.data.code);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"CERT-PART-001\",\n  \"name\": \"Certificado de Participación\",\n  \"doc_type_code\": \"CERTIFICADO\",\n  \"doc_category_code\": \"PARTICIPACION\",\n  \"file_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"prev_file_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"is_active\": true,\n  \"fields\": [\n    {\n      \"key\": \"nombre_participante\",\n      \"label\": \"Nombre del Participante\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"dni\",\n      \"label\": \"Documento de Identidad\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"fecha_evento\",\n      \"label\": \"Fecha del Evento\",\n      \"field_type\": \"date\",\n      \"required\": true\n    },\n    {\n      \"key\": \"nombre_evento\",\n      \"label\": \"Nombre del Evento\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"horas\",\n      \"label\": \"Horas Académicas\",\n      \"field_type\": \"number\",\n      \"required\": false\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates"]
+            },
+            "description": "Create a new document template with fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Template",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Certificado de Participación (Actualizado)\",\n  \"is_active\": true,\n  \"fields\": [\n    {\n      \"id\": \"existing-field-uuid\",\n      \"key\": \"nombre_participante\",\n      \"label\": \"Nombre Completo del Participante\",\n      \"field_type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"key\": \"institucion\",\n      \"label\": \"Institución\",\n      \"field_type\": \"text\",\n      \"required\": false\n    },\n    {\n      \"id\": \"field-to-delete-uuid\",\n      \"key\": \"old_field\",\n      \"label\": \"Campo a Eliminar\",\n      \"_delete\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates", "{{template_id}}"]
+            },
+            "description": "Update document template and its fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Enable Template",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}/enable",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates", "{{template_id}}", "enable"]
+            },
+            "description": "Enable a document template"
+          },
+          "response": []
+        },
+        {
+          "name": "Disable Template",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}/disable",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates", "{{template_id}}", "disable"]
+            },
+            "description": "Disable a document template"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Template",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/document-templates/{{template_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["document-templates", "{{template_id}}"]
+            },
+            "description": "Delete a document template"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "List Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events?page=1&page_size=10&q=&is_public=&status=&template_id=",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "page_size", "value": "10"},
+                {"key": "q", "value": "", "description": "Search by title or code"},
+                {"key": "is_public", "value": "", "description": "Filter by public status"},
+                {"key": "status", "value": "", "description": "Filter by status (SCHEDULED, COMPLETED, etc)"},
+                {"key": "template_id", "value": "", "description": "Filter by template ID"}
+              ]
+            },
+            "description": "List events with filters and pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Event by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events/{{event_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events", "{{event_id}}"]
+            },
+            "description": "Get event by ID with nested relations (template, schedules, participants)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Event by Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events/code/{{event_code}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events", "code", "{{event_code}}"]
+            },
+            "description": "Get event by code with nested relations"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Event",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('event_id', jsonData.data.id);",
+                  "    pm.collectionVariables.set('event_code', jsonData.data.code);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"EVT-2026-001\",\n  \"title\": \"Curso de Capacitación en Go\",\n  \"description\": \"Curso intensivo de Go para desarrolladores backend\",\n  \"location\": \"Sala de Conferencias A - Piso 3\",\n  \"is_public\": true,\n  \"certificate_series\": \"CERT-GO\",\n  \"organizational_units_path\": \"/OGTI/DSI\",\n  \"template_id\": \"{{template_id}}\",\n  \"max_participants\": 50,\n  \"registration_open_at\": \"2026-01-10T08:00:00Z\",\n  \"registration_close_at\": \"2026-01-15T18:00:00Z\",\n  \"status\": \"SCHEDULED\",\n  \"schedules\": [\n    {\n      \"start_datetime\": \"2026-01-20T09:00:00Z\",\n      \"end_datetime\": \"2026-01-20T13:00:00Z\"\n    },\n    {\n      \"start_datetime\": \"2026-01-21T09:00:00Z\",\n      \"end_datetime\": \"2026-01-21T13:00:00Z\"\n    },\n    {\n      \"start_datetime\": \"2026-01-22T09:00:00Z\",\n      \"end_datetime\": \"2026-01-22T13:00:00Z\"\n    }\n  ],\n  \"participants\": [\n    {\n      \"national_id\": \"12345678\",\n      \"first_name\": \"Juan Carlos\",\n      \"last_name\": \"Pérez García\",\n      \"email\": \"juan.perez@example.com\",\n      \"phone\": \"999888777\",\n      \"registration_source\": \"WEB\",\n      \"registration_status\": \"REGISTERED\",\n      \"attendance_status\": \"PENDING\"\n    },\n    {\n      \"national_id\": \"87654321\",\n      \"first_name\": \"María Elena\",\n      \"last_name\": \"García López\",\n      \"email\": \"maria.garcia@example.com\",\n      \"phone\": \"999777666\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events"]
+            },
+            "description": "Create a new event with schedules and participants"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Event (Minimal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"EVT-2026-002\",\n  \"title\": \"Taller de Docker\",\n  \"location\": \"Laboratorio de Cómputo\",\n  \"is_public\": true,\n  \"template_id\": \"{{template_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events"]
+            },
+            "description": "Create event with minimal required fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Event",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Curso de Capacitación en Go (Actualizado)\",\n  \"description\": \"Curso intensivo de Go para desarrolladores - Edición actualizada\",\n  \"max_participants\": 60,\n  \"status\": \"IN_PROGRESS\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events/{{event_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events", "{{event_id}}"]
+            },
+            "description": "Update event fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Event",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/events/{{event_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["events", "{{event_id}}"]
+            },
+            "description": "Delete an event"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents?page=1&page_size=10&q=&event_id=&template_id=&status=",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "page_size", "value": "10"},
+                {"key": "q", "value": "", "description": "Search by serial_code, name, or national_id"},
+                {"key": "event_id", "value": "", "description": "Filter by event ID"},
+                {"key": "template_id", "value": "", "description": "Filter by template ID"},
+                {"key": "status", "value": "", "description": "Filter by status (CREATED, PDF.PENDING, PDF.COMPLETED, etc)"}
+              ]
+            },
+            "description": "List documents with filters and pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Document by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/{{document_id}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "{{document_id}}"]
+            },
+            "description": "Get document by ID with all details"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Document by Serial Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/serial/{{serial_code}}",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "serial", "{{serial_code}}"]
+            },
+            "description": "Get document by serial code (for verification)"
+          },
+          "response": []
+        },
+        {
+          "name": "Action: reg_doc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.results && jsonData.data.results.length > 0) {",
+                  "    var firstResult = jsonData.data.results[0];",
+                  "    pm.collectionVariables.set('document_id', firstResult.document_id);",
+                  "    pm.collectionVariables.set('serial_code', firstResult.serial_code);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reg_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\n      \"user_detail_id\": \"{{user_detail_id}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/actions",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "actions"]
+            },
+            "description": "Register a single document for a participant"
+          },
+          "response": []
+        },
+        {
+          "name": "Action: sync_doc",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"sync_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\"user_detail_id\": \"00000000-0000-0000-0000-000000000001\"},\n    {\"user_detail_id\": \"00000000-0000-0000-0000-000000000002\"},\n    {\"user_detail_id\": \"00000000-0000-0000-0000-000000000003\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/actions",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "actions"]
+            },
+            "description": "Sync documents for multiple participants (create if not exists, reset pdf_job_id if exists)"
+          },
+          "response": []
+        },
+        {
+          "name": "Action: gen_doc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.pdf_job_id) {",
+                  "    console.log('PDF Job ID: ' + jsonData.data.pdf_job_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"gen_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\n      \"user_detail_id\": \"{{user_detail_id}}\",\n      \"template_data\": {\n        \"nombre_participante\": \"JUAN CARLOS PÉREZ GARCÍA\",\n        \"dni\": \"12345678\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    }\n  ],\n  \"qr_config\": {\n    \"base_url\": \"https://verify.example.com/cert\",\n    \"qr_size_cm\": 2.5,\n    \"qr_margin_y_cm\": 1.0,\n    \"qr_page\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/actions",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "actions"]
+            },
+            "description": "Generate PDFs for documents (sends event to pdf-svc via NATS)"
+          },
+          "response": []
+        },
+        {
+          "name": "Action: gen_doc (Multiple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"gen_doc\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\n      \"user_detail_id\": \"00000000-0000-0000-0000-000000000001\",\n      \"template_data\": {\n        \"nombre_participante\": \"JUAN CARLOS PÉREZ GARCÍA\",\n        \"dni\": \"12345678\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    },\n    {\n      \"user_detail_id\": \"00000000-0000-0000-0000-000000000002\",\n      \"template_data\": {\n        \"nombre_participante\": \"MARÍA ELENA GARCÍA LÓPEZ\",\n        \"dni\": \"87654321\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    },\n    {\n      \"user_detail_id\": \"00000000-0000-0000-0000-000000000003\",\n      \"template_data\": {\n        \"nombre_participante\": \"PEDRO ANTONIO RODRIGUEZ SILVA\",\n        \"dni\": \"11223344\",\n        \"fecha_evento\": \"20 de Enero de 2026\",\n        \"nombre_evento\": \"Curso de Capacitación en Go\",\n        \"horas\": \"40\"\n      }\n    }\n  ],\n  \"qr_config\": {\n    \"base_url\": \"https://verify.example.com/cert\",\n    \"qr_size_cm\": 2.5,\n    \"qr_margin_y_cm\": 1.0,\n    \"qr_page\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/actions",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "actions"]
+            },
+            "description": "Generate PDFs for multiple documents in batch"
+          },
+          "response": []
+        },
+        {
+          "name": "Action: doc_reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"doc_reject\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\"user_detail_id\": \"{{user_detail_id}}\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/actions",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "actions"]
+            },
+            "description": "Reject documents (set status to REJECTED)"
+          },
+          "response": []
+        },
+        {
+          "name": "Action: doc_renew",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"doc_renew\",\n  \"event_id\": \"{{event_id}}\",\n  \"participants\": [\n    {\"user_detail_id\": \"{{user_detail_id}}\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/documents/actions",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["documents", "actions"]
+            },
+            "description": "Renew documents (set status to RENEW, allows re-generation)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

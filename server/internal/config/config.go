@@ -11,6 +11,7 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	NATS     NATSConfig
+	Keycloak KeycloakConfig
 }
 
 type ServerConfig struct {
@@ -40,6 +41,11 @@ type RedisConfig struct {
 type NATSConfig struct {
 	URL  string
 	Name string
+}
+
+type KeycloakConfig struct {
+	SSOURL string
+	Realm  string
 }
 
 func Load() (*Config, error) {
@@ -75,6 +81,10 @@ func Load() (*Config, error) {
 	viper.SetDefault("NATS_URL", "nats://localhost:4222")
 	viper.SetDefault("NATS_NAME", "cert-server")
 
+	// Keycloak (no defaults - required)
+	viper.SetDefault("KEYCLOAK_SSO_URL", "")
+	viper.SetDefault("KEYCLOAK_REALM", "")
+
 	_ = viper.ReadInConfig()
 
 	return &Config{
@@ -103,5 +113,14 @@ func Load() (*Config, error) {
 			URL:  viper.GetString("NATS_URL"),
 			Name: viper.GetString("NATS_NAME"),
 		},
+		Keycloak: KeycloakConfig{
+			SSOURL: viper.GetString("KEYCLOAK_SSO_URL"),
+			Realm:  viper.GetString("KEYCLOAK_REALM"),
+		},
 	}, nil
+}
+
+// IsKeycloakConfigured verifica si Keycloak está configurado
+func (c *Config) IsKeycloakConfigured() bool {
+	return c.Keycloak.SSOURL != "" && c.Keycloak.Realm != ""
 }

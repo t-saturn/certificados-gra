@@ -1,0 +1,1129 @@
+{
+  "info": {
+    "name": "DX API - Document Exchange",
+    "description": "API para gestión de documentos, eventos, usuarios y más",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "userDetailId",
+      "value": ""
+    },
+    {
+      "key": "documentTypeId",
+      "value": ""
+    },
+    {
+      "key": "documentCategoryId",
+      "value": ""
+    },
+    {
+      "key": "documentTemplateId",
+      "value": ""
+    },
+    {
+      "key": "documentId",
+      "value": ""
+    },
+    {
+      "key": "eventId",
+      "value": ""
+    },
+    {
+      "key": "eventParticipantId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "evaluationId",
+      "value": ""
+    },
+    {
+      "key": "studyMaterialId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"keycloak_id\": \"uuid-from-keycloak\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"updated@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Details",
+      "item": [
+        {
+          "name": "Get All User Details",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/user-details?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-details"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Detail by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/user-details/{{userDetailId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-details", "{{userDetailId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get User Detail by DNI",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/user-details/dni/12345678",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-details", "dni", "12345678"]
+            }
+          }
+        },
+        {
+          "name": "Create User Detail",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/user-details",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-details"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"national_id\": \"12345678\",\n  \"first_name\": \"Juan\",\n  \"last_name\": \"Pérez\",\n  \"email\": \"juan@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update User Detail",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/user-details/{{userDetailId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-details", "{{userDetailId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Juan Carlos\",\n  \"last_name\": \"Pérez García\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User Detail",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/user-details/{{userDetailId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-details", "{{userDetailId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Document Types",
+      "item": [
+        {
+          "name": "Get All Document Types",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-types?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Active Document Types",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-types/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types", "active"]
+            }
+          }
+        },
+        {
+          "name": "Get Document Type by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-types/{{documentTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types", "{{documentTypeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Document Type by Code",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-types/code/CERT",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types", "code", "CERT"]
+            }
+          }
+        },
+        {
+          "name": "Create Document Type",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/document-types",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"CERT\",\n  \"name\": \"Certificado\",\n  \"description\": \"Certificado de participación\",\n  \"is_active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Document Type",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/document-types/{{documentTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types", "{{documentTypeId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Certificado Actualizado\",\n  \"is_active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Document Type",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/document-types/{{documentTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-types", "{{documentTypeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Document Categories",
+      "item": [
+        {
+          "name": "Get All Document Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-categories?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-categories"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Document Category by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-categories/{{documentCategoryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-categories", "{{documentCategoryId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Categories by Document Type",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-categories/document-type/{{documentTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-categories", "document-type", "{{documentTypeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Document Category",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/document-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-categories"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"document_type_id\": \"{{documentTypeId}}\",\n  \"name\": \"Categoría A\",\n  \"description\": \"Descripción de la categoría\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Document Category",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/document-categories/{{documentCategoryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-categories", "{{documentCategoryId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Categoría Actualizada\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Document Category",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/document-categories/{{documentCategoryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-categories", "{{documentCategoryId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Document Templates",
+      "item": [
+        {
+          "name": "Get All Document Templates",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Active Document Templates",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates", "active"]
+            }
+          }
+        },
+        {
+          "name": "Get Document Template by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates/{{documentTemplateId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates", "{{documentTemplateId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Templates by Document Type",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates/document-type/{{documentTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates", "document-type", "{{documentTypeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Document Template",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"document_type_id\": \"{{documentTypeId}}\",\n  \"category_id\": 1,\n  \"name\": \"Plantilla Certificado\",\n  \"content\": \"<html>...</html>\",\n  \"is_active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Document Template",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates/{{documentTemplateId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates", "{{documentTemplateId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plantilla Actualizada\",\n  \"is_active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Document Template",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/document-templates/{{documentTemplateId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["document-templates", "{{documentTemplateId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Get All Documents",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Document by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents/{{documentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "{{documentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Document by Serial Code",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents/serial/DOC-2024-001",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "serial", "DOC-2024-001"]
+            }
+          }
+        },
+        {
+          "name": "Verify Document",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents/verify/ABC123XYZ",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "verify", "ABC123XYZ"]
+            }
+          }
+        },
+        {
+          "name": "Get Documents by Event",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents/event/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "event", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Documents by User Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/documents/user-detail/{{userDetailId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "user-detail", "{{userDetailId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Document",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_detail_id\": \"{{userDetailId}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"template_id\": \"{{documentTemplateId}}\",\n  \"serial_code\": \"DOC-2024-001\",\n  \"verification_code\": \"ABC123XYZ\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Document",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/documents/{{documentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "{{documentId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serial_code\": \"DOC-2024-002\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/documents/{{documentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "{{documentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Get All Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["events"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Public Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/public",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "public"]
+            }
+          }
+        },
+        {
+          "name": "Get Events by Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/status/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "status", "active"]
+            }
+          }
+        },
+        {
+          "name": "Get Event by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Event by Code",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/events/code/EVT-2024-001",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "code", "EVT-2024-001"]
+            }
+          }
+        },
+        {
+          "name": "Create Event",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["events"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"EVT-2024-001\",\n  \"name\": \"Curso de Capacitación\",\n  \"description\": \"Descripción del evento\",\n  \"start_date\": \"2024-03-01T09:00:00Z\",\n  \"end_date\": \"2024-03-01T17:00:00Z\",\n  \"status\": \"draft\",\n  \"is_public\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Event",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Curso Actualizado\",\n  \"status\": \"published\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Event",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Event Participants",
+      "item": [
+        {
+          "name": "Get Event Participant by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants/{{eventParticipantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants", "{{eventParticipantId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Participants by Event",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants/event/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants", "event", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Count Participants by Event",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants/event/{{eventId}}/count",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants", "event", "{{eventId}}", "count"]
+            }
+          }
+        },
+        {
+          "name": "Get Participations by User Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants/user-detail/{{userDetailId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants", "user-detail", "{{userDetailId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Event Participant",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"{{eventId}}\",\n  \"user_detail_id\": \"{{userDetailId}}\",\n  \"status\": \"registered\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Event Participant",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants/{{eventParticipantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants", "{{eventParticipantId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"attended\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Event Participant",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/event-participants/{{eventParticipantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["event-participants", "{{eventParticipantId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notification by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Notifications by User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/user/{{userId}}?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "user", "{{userId}}"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Notifications by User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/user/{{userId}}/unread",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "user", "{{userId}}", "unread"]
+            }
+          }
+        },
+        {
+          "name": "Count Unread Notifications",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/user/{{userId}}/unread/count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "user", "{{userId}}", "unread", "count"]
+            }
+          }
+        },
+        {
+          "name": "Create Notification",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"title\": \"Nueva notificación\",\n  \"message\": \"Tienes un nuevo documento disponible\",\n  \"type\": \"info\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}", "read"]
+            }
+          }
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/user/{{userId}}/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "user", "{{userId}}", "read-all"]
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Evaluations",
+      "item": [
+        {
+          "name": "Get All Evaluations",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/evaluations?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluations"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Evaluation by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/evaluations/{{evaluationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluations", "{{evaluationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Evaluations by User",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/evaluations/user/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluations", "user", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Evaluation",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/evaluations",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluations"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{userId}}\",\n  \"document_id\": \"{{documentId}}\",\n  \"title\": \"Evaluación Final\",\n  \"score\": 85.5,\n  \"max_score\": 100\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Evaluation",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/evaluations/{{evaluationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluations", "{{evaluationId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 90.0\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Evaluation",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/evaluations/{{evaluationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["evaluations", "{{evaluationId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Study Materials",
+      "item": [
+        {
+          "name": "Get All Study Materials",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/study-materials?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["study-materials"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Study Material by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/study-materials/{{studyMaterialId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["study-materials", "{{studyMaterialId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Study Material",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/study-materials",
+              "host": ["{{baseUrl}}"],
+              "path": ["study-materials"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Guía de Estudio\",\n  \"description\": \"Material de apoyo para el curso\",\n  \"content\": \"Contenido del material...\",\n  \"type\": \"article\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Study Material",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/study-materials/{{studyMaterialId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["study-materials", "{{studyMaterialId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Guía de Estudio Actualizada\",\n  \"content\": \"Contenido actualizado...\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Study Material",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/study-materials/{{studyMaterialId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["study-materials", "{{studyMaterialId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
